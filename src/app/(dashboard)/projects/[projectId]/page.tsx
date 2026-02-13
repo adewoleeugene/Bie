@@ -198,7 +198,8 @@ export default function ProjectDashboardPage() {
                                                 {activity.user.name} <span className="text-muted-foreground font-normal">
                                                     {activity.action === "STATUS_CHANGE" ? "changed status of" :
                                                         activity.action === "ASSIGNED" ? "assigned" :
-                                                            activity.action === "EDITED" ? "edited" : "commented on"}
+                                                            (activity.action === "EDITED" && (activity.metadata as any)?.isCreation) ? "created" :
+                                                                activity.action === "EDITED" ? "edited" : "commented on"}
                                                 </span> {activity.task.title}
                                             </p>
                                             <p className="text-xs text-muted-foreground">

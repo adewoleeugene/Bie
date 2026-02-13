@@ -11,6 +11,7 @@ import { useSprints } from "@/hooks/use-sprints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { BlockEditor } from "@/components/wiki/block-editor";
 import {
     Dialog,
     DialogContent,
@@ -48,7 +49,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
         resolver: zodResolver(createTaskSchema) as any,
         defaultValues: {
             title: "",
-            description: "",
+            description: undefined,
             status: "BACKLOG",
             priority: "P2",
             assigneeIds: [],
@@ -67,7 +68,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
         if (open) {
             form.reset({
                 title: "",
-                description: "",
+                description: undefined,
                 status: "BACKLOG",
                 priority: "P2",
                 assigneeIds: [],
@@ -145,11 +146,12 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                 <FormItem>
                                     <FormLabel>Description</FormLabel>
                                     <FormControl>
-                                        <Textarea
-                                            placeholder="Enter task description"
-                                            className="resize-none"
-                                            {...field}
-                                        />
+                                        <div className="min-h-[150px] border rounded-md p-1">
+                                            <BlockEditor
+                                                initialContent={field.value}
+                                                onChange={field.onChange}
+                                            />
+                                        </div>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

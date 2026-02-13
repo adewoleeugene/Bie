@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { createWikiPage } from "@/actions/wiki";
+import { useWikiTemplates } from "@/hooks/use-wiki";
 import { Plus } from "lucide-react";
 
 interface WikiPageDialogProps {
@@ -48,13 +49,25 @@ export function WikiPageDialog({
     const [title, setTitle] = useState("");
     const [selectedNamespace, setSelectedNamespace] = useState<WikiNamespace>(namespace);
     const [isTemplate, setIsTemplate] = useState(false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
+
+    const { data: templates } = useWikiTemplates(organizationId);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
+        let content = null;
+        if (selectedTemplateId && selectedTemplateId !== "none" && templates) {
+            const template = templates.find((t) => t.id === selectedTemplateId);
+            if (template) {
+                content = template.content;
+            }
+        }
+
         const result = await createWikiPage({
             title,
+            content,
             organizationId,
             projectId: selectedNamespace === WikiNamespace.PROJECT ? projectId : undefined,
             parentPageId,
@@ -68,6 +81,7 @@ export function WikiPageDialog({
             setOpen(false);
             setTitle("");
             setIsTemplate(false);
+            setSelectedTemplateId("none");
             if (onSuccess) {
                 onSuccess();
             }
@@ -92,7 +106,7 @@ export function WikiPageDialog({
                     <DialogHeader>
                         <DialogTitle>Create New Wiki Page</DialogTitle>
                         <DialogDescription>
-                            Create a new page in your wiki. You can add content after creating the page.
+                            Create a new page in your wiki. You can start blank or use a template.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -123,6 +137,29 @@ export function WikiPageDialog({
                                 </Select>
                             </div>
                         )}
+
+                        {!isTemplate && templates && templates.length > 0 && (
+                            <div className="space-y-2">
+                                <Label htmlFor="template">Use Template (Optional)</Label>
+                                <Select
+                                    value={selectedTemplateId}
+                                    onValueChange={setSelectedTemplateId}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a template" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None (Blank Page)</SelectItem>
+                                        {templates.map((template) => (
+                                            <SelectItem key={template.id} value={template.id}>
+                                                {template.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         <div className="flex items-center space-x-2">
                             <input
                                 type="checkbox"

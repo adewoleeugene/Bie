@@ -13,7 +13,7 @@ import {
     DeleteTaskInput,
     ReorderTaskInput,
 } from "@/lib/validators/task";
-import { Task } from "@prisma/client";
+import { Task, ActivityAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 // Helper to get user's organization
@@ -79,17 +79,27 @@ export async function createTask(
                 },
                 project: true,
             },
+        },
         });
 
-        revalidatePath("/");
-        return { success: true, data: task };
-    } catch (error) {
-        console.error("Create task error:", error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to create task",
-        };
-    }
+    await db.taskActivity.create({
+        data: {
+            taskId: task.id,
+            userId,
+            action: ActivityAction.EDITED, // Using EDITED for creation as CREATED is not in enum
+            metadata: { isCreation: true },
+        },
+    });
+
+    revalidatePath("/");
+    return { success: true, data: task };
+} catch (error) {
+    console.error("Create task error:", error);
+    return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create task",
+    };
+}
 }
 
 export async function updateTask(
@@ -161,6 +171,25 @@ export async function updateTask(
             },
         });
 
+        // Create activity log
+        let action: ActivityAction = ActivityAction.EDITED;
+
+        if (validated.status !== undefined && existingTask.status !== validated.status) {
+            action = ActivityAction.STATUS_CHANGE;
+        } else if (validated.assigneeIds !== undefined) {
+            action = ActivityAction.ASSIGNED;
+        }
+
+        // Only create activity if something significant changed (status, assignees, or generic edit)
+        // For strictness, we might want to skip if nothing changed, but here likely something did.
+        await db.taskActivity.create({
+            data: {
+                taskId: validated.id,
+                userId,
+                action,
+            },
+        });
+
         revalidatePath("/");
         return { success: true, data: task };
     } catch (error) {
@@ -211,7 +240,7 @@ export async function reorderTask(
 ): Promise<ActionResult> {
     try {
         const validated = reorderTaskSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId } = await getUserOrganization();
 
         // Verify task belongs to user's organization
         const existingTask = await db.task.findFirst({
@@ -232,6 +261,16 @@ export async function reorderTask(
                 sortOrder: validated.sortOrder,
             },
         });
+
+        if (existingTask.status !== validated.status) {
+            await db.taskActivity.create({
+                data: {
+                    taskId: validated.id,
+                    userId,
+                    action: ActivityAction.STATUS_CHANGE,
+                },
+            });
+        }
 
         revalidatePath("/");
         return { success: true, data: undefined };

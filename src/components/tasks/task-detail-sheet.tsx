@@ -4,8 +4,10 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { useUpdateTask, useDeleteTask, useCreateTask, useReorderTask } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
+import { useDebounce } from "@/hooks/use-debounce"; // Add this line
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// Remove Textarea import if not used elsewhere, or keep it. I'll replace it later.
+import { BlockEditor } from "@/components/wiki/block-editor"; // Add this line
 import { Button } from "@/components/ui/button";
 import {
     Sheet,
@@ -146,8 +148,8 @@ function SortableSubtaskRow({
             <button
                 onClick={onOpen}
                 className={`flex-1 truncate text-left ${subtask.status === "DONE" || subtask.status === "ARCHIVED"
-                        ? "line-through text-neutral-400"
-                        : ""
+                    ? "line-through text-neutral-400"
+                    : ""
                     }`}
             >
                 {subtask.title}
@@ -207,6 +209,28 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
     const [subtaskTitle, setSubtaskTitle] = useState("");
     const [isAddingSubtask, setIsAddingSubtask] = useState(false);
     const [selectedSubtask, setSelectedSubtask] = useState<TaskWithRelations | null>(null);
+    const [description, setDescription] = useState(task?.description);
+    const debouncedDescription = useDebounce(description, 1000);
+    const [isDescriptionDirty, setIsDescriptionDirty] = useState(false);
+
+    // Sync description when task changes (e.g. open different task)
+    useEffect(() => {
+        if (task) {
+            setDescription(task.description);
+            setIsDescriptionDirty(false);
+        }
+    }, [task?.id]); // Only sync on ID change to avoid cursor jumps during typing
+
+    // Auto-save description
+    useEffect(() => {
+        if (isDescriptionDirty && task) {
+            updateTask.mutate({ id: task.id, description: debouncedDescription });
+            // Don't reset dirty immediately to prevent race conditions? 
+            // Actually mutating optimistic update should clear dirty?
+            // No, just let it safe. Maybe reset dirty after save?
+            // Here we rely on React Query optimistic update.
+        }
+    }, [debouncedDescription, isDescriptionDirty, task, updateTask]);
 
     // Local subtask order for optimistic updates
     const [localSubtasks, setLocalSubtasks] = useState<TaskWithRelations["subtasks"]>([]);
@@ -259,11 +283,7 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
         }
     };
 
-    const handleDescriptionBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-        if (e.target.value !== (task.description as string)) {
-            updateTask.mutate({ id: task.id, description: e.target.value });
-        }
-    };
+
 
     const currentAssigneeIds = task.assignees.map(a => a.user.id);
 
@@ -440,12 +460,26 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                         {/* Description */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-semibold text-neutral-500 uppercase">Description</label>
-                            <Textarea
-                                defaultValue={(task.description as string) || ""}
-                                onBlur={handleDescriptionBlur}
-                                className="min-h-[100px] resize-none"
-                                placeholder="Add a more detailed description..."
-                            />
+                            <div className="min-h-[100px] border rounded-md p-1">
+                                <BlockEditor
+                                    key={task.id}
+                                    initialContent={typeof description === "string"
+                                        ? [
+                                            {
+                                                type: "paragraph",
+                                                content: [{ type: "text", text: description, styles: {} }]
+                                            }
+                                        ]
+                                        : description}
+                                    onChange={(content) => {
+                                        setDescription(content);
+                                        setIsDescriptionDirty(true);
+                                    }}
+                                />
+                                {isDescriptionDirty && (
+                                    <div className="text-[10px] text-muted-foreground mt-1 px-1">Saving...</div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Assignees */}

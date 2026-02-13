@@ -136,6 +136,15 @@ export function Sidebar({ projects }: SidebarProps) {
                                                     Backlog
                                                 </Button>
                                             </Link>
+                                            <Link href={`/projects/${project.id}/wiki`}>
+                                                <Button
+                                                    variant={pathname?.includes("/wiki") ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    className="h-8 w-full justify-start text-xs font-normal"
+                                                >
+                                                    Wiki
+                                                </Button>
+                                            </Link>
                                         </div>
                                     )}
                                 </div>
