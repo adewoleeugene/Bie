@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchDialog } from "@/components/search-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -30,10 +31,13 @@ export function TopNav({ user, organizationName }: TopNavProps) {
 
     return (
         <div className="flex h-16 items-center justify-between border-b bg-white px-6 dark:bg-neutral-950">
-            <div>
+            <div className="flex items-center gap-4">
                 <h2 className="text-sm font-medium text-neutral-500">
                     {organizationName}
                 </h2>
+                <div className="w-[300px]">
+                    <SearchDialog />
+                </div>
             </div>
 
             <DropdownMenu>

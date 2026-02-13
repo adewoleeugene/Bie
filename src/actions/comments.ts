@@ -80,24 +80,23 @@ export async function createComment(taskId: string, body: string) {
                     },
                 },
             },
-        },
         });
 
-    await db.taskActivity.create({
-        data: {
-            taskId,
-            userId,
-            action: ActivityAction.COMMENTED,
-        },
-    });
+        await db.taskActivity.create({
+            data: {
+                taskId,
+                userId,
+                action: ActivityAction.COMMENTED,
+            },
+        });
 
-    revalidatePath("/");
-    return { success: true, data: comment };
-} catch (error) {
-    console.error("Create comment error:", error);
-    return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create comment",
-    };
-}
+        revalidatePath("/");
+        return { success: true, data: comment };
+    } catch (error) {
+        console.error("Create comment error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to create comment",
+        };
+    }
 }

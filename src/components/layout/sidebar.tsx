@@ -145,6 +145,15 @@ export function Sidebar({ projects }: SidebarProps) {
                                                     Wiki
                                                 </Button>
                                             </Link>
+                                            <Link href={`/projects/${project.id}/calendar`}>
+                                                <Button
+                                                    variant={pathname?.includes("/calendar") ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    className="h-8 w-full justify-start text-xs font-normal"
+                                                >
+                                                    Calendar
+                                                </Button>
+                                            </Link>
                                         </div>
                                     )}
                                 </div>

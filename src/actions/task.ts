@@ -13,7 +13,7 @@ import {
     DeleteTaskInput,
     ReorderTaskInput,
 } from "@/lib/validators/task";
-import { Task, ActivityAction } from "@prisma/client";
+import { Task, ActivityAction, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 // Helper to get user's organization
@@ -79,27 +79,26 @@ export async function createTask(
                 },
                 project: true,
             },
-        },
         });
 
-    await db.taskActivity.create({
-        data: {
-            taskId: task.id,
-            userId,
-            action: ActivityAction.EDITED, // Using EDITED for creation as CREATED is not in enum
-            metadata: { isCreation: true },
-        },
-    });
+        await db.taskActivity.create({
+            data: {
+                taskId: task.id,
+                userId,
+                action: ActivityAction.EDITED, // Using EDITED for creation as CREATED is not in enum
+                metadata: { isCreation: true },
+            },
+        });
 
-    revalidatePath("/");
-    return { success: true, data: task };
-} catch (error) {
-    console.error("Create task error:", error);
-    return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create task",
-    };
-}
+        revalidatePath("/");
+        return { success: true, data: task };
+    } catch (error) {
+        console.error("Create task error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to create task",
+        };
+    }
 }
 
 export async function updateTask(
@@ -107,7 +106,7 @@ export async function updateTask(
 ): Promise<ActionResult<Task>> {
     try {
         const validated = updateTaskSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId } = await getUserOrganization(); // Added userId here
 
         // Verify task belongs to user's organization
         const existingTask = await db.task.findFirst({
@@ -283,7 +282,7 @@ export async function reorderTask(
     }
 }
 
-export async function getTasks(projectId?: string, options?: { sprintId?: string | null }) {
+export async function getTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
     try {
         const { organizationId } = await getUserOrganization();
 
@@ -291,8 +290,16 @@ export async function getTasks(projectId?: string, options?: { sprintId?: string
         // If sprintId is undefined, don't filter by sprintId
         // If filters are provided, combine them
 
-        const where: any = { organizationId };
-        if (projectId) where.projectId = projectId;
+        const where: Prisma.TaskWhereInput = { organizationId };
+
+        // Handle projectId filter: 
+        // If projectId is generic string, filter by it.
+        // If projectId is explicitly null, filter for tasks with NO project.
+        // If projectId is undefined, return ALL tasks (ignore project filter).
+        if (projectId !== undefined) {
+            where.projectId = projectId;
+        }
+
         if (options?.sprintId !== undefined) where.sprintId = options.sprintId;
 
         const tasks = await db.task.findMany({
