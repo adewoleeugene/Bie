@@ -1,0 +1,348 @@
+
+> christbase@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.85:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 502ms
+ GET /login 200 in 905ms (compile: 515ms, render: 390ms)
+ GET /login 200 in 236ms (compile: 26ms, render: 210ms)
+ GET /login 200 in 58ms (compile: 4ms, render: 54ms)
+ POST /login 303 in 489ms (compile: 8ms, render: 480ms)
+(node:44256) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC0rYXPF-1j9t_qUiIFwDmE-5Qpb10Na_qm4Cd2__7E8XNdeRhl2Cx3rz9rnqi_zTg&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile&authuser=0&prompt=none 302 in 5.9s (compile: 783ms, render: 5.1s)
+ GET / 307 in 919ms (compile: 129ms, render: 790ms)
+ GET /dashboard 404 in 860ms (compile: 804ms, render: 55ms)
+ GET /dashboard 404 in 75ms (compile: 8ms, render: 66ms)
+ GET / 307 in 3.0s (compile: 5ms, render: 3.0s)
+ GET /dashboard 404 in 44ms (compile: 4ms, render: 41ms)
+ GET /login 200 in 75ms (compile: 7ms, render: 68ms)
+ POST /login 303 in 591ms (compile: 6ms, render: 585ms)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC1U6bk9h7WCgjUOWBBHBVkQcREpV5T5we-an9_R2Dhai7yhn9bXshMNZmIjHpn08w&scope=email+profile+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&authuser=0&prompt=none 302 in 4.7s (compile: 4ms, render: 4.7s)
+ GET / 307 in 628ms (compile: 9ms, render: 619ms)
+ GET /dashboard 404 in 37ms (compile: 7ms, render: 31ms)
+ GET /login 200 in 520ms (compile: 231ms, render: 289ms)
+ GET /login 200 in 227ms (compile: 6ms, render: 220ms)
+ GET /login 200 in 210ms (compile: 12ms, render: 199ms)
+ GET /login 200 in 138ms (compile: 3ms, render: 134ms)
+ GET /login 200 in 169ms (compile: 3ms, render: 166ms)
+ GET /login 200 in 142ms (compile: 3ms, render: 139ms)
+ GET /login 200 in 132ms (compile: 4ms, render: 128ms)
+ GET /login 200 in 130ms (compile: 4ms, render: 126ms)
+ GET /login 200 in 136ms (compile: 3ms, render: 133ms)
+ GET /login 200 in 134ms (compile: 3ms, render: 132ms)
+ GET /login 200 in 140ms (compile: 2ms, render: 138ms)
+ GET /login 200 in 123ms (compile: 3ms, render: 120ms)
+ GET /login 200 in 107ms (compile: 2ms, render: 105ms)
+ GET /login 200 in 121ms (compile: 21ms, render: 100ms)
+ GET /login 200 in 99ms (compile: 2ms, render: 96ms)
+ GET /login 200 in 96ms (compile: 1966µs, render: 94ms)
+ GET /login 200 in 109ms (compile: 3ms, render: 106ms)
+ GET /login 200 in 108ms (compile: 2ms, render: 106ms)
+ GET /login 200 in 87ms (compile: 1737µs, render: 85ms)
+ GET /login 200 in 98ms (compile: 1703µs, render: 96ms)
+ GET /login 200 in 122ms (compile: 3ms, render: 120ms)
+ GET /login 200 in 114ms (compile: 1219µs, render: 113ms)
+ GET /login 200 in 125ms (compile: 1386µs, render: 124ms)
+ GET /login 200 in 109ms (compile: 6ms, render: 104ms)
+ GET /login 200 in 84ms (compile: 3ms, render: 82ms)
+ GET /login 200 in 52ms (compile: 1694µs, render: 50ms)
+ GET /login 200 in 35ms (compile: 4ms, render: 31ms)
+ GET /login 200 in 38ms (compile: 1657µs, render: 36ms)
+ GET /login 200 in 86ms (compile: 1772µs, render: 84ms)
+ GET /login 200 in 99ms (compile: 1336µs, render: 98ms)
+ GET /login 200 in 170ms (compile: 17ms, render: 153ms)
+ GET /login 200 in 139ms (compile: 1588µs, render: 137ms)
+ GET /login 200 in 141ms (compile: 3ms, render: 138ms)
+ GET /login 200 in 150ms (compile: 1428µs, render: 149ms)
+ GET /login 200 in 136ms (compile: 5ms, render: 131ms)
+ GET /login 200 in 85ms (compile: 1889µs, render: 83ms)
+ GET /login 200 in 68ms (compile: 3ms, render: 66ms)
+ GET /login 200 in 55ms (compile: 2ms, render: 52ms)
+ GET /login 200 in 41ms (compile: 1580µs, render: 40ms)
+ GET /login 200 in 27ms (compile: 5ms, render: 22ms)
+ GET /dashboard 200 in 8.3s (compile: 1532ms, render: 6.7s)
+ GET /dashboard 200 in 6.7s (compile: 4ms, render: 6.7s)
+ GET /dashboard 200 in 6.8s (compile: 1398µs, render: 6.8s)
+ GET /dashboard 200 in 6.9s (compile: 1810µs, render: 6.9s)
+ GET /dashboard 200 in 6.8s (compile: 9ms, render: 6.8s)
+ GET /dashboard 200 in 314ms (compile: 10ms, render: 304ms)
+ GET /dashboard 200 in 274ms (compile: 8ms, render: 266ms)
+ GET /dashboard 200 in 121ms (compile: 1944µs, render: 119ms)
+ GET /dashboard 200 in 155ms (compile: 2ms, render: 153ms)
+ GET /dashboard 200 in 192ms (compile: 2ms, render: 189ms)
+ GET /dashboard 200 in 7.0s (compile: 4ms, render: 7.0s)
+ GET /login 200 in 149ms (compile: 30ms, render: 119ms)
+ POST /login 303 in 829ms (compile: 28ms, render: 801ms)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC1N3bwwwq7CVckGqpjb8UMSlZNL8A8y97ScX35RevP390nuYktjP-a7Khk6zeZHJA&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&authuser=0&prompt=none 302 in 7.5s (compile: 626ms, render: 6.9s)
+○ Compiling / ...
+ GET / 307 in 11.0s (compile: 6.0s, render: 5.1s)
+ GET /dashboard 200 in 6.5s (compile: 68ms, render: 6.5s)
+ GET /login 200 in 876ms (compile: 83ms, render: 793ms)
+ GET /login 200 in 230ms (compile: 46ms, render: 184ms)
+ POST /login 303 in 506ms (compile: 8ms, render: 498ms)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC3U-j13fUK6BT00guzSG9lFJbbK9haxxut_XbTbbJG6NWcIah7yIgchrUBluSFaRA&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&authuser=0&prompt=none 302 in 4.7s (compile: 16ms, render: 4.7s)
+ GET / 307 in 600ms (compile: 6ms, render: 594ms)
+ GET /dashboard 200 in 4.6s (compile: 6ms, render: 4.5s)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 3.7s (compile: 3.6s, render: 68ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 56ms (compile: 9ms, render: 46ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 45ms (compile: 3ms, render: 42ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 43ms (compile: 1708µs, render: 41ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 49ms (compile: 2ms, render: 47ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 57ms (compile: 3ms, render: 54ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 32ms (compile: 3ms, render: 30ms)
+ POST /projects/cmljmawel0001gi2g7q6oiour/board 200 in 6.4s (compile: 22ms, render: 6.3s)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 168ms (compile: 24ms, render: 143ms)
+ POST /projects/cmljmawel0001gi2g7q6oiour/board 200 in 6.2s (compile: 6ms, render: 6.2s)
+✓ Compiled in 923ms
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 6.1s (compile: 538ms, render: 5.6s)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 5.5s (compile: 10ms, render: 5.4s)
+[getTasks] Fetched 0 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljmawel0001gi2g7q6oiour
+ POST /projects/cmljmawel0001gi2g7q6oiour/board 200 in 6.4s (compile: 4ms, render: 6.4s)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 222ms (compile: 54ms, render: 168ms)
+Get tasks error: Error: Unauthorized
+    at getUserOrganization (src/actions/task.ts:23:15)
+    at async getTasks (src/actions/task.ts:248:36)
+    at async DashboardPage (src/app/(dashboard)/dashboard/page.tsx:7:31)
+  21 |     const session = await auth();
+  22 |     if (!session?.user?.email) {
+> 23 |         throw new Error("Unauthorized");
+     |               ^
+  24 |     }
+  25 |
+  26 |     const user = await db.user.findUnique({
+Get projects error: Error: Unauthorized
+    at getUserOrganization (src/actions/project.ts:9:15)
+    at async getProjects (src/actions/project.ts:35:36)
+    at async DashboardPage (src/app/(dashboard)/dashboard/page.tsx:7:31)
+   7 |     const session = await auth();
+   8 |     if (!session?.user?.email) {
+>  9 |         throw new Error("Unauthorized");
+     |               ^
+  10 |     }
+  11 |
+  12 |     const user = await db.user.findUnique({
+ GET /dashboard 307 in 1722ms (compile: 843ms, render: 879ms)
+ GET /login 200 in 167ms (compile: 18ms, render: 149ms)
+ POST /login 303 in 4.3s (compile: 696ms, render: 3.6s)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC1C5xS4-idZBStXtr1ZQY0i9iT5qTfRtr9M5VBmPgHzsDA2LT9XUW_ZueYmz_niWQ&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=consent 302 in 5.6s (compile: 143ms, render: 5.4s)
+ GET / 307 in 2.6s (compile: 61ms, render: 2.5s)
+[getTasks] Fetched 20 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: ALL
+ GET /dashboard 200 in 5.7s (compile: 49ms, render: 5.7s)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 2.8s (compile: 346ms, render: 2.4s)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 1328ms (compile: 26ms, render: 1302ms)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 8.3s (compile: 172ms, render: 8.1s)
+○ Compiling /projects/[projectId]/table ...
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 13.4s (compile: 13.1s, render: 328ms)
+ GET /projects/cmljmawel0001gi2g7q6oiour/board 200 in 5.6s (compile: 35ms, render: 5.5s)
+[getTasks] Fetched 0 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljmawel0001gi2g7q6oiour
+ POST /projects/cmljmawel0001gi2g7q6oiour/board 200 in 4.1s (compile: 26ms, render: 4.1s)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 40ms (compile: 13ms, render: 27ms)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 2.2s (compile: 6ms, render: 2.2s)
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 64ms (compile: 11ms, render: 53ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 40ms (compile: 8ms, render: 32ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 36ms (compile: 8ms, render: 28ms)
+✓ Compiled in 451ms
+[31m[auth][error][0m JWTSessionError: Read more at https://errors.authjs.dev#jwtsessionerror
+[31m[auth][cause][0m: JWEInvalid: Invalid Compact JWE
+    at compactDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4128:15)
+    at jwtDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4164:215)
+    at Object.decode (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4489:202)
+    at Module.session (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:11925:39)
+    at AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12510:196)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12749:34)
+    at async DashboardLayout (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__92b77878._.js:343:21)
+[31m[auth][details][0m: {}
+[31m[auth][error][0m JWTSessionError: Read more at https://errors.authjs.dev#jwtsessionerror
+[31m[auth][cause][0m: JWEInvalid: Invalid Compact JWE
+    at compactDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4128:15)
+    at jwtDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4164:215)
+    at Object.decode (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4489:202)
+    at Module.session (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:11925:39)
+    at AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12510:196)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12749:34)
+    at async DashboardLayout (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__92b77878._.js:343:21)
+[31m[auth][details][0m: {}
+[31m[auth][error][0m JWTSessionError: Read more at https://errors.authjs.dev#jwtsessionerror
+[31m[auth][cause][0m: JWEInvalid: Invalid Compact JWE
+    at compactDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4128:15)
+    at jwtDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4164:215)
+    at Object.decode (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4489:202)
+    at Module.session (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:11925:39)
+    at AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12510:196)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12749:34)
+    at async DashboardLayout (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__92b77878._.js:343:21)
+[31m[auth][details][0m: {}
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 711ms (compile: 400ms, render: 311ms)
+[31m[auth][error][0m JWTSessionError: Read more at https://errors.authjs.dev#jwtsessionerror
+[31m[auth][cause][0m: JWEInvalid: Invalid Compact JWE
+    at compactDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4128:15)
+    at jwtDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4164:215)
+    at Object.decode (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4489:202)
+    at Module.session (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:11925:39)
+    at AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12510:196)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12749:34)
+    at async DashboardLayout (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__92b77878._.js:343:21)
+[31m[auth][details][0m: {}
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 212ms (compile: 5ms, render: 207ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 232ms (compile: 7ms, render: 225ms)
+[31m[auth][error][0m JWTSessionError: Read more at https://errors.authjs.dev#jwtsessionerror
+[31m[auth][cause][0m: JWEInvalid: Invalid Compact JWE
+    at compactDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4128:15)
+    at jwtDecrypt (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4164:215)
+    at Object.decode (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:4489:202)
+    at Module.session (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:11925:39)
+    at AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12510:196)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__2a4c5201._.js:12749:34)
+    at async DashboardLayout (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__92b77878._.js:343:21)
+[31m[auth][details][0m: {}
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 136ms (compile: 5ms, render: 131ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 87ms (compile: 3ms, render: 84ms)
+ GET /login 200 in 214ms (compile: 146ms, render: 69ms)
+ GET /login 200 in 19ms (compile: 1638µs, render: 17ms)
+✓ Compiled in 209ms
+ GET /login 200 in 304ms (compile: 159ms, render: 145ms)
+ GET /login 200 in 116ms (compile: 2ms, render: 114ms)
+ GET /login 200 in 138ms (compile: 11ms, render: 128ms)
+ GET /login 200 in 148ms (compile: 10ms, render: 138ms)
+ GET /login 200 in 214ms (compile: 3ms, render: 211ms)
+ GET /login 200 in 222ms (compile: 3ms, render: 219ms)
+ GET /login 200 in 220ms (compile: 1877µs, render: 219ms)
+ GET /login 200 in 191ms (compile: 8ms, render: 183ms)
+ GET /login 200 in 191ms (compile: 9ms, render: 182ms)
+ GET /login 200 in 148ms (compile: 7ms, render: 141ms)
+ GET /login 200 in 123ms (compile: 5ms, render: 118ms)
+ GET /login 200 in 121ms (compile: 1878µs, render: 120ms)
+ GET /login 200 in 163ms (compile: 3ms, render: 160ms)
+ GET /login 200 in 278ms (compile: 1775µs, render: 276ms)
+ GET /login 200 in 307ms (compile: 3ms, render: 304ms)
+ GET /login 200 in 282ms (compile: 6ms, render: 276ms)
+ GET /login 200 in 260ms (compile: 4ms, render: 256ms)
+ GET /login 200 in 235ms (compile: 3ms, render: 232ms)
+ GET /login 200 in 194ms (compile: 5ms, render: 189ms)
+ GET /login 200 in 71ms (compile: 6ms, render: 65ms)
+✓ Compiled in 404ms
+ GET /login 200 in 442ms (compile: 348ms, render: 93ms)
+ GET /signup 200 in 715ms (compile: 668ms, render: 47ms)
+ GET /login 200 in 60ms (compile: 4ms, render: 56ms)
+ GET /signup 200 in 1582ms (compile: 10ms, render: 1573ms)
+ GET /signup 200 in 33ms (compile: 6ms, render: 27ms)
+ GET /signup 200 in 689ms (compile: 4ms, render: 685ms)
+ GET /signup 200 in 2.5s (compile: 255ms, render: 2.3s)
+ GET /login 200 in 1018ms (compile: 132ms, render: 886ms)
+ GET /signup 200 in 5.4s (compile: 139ms, render: 5.2s)
+ POST /login 303 in 2.1s (compile: 404ms, render: 1670ms)
+ GET /api/auth/callback/google?code=4%2F0ASc3gC0eGT_6LoI1RdY6BvocS6xN4jvHXACHeY-ZFJxLS721zR9Q6D8co8M8P2f7ZO3BBQ&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid&authuser=0&prompt=none 302 in 22.9s (compile: 15.0s, render: 7.9s)
+ GET /signup 200 in 17.3s (compile: 631ms, render: 16.7s)
+ GET / 307 in 21.1s (compile: 17.7s, render: 3.5s)
+[getTasks] Fetched 20 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: ALL
+ GET /dashboard 200 in 14.2s (compile: 923ms, render: 13.3s)
+ GET /signup 200 in 13.0s (compile: 2.7s, render: 10.3s)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 12.6s (compile: 7.3s, render: 5.3s)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 628ms (compile: 53ms, render: 575ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/board 200 in 576ms (compile: 42ms, render: 534ms)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 7.0s (compile: 30ms, render: 7.0s)
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 12.6s (compile: 1052ms, render: 11.5s)
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 8.2s (compile: 74ms, render: 8.1s)
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 4.2s (compile: 148ms, render: 4.1s)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 4.0s (compile: 11ms, render: 4.0s)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 2.2s (compile: 33ms, render: 2.2s)
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 4.6s (compile: 71ms, render: 4.5s)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 2.3s (compile: 49ms, render: 2.2s)
+[getTasks] Fetched 7 tasks for Org: cmljmaui60000gi2g5i7nuzjb, Project: cmljn60350000sl2gfibj7h97
+ POST /projects/cmljn60350000sl2gfibj7h97/board 200 in 2.1s (compile: 10ms, render: 2.1s)
+ GET /signup 200 in 708ms (compile: 40ms, render: 667ms)
+ GET /projects/cmljn60350000sl2gfibj7h97/table 200 in 1177ms (compile: 203ms, render: 973ms)
+Signup error: Error [PrismaClientValidationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].user.create()` invocation in
+/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/ssr/[root-of-the-server]__c7fd9ef6._.js:235:152
+
+  232 // Hash password
+  233 const hashedPassword = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$bcryptjs$2f$index$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].hash(validated.password, 10);
+  234 // Create user
+→ 235 const user = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].user.create({
+        data: {
+          name: "Auth Test",
+          email: "authtest@example.com",
+          password: "$2b$10$MDgIA4D2y/kOsCPKIqXGL.T8LiBb5ym02TyQ4vLnQf25eTUvphvQK",
+          ~~~~~~~~
+      ?   id?: String,
+      ?   emailVerified?: DateTime | Null,
+      ?   image?: String | Null,
+      ?   createdAt?: DateTime,
+      ?   updatedAt?: DateTime,
+      ?   memberships?: OrganizationMemberCreateNestedManyWithoutUserInput,
+      ?   squadMembers?: SquadMemberCreateNestedManyWithoutUserInput,
+      ?   taskAssignees?: TaskAssigneeCreateNestedManyWithoutUserInput,
+      ?   comments?: CommentCreateNestedManyWithoutAuthorInput,
+      ?   activities?: TaskActivityCreateNestedManyWithoutUserInput,
+      ?   focusSessions?: FocusSessionCreateNestedManyWithoutUserInput,
+      ?   timeEntries?: TimeEntryCreateNestedManyWithoutUserInput,
+      ?   wikiPages?: WikiPageCreateNestedManyWithoutAuthorInput,
+      ?   wikiEdits?: WikiPageVersionCreateNestedManyWithoutEditedByInput,
+      ?   notifications?: NotificationCreateNestedManyWithoutUserInput,
+      ?   projectsLed?: ProjectCreateNestedManyWithoutLeadInput,
+      ?   accounts?: AccountCreateNestedManyWithoutUserInput,
+      ?   sessions?: SessionCreateNestedManyWithoutUserInput
+        }
+      })
+
+Unknown argument `password`. Available options are marked with ?.
+    at <unknown> (src/actions/auth.ts:30:36)
+    at async signUp (src/actions/auth.ts:30:22)
+  28 |
+  29 |         // Create user
+> 30 |         const user = await db.user.create({
+     |                                    ^
+  31 |             data: {
+  32 |                 name: validated.name,
+  33 |                 email: validated.email, {
+  clientVersion: '7.4.0'
+}
+ POST /signup 200 in 43s (compile: 122ms, render: 43s)
+ GET /login 200 in 918ms (compile: 127ms, render: 791ms)
+ GET /api/auth/providers 200 in 5.2s (compile: 2.8s, render: 2.4s)
+ GET /api/auth/csrf 200 in 440ms (compile: 111ms, render: 328ms)
+[31m[auth][error][0m CredentialsSignin: Read more at https://errors.authjs.dev#credentialssignin
+    at Module.callback (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_@auth_core_889cc73b._.js:4314:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async AuthInternal (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_@auth_core_889cc73b._.js:5148:24)
+    at async Auth (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_@auth_core_889cc73b._.js:5370:34)
+    at async AppRouteRouteModule.do (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.dev.js:5:37866)
+    at async AppRouteRouteModule.handle (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.dev.js:5:45156)
+    at async responseGenerator (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_next_c0d7f167._.js:17154:38)
+    at async AppRouteRouteModule.handleResponse (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.dev.js:1:191938)
+    at async handleResponse (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_next_c0d7f167._.js:17217:32)
+    at async Module.handler (/Users/christexfoundation/ChristBase/christbase/.next/dev/server/chunks/node_modules_next_c0d7f167._.js:17270:13)
+    at async DevServer.renderToResponseWithComponentsImpl (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/base-server.js:1442:9)
+    at async DevServer.renderPageComponent (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/base-server.js:1494:24)
+    at async DevServer.renderToResponseImpl (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/base-server.js:1544:32)
+    at async DevServer.pipeImpl (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/base-server.js:1038:25)
+    at async NextNodeServer.handleCatchallRenderRequest (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/next-server.js:395:17)
+    at async DevServer.handleRequestImpl (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/base-server.js:929:17)
+    at async /Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/dev/next-dev-server.js:387:20
+    at async Span.traceAsyncFn (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/trace/trace.js:157:20)
+    at async DevServer.handleRequest (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/dev/next-dev-server.js:383:24)
+    at async invokeRender (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/lib/router-server.js:248:21)
+    at async handleRequest (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/lib/router-server.js:447:24)
+    at async requestHandlerImpl (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/lib/router-server.js:496:13)
+    at async Server.requestListener (/Users/christexfoundation/ChristBase/christbase/node_modules/next/dist/server/lib/start-server.js:226:13)
+ POST /api/auth/callback/credentials? 200 in 4.3s (compile: 8ms, render: 4.3s)

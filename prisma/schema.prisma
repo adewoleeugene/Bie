@@ -1,0 +1,415 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum OrgPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum SprintStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  ARCHIVED
+}
+
+enum TaskPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum ActivityAction {
+  STATUS_CHANGE
+  ASSIGNED
+  EDITED
+  COMMENTED
+}
+
+enum FocusSessionType {
+  POMODORO
+  FREE
+}
+
+enum TimeEntrySource {
+  MANUAL
+  FOCUS_SESSION
+}
+
+enum WikiNamespace {
+  COMPANY
+  PROJECT
+}
+
+enum NotificationType {
+  MENTION
+  DUE_SOON
+  OVERDUE
+  ASSIGNED
+  COMMENT
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  plan      OrgPlan  @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       OrganizationMember[]
+  projects      Project[]
+  squads        Squad[]
+  tasks         Task[]
+  sprints       Sprint[]
+  wikiPages     WikiPage[]
+  notifications Notification[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships    OrganizationMember[]
+  squadMembers   SquadMember[]
+  taskAssignees  TaskAssignee[]
+  comments       Comment[]
+  activities     TaskActivity[]
+  focusSessions  FocusSession[]
+  timeEntries    TimeEntry[]
+  wikiPages      WikiPage[]       @relation("WikiPageAuthor")
+  wikiEdits      WikiPageVersion[] @relation("WikiPageEditor")
+  notifications  Notification[]
+  projectsLed    Project[]        @relation("ProjectLead")
+  accounts       Account[]
+  sessions       Session[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model OrganizationMember {
+  organizationId String
+  userId         String
+  role           OrgRole  @default(MEMBER)
+  joinedAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
+model Squad {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      SquadMember[]
+  projects     Project[]
+
+  @@index([organizationId])
+}
+
+model SquadMember {
+  squadId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  squad Squad @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([squadId, userId])
+  @@index([userId])
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  status         ProjectStatus @default(ACTIVE)
+  organizationId String
+  leadId         String?
+  squadId        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         User?        @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  squad        Squad?       @relation(fields: [squadId], references: [id], onDelete: SetNull)
+  sprints      Sprint[]
+  tasks        Task[]
+  wikiPages    WikiPage[]
+
+  @@index([organizationId])
+  @@index([squadId])
+}
+
+model Sprint {
+  id             String       @id @default(cuid())
+  name           String
+  goal           String?
+  startDate      DateTime
+  endDate        DateTime
+  status         SprintStatus @default(PLANNING)
+  retrospective  String?
+  organizationId String
+  projectId      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@index([organizationId])
+  @@index([projectId])
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  title          String
+  description    Json?
+  status         TaskStatus   @default(BACKLOG)
+  priority       TaskPriority @default(P2)
+  dueDate        DateTime?
+  startDate      DateTime?
+  estimatedHours Float?
+  labels         String[]     @default([])
+  sortOrder      Int          @default(0)
+  organizationId String
+  projectId      String?
+  sprintId       String?
+  parentTaskId   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sprint       Sprint?        @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  parentTask   Task?          @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks     Task[]         @relation("TaskSubtasks")
+  assignees    TaskAssignee[]
+  comments     Comment[]
+  activities   TaskActivity[]
+  focusSessions FocusSession[]
+  timeEntries  TimeEntry[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([sprintId])
+  @@index([status])
+  @@index([parentTaskId])
+}
+
+model TaskAssignee {
+  taskId     String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  taskId    String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskActivity {
+  id        String         @id @default(cuid())
+  taskId    String
+  userId    String
+  action    ActivityAction
+  metadata  Json?
+  createdAt DateTime       @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model FocusSession {
+  id            String           @id @default(cuid())
+  userId        String
+  taskId        String?
+  startedAt     DateTime
+  endedAt       DateTime?
+  duration      Int?
+  type          FocusSessionType @default(POMODORO)
+  pomodoroCount Int              @default(0)
+  notes         String?
+  completed     Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([taskId])
+}
+
+model TimeEntry {
+  id          String          @id @default(cuid())
+  userId      String
+  taskId      String
+  startedAt   DateTime
+  endedAt     DateTime?
+  duration    Int?
+  description String?
+  source      TimeEntrySource @default(MANUAL)
+  createdAt   DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([taskId])
+}
+
+model WikiPage {
+  id             String        @id @default(cuid())
+  title          String
+  content        Json?
+  namespace      WikiNamespace @default(COMPANY)
+  organizationId String
+  projectId      String?
+  parentPageId   String?
+  authorId       String
+  sortOrder      Int           @default(0)
+  template       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentPage   WikiPage?       @relation("WikiPageTree", fields: [parentPageId], references: [id], onDelete: SetNull)
+  childPages   WikiPage[]      @relation("WikiPageTree")
+  author       User            @relation("WikiPageAuthor", fields: [authorId], references: [id])
+  versions     WikiPageVersion[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([parentPageId])
+}
+
+model WikiPageVersion {
+  id         String   @id @default(cuid())
+  pageId     String
+  content    Json
+  editedById String
+  createdAt  DateTime @default(now())
+
+  page     WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  editedBy User     @relation("WikiPageEditor", fields: [editedById], references: [id])
+
+  @@index([pageId])
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  type           NotificationType
+  title          String
+  body           String?
+  linkUrl        String?
+  read           Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([organizationId])
+}
