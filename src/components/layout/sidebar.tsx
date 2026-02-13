@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FolderKanban, LayoutDashboard, Settings, Users } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen } from "lucide-react";
 
 interface Project {
     id: string;
@@ -55,6 +55,16 @@ export function Sidebar({ projects }: SidebarProps) {
                     >
                         <Users className="mr-2 h-4 w-4" />
                         Squads
+                    </Button>
+                </Link>
+
+                <Link href="/wiki">
+                    <Button
+                        variant={pathname === "/wiki" || pathname?.startsWith("/wiki/") ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Wiki
                     </Button>
                 </Link>
 
