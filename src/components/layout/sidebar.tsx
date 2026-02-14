@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen, Zap, Clock, Sun, Timer } from "lucide-react";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
 
@@ -79,6 +79,42 @@ export function Sidebar({ projects }: SidebarProps) {
                         Wiki
                     </Button>
                 </Link>
+
+                {/* Productivity Section */}
+                <div className="pt-4">
+                    <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        Productivity
+                    </h3>
+                    <div className="space-y-1">
+                        <Link href="/my-day">
+                            <Button
+                                variant={pathname === "/my-day" ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                            >
+                                <Sun className="mr-2 h-4 w-4" />
+                                My Day
+                            </Button>
+                        </Link>
+                        <Link href="/focus">
+                            <Button
+                                variant={pathname === "/focus" ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                            >
+                                <Zap className="mr-2 h-4 w-4" />
+                                Focus Sessions
+                            </Button>
+                        </Link>
+                        <Link href="/time-tracking">
+                            <Button
+                                variant={pathname === "/time-tracking" ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                            >
+                                <Clock className="mr-2 h-4 w-4" />
+                                Time Tracking
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
 
                 {/* Favorites & Recent */}
                 <div className="pt-2">

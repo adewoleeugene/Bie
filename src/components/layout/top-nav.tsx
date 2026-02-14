@@ -2,6 +2,7 @@
 
 import { SearchDialog } from "@/components/search-dialog";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -42,6 +43,9 @@ export function TopNav({ user, organizationName }: TopNavProps) {
             </div>
 
             <div className="flex items-center gap-2">
+                {/* Pomodoro Timer */}
+                <PomodoroTimer />
+
                 {/* Notification Bell */}
                 <NotificationBell />
 
