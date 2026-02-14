@@ -20,16 +20,15 @@ export function BlockEditor({ initialContent, onChange, editable = true }: Block
     });
 
     useEffect(() => {
-        if (!editable) {
-            editor.isEditable = false;
-        }
+        editor.isEditable = editable;
     }, [editable, editor]);
 
     return (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="min-h-[500px]">
             <BlockNoteView
                 editor={editor}
                 theme="light"
+                editable={editable}
                 onChange={() => {
                     if (onChange) {
                         onChange(editor.document);

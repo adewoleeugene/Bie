@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchDialog } from "@/components/search-dialog";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -40,36 +41,42 @@ export function TopNav({ user, organizationName }: TopNavProps) {
                 </div>
             </div>
 
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-3 rounded-lg p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-                        <div className="text-right">
-                            <p className="text-sm font-medium">{user.name}</p>
-                            <p className="text-xs text-neutral-500">{user.email}</p>
-                        </div>
-                        <Avatar>
-                            <AvatarImage src={user.image || undefined} alt={user.name || ""} />
-                            <AvatarFallback>{initials}</AvatarFallback>
-                        </Avatar>
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => signOut({ callbackUrl: "/login" })}
-                    >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign out
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+                {/* Notification Bell */}
+                <NotificationBell />
+
+                {/* User Menu */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-3 rounded-lg p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                            <div className="text-right">
+                                <p className="text-sm font-medium">{user.name}</p>
+                                <p className="text-xs text-neutral-500">{user.email}</p>
+                            </div>
+                            <Avatar>
+                                <AvatarImage src={user.image || undefined} alt={user.name || ""} />
+                                <AvatarFallback>{initials}</AvatarFallback>
+                            </Avatar>
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                            <User className="mr-2 h-4 w-4" />
+                            Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => signOut({ callbackUrl: "/login" })}
+                        >
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Sign out
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 }

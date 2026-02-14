@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useUpdateTask, useDeleteTask, useCreateTask, useReorderTask } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
-import { useDebounce } from "@/hooks/use-debounce"; // Add this line
+import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
-// Remove Textarea import if not used elsewhere, or keep it. I'll replace it later.
-import { BlockEditor } from "@/components/wiki/block-editor"; // Add this line
+import dynamic from "next/dynamic";
+const BlockEditor = dynamic(() => import("@/components/wiki/block-editor").then((mod) => mod.BlockEditor), { ssr: false });
 import { Button } from "@/components/ui/button";
 import {
     Sheet,
@@ -36,10 +36,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Trash2, Plus, X, GripVertical, ChevronRight } from "lucide-react";
+import { Clock, Trash2, Plus, X, GripVertical, ChevronRight, Maximize2, Hash } from "lucide-react";
 import { TaskStatus, TaskPriority } from "@prisma/client";
 import { TaskWithRelations } from "@/types/task";
 import { TaskComments } from "@/components/tasks/task-comments";
+import { useRouter } from "next/navigation";
 import {
     DndContext,
     closestCenter,
@@ -170,7 +171,7 @@ function SortableSubtaskRow({
 
             {/* Assignees */}
             <div className="flex -space-x-1 flex-shrink-0">
-                {subtask.assignees?.slice(0, 2).map((a) => (
+                {subtask.assignees?.slice(0, 2).map((a: any) => (
                     <Avatar key={a.user.id} className="h-5 w-5 border border-white">
                         <AvatarImage src={a.user.image || undefined} />
                         <AvatarFallback className="text-[8px]">
@@ -200,6 +201,7 @@ function SortableSubtaskRow({
 }
 
 export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetProps) {
+    const router = useRouter();
     const updateTask = useUpdateTask();
     const deleteTask = useDeleteTask();
     const createTask = useCreateTask();
@@ -219,21 +221,44 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
             setDescription(task.description);
             setIsDescriptionDirty(false);
         }
-    }, [task?.id]); // Only sync on ID change to avoid cursor jumps during typing
+    }, [task?.id, task?.description]); // Added task?.description for direct syncs
 
     // Auto-save description
     useEffect(() => {
         if (isDescriptionDirty && task) {
             updateTask.mutate({ id: task.id, description: debouncedDescription });
-            // Don't reset dirty immediately to prevent race conditions? 
-            // Actually mutating optimistic update should clear dirty?
-            // No, just let it safe. Maybe reset dirty after save?
-            // Here we rely on React Query optimistic update.
         }
     }, [debouncedDescription, isDescriptionDirty, task, updateTask]);
 
-    // Local subtask order for optimistic updates
     const [localSubtasks, setLocalSubtasks] = useState<TaskWithRelations["subtasks"]>([]);
+
+    const TEMPLATES = {
+        BUG: [
+            { type: "heading", content: [{ type: "text", text: "Steps to Reproduce", styles: { bold: true } }] },
+            { type: "bulletListItem", content: [{ type: "text", text: "1. ", styles: {} }] },
+            { type: "heading", content: [{ type: "text", text: "Expected Behavior", styles: { bold: true } }] },
+            { type: "paragraph", content: [{ type: "text", text: "Description of what was expected...", styles: {} }] },
+        ],
+        FEATURE: [
+            { type: "heading", content: [{ type: "text", text: "Problem Statement", styles: { bold: true } }] },
+            { type: "paragraph", content: [{ type: "text", text: "Why are we building this?", styles: {} }] },
+            { type: "heading", content: [{ type: "text", text: "Requirements", styles: { bold: true } }] },
+            { type: "checkListItem", content: [{ type: "text", text: "Frontend implementation", styles: {} }] },
+            { type: "checkListItem", content: [{ type: "text", text: "API endpoint development", styles: {} }] },
+        ],
+        MEETING: [
+            { type: "heading", content: [{ type: "text", text: "Agenda", styles: { bold: true } }] },
+            { type: "bulletListItem", content: [{ type: "text", text: "Topic A", styles: {} }] },
+            { type: "heading", content: [{ type: "text", text: "Action Items", styles: { bold: true } }] },
+            { type: "checkListItem", content: [{ type: "text", text: "Follow up with @team", styles: {} }] },
+        ]
+    };
+
+    const applyTemplate = (templateKey: keyof typeof TEMPLATES) => {
+        const content = TEMPLATES[templateKey];
+        setDescription(content);
+        setIsDescriptionDirty(true);
+    };
 
     // Sync local subtasks with task.subtasks
     useState(() => {
@@ -243,8 +268,8 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
     });
 
     // Update local subtasks when task changes
-    if (task?.subtasks && JSON.stringify(localSubtasks.map(s => s.id)) !== JSON.stringify(task.subtasks.map(s => s.id))) {
-        setLocalSubtasks([...task.subtasks].sort((a, b) => a.sortOrder - b.sortOrder));
+    if (task?.subtasks && JSON.stringify(localSubtasks.map((s: any) => s.id)) !== JSON.stringify(task.subtasks.map((s: any) => s.id))) {
+        setLocalSubtasks([...task.subtasks].sort((a: any, b: any) => a.sortOrder - b.sortOrder));
     }
 
     const sensors = useSensors(
@@ -285,11 +310,11 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
 
 
 
-    const currentAssigneeIds = task.assignees.map(a => a.user.id);
+    const currentAssigneeIds = task.assignees.map((a: any) => a.user.id);
 
     const toggleAssignee = (userId: string) => {
         const newAssignees = currentAssigneeIds.includes(userId)
-            ? currentAssigneeIds.filter(id => id !== userId)
+            ? currentAssigneeIds.filter((id: string) => id !== userId)
             : [...currentAssigneeIds, userId];
 
         updateTask.mutate({ id: task.id, assigneeIds: newAssignees });
@@ -319,8 +344,8 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
 
         if (!over || active.id === over.id) return;
 
-        const oldIndex = localSubtasks.findIndex((s) => s.id === active.id);
-        const newIndex = localSubtasks.findIndex((s) => s.id === over.id);
+        const oldIndex = localSubtasks.findIndex((s: any) => s.id === active.id);
+        const newIndex = localSubtasks.findIndex((s: any) => s.id === over.id);
 
         if (oldIndex === -1 || newIndex === -1) return;
 
@@ -338,86 +363,89 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
     };
 
     const subtaskCount = localSubtasks.length;
-    const subtaskDoneCount = localSubtasks.filter(s => s.status === "DONE" || s.status === "ARCHIVED").length;
+    const subtaskDoneCount = localSubtasks.filter((s: any) => s.status === "DONE" || s.status === "ARCHIVED").length;
     const subtaskProgress = subtaskCount > 0 ? Math.round((subtaskDoneCount / subtaskCount) * 100) : 0;
 
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
-                <SheetContent className="sm:max-w-[600px] w-full overflow-y-auto">
-                    <SheetHeader className="mb-6 space-y-4">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1 mr-4">
-                                {isEditingTitle ? (
-                                    <Input
-                                        defaultValue={task.title}
-                                        onBlur={handleTitleBlur}
-                                        autoFocus
-                                        className="font-semibold text-lg"
-                                    />
-                                ) : (
-                                    <SheetTitle
-                                        className="text-xl cursor-text hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded px-1 -ml-1 transition-colors"
-                                        onClick={() => setIsEditingTitle(true)}
-                                    >
-                                        {task.title}
-                                    </SheetTitle>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-red-600">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This action cannot be undone. This will permanently delete the task
-                                                &quot;{task.title}&quot; and remove it from our servers.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction
-                                                onClick={handleDelete}
-                                                className="bg-red-600 hover:bg-red-700 text-white"
-                                            >
-                                                Delete
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                                <Badge variant="outline">{task.status}</Badge>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-xs text-neutral-500">
-                            <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Created {format(new Date(task.createdAt), "MMM d, yyyy")}
+                <SheetContent className="sm:max-w-[700px] w-full p-0 flex flex-col gap-0 border-l border-neutral-200 dark:border-neutral-800">
+                    {/* Notion-style Top Navigation Bar */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-100 dark:border-neutral-900 bg-white dark:bg-neutral-950">
+                        <div className="flex items-center gap-2 text-sm text-neutral-500 overflow-hidden">
+                            {task.parentTask && (
+                                <>
+                                    <span className="cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 px-1 rounded truncate max-w-[150px]">
+                                        {task.parentTask.title}
+                                    </span>
+                                    <span className="text-neutral-300">/</span>
+                                </>
+                            )}
+                            <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                                {task.title}
                             </span>
-                            {task.project && (
-                                <span className="flex items-center gap-1 px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 rounded-full">
-                                    📁 {task.project.name}
-                                </span>
-                            )}
-                            {task.sprint && (
-                                <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-full">
-                                    🏃 {task.sprint.name}
-                                </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs gap-1.5 text-neutral-500"
+                                onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)}
+                            >
+                                <Maximize2 className="h-3.5 w-3.5" />
+                                Open as page
+                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-400 hover:text-red-500">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action is permanent and will remove all associated content and subtasks.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-8 py-10">
+                        {/* Task Title */}
+                        <div className="mb-8">
+                            {isEditingTitle ? (
+                                <Input
+                                    defaultValue={task.title}
+                                    onBlur={handleTitleBlur}
+                                    autoFocus
+                                    className="text-4xl font-bold h-auto p-0 border-0 focus-visible:ring-0 shadow-none"
+                                />
+                            ) : (
+                                <h1
+                                    className="text-4xl font-bold cursor-text hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded-md transition-colors leading-[1.2]"
+                                    onClick={() => setIsEditingTitle(true)}
+                                >
+                                    {task.title}
+                                </h1>
                             )}
                         </div>
-                    </SheetHeader>
 
-                    <div className="space-y-8">
-                        {/* Status & Priority & Due Date Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-neutral-500 uppercase">Status</label>
+                        {/* Notion-style Property List */}
+                        <div className="space-y-px mb-12">
+                            <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
+                                <label className="text-sm text-neutral-500 flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-sm bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[10px] text-blue-600">ST</div>
+                                    Status
+                                </label>
                                 <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors rounded px-2 w-fit">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -429,10 +457,72 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-neutral-500 uppercase">Priority</label>
+
+                            <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
+                                <label className="text-sm text-neutral-500 flex items-center gap-2">
+                                    <Avatar className="h-4 w-4">
+                                        <AvatarFallback className="text-[8px] bg-neutral-200">AS</AvatarFallback>
+                                    </Avatar>
+                                    Assignees
+                                </label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {members?.map((member: any) => {
+                                        const isAssigned = currentAssigneeIds.includes(member.id);
+                                        return (
+                                            <button
+                                                key={member.id}
+                                                onClick={() => toggleAssignee(member.id)}
+                                                className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs transition-colors ${isAssigned
+                                                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                                    : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 opacity-40 group-hover:opacity-100"
+                                                    }`}
+                                            >
+                                                {member.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
+                                <label className="text-sm text-neutral-500 flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-neutral-400" />
+                                    Start Date
+                                </label>
+                                <Input
+                                    type="datetime-local"
+                                    defaultValue={task.startDate ? new Date(task.startDate).toISOString().slice(0, 16) : ""}
+                                    onChange={(e) => {
+                                        const date = e.target.value ? new Date(e.target.value) : null;
+                                        updateTask.mutate({ id: task.id, startDate: date?.toISOString() || null });
+                                    }}
+                                    className="h-7 border-0 p-0 shadow-none focus-visible:ring-0 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors rounded px-2 w-fit bg-transparent"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
+                                <label className="text-sm text-neutral-500 flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-neutral-400" />
+                                    Due Date
+                                </label>
+                                <Input
+                                    type="datetime-local"
+                                    defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ""}
+                                    onChange={(e) => {
+                                        const date = e.target.value ? new Date(e.target.value) : null;
+                                        updateTask.mutate({ id: task.id, dueDate: date?.toISOString() || null });
+                                    }}
+                                    className="h-7 border-0 p-0 shadow-none focus-visible:ring-0 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors rounded px-2 w-fit bg-transparent"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
+                                <label className="text-sm text-neutral-500 flex items-center gap-2">
+                                    <Hash className="h-4 w-4 text-neutral-400" />
+                                    Priority
+                                </label>
                                 <Select value={task.priority} onValueChange={(v) => handlePriorityChange(v as TaskPriority)}>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors rounded px-2 w-fit">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -443,50 +533,80 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-neutral-500 uppercase">Due Date</label>
-                                <Input
-                                    type="datetime-local"
-                                    defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ""}
-                                    onChange={(e) => {
-                                        const date = e.target.value ? new Date(e.target.value) : null;
-                                        updateTask.mutate({ id: task.id, dueDate: date?.toISOString() || null });
-                                    }}
-                                    className="text-sm"
-                                />
-                            </div>
                         </div>
 
                         {/* Description */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-neutral-500 uppercase">Description</label>
-                            <div className="min-h-[100px] border rounded-md p-1">
-                                <BlockEditor
-                                    key={task.id}
-                                    initialContent={typeof description === "string"
-                                        ? [
-                                            {
-                                                type: "paragraph",
-                                                content: [{ type: "text", text: description, styles: {} }]
-                                            }
-                                        ]
-                                        : description}
-                                    onChange={(content) => {
-                                        setDescription(content);
-                                        setIsDescriptionDirty(true);
-                                    }}
-                                />
-                                {isDescriptionDirty && (
-                                    <div className="text-[10px] text-muted-foreground mt-1 px-1">Saving...</div>
-                                )}
-                            </div>
+                        <div className="space-y-4">
+                            {!description || (Array.isArray(description) && description.length === 0) ? (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                                    <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Start from a Template</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button
+                                            variant="outline"
+                                            className="h-auto py-3 px-4 flex flex-col items-start gap-1 justify-start border-neutral-100 dark:border-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                            onClick={() => applyTemplate('BUG')}
+                                        >
+                                            <span className="text-sm font-medium">🐛 Bug Report</span>
+                                            <span className="text-[10px] text-neutral-400">Steps, expected, actual</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="h-auto py-3 px-4 flex flex-col items-start gap-1 justify-start border-neutral-100 dark:border-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                            onClick={() => applyTemplate('FEATURE')}
+                                        >
+                                            <span className="text-sm font-medium">🚀 Feature Req</span>
+                                            <span className="text-[10px] text-neutral-400">Context, specs, roadmap</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="h-auto py-3 px-4 flex flex-col items-start gap-1 justify-start border-neutral-100 dark:border-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                            onClick={() => applyTemplate('MEETING')}
+                                        >
+                                            <span className="text-sm font-medium">📅 Meeting Notes</span>
+                                            <span className="text-[10px] text-neutral-400">Agenda, action items</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="h-auto py-3 px-4 flex flex-col items-start gap-1 justify-start border-neutral-100 dark:border-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                            onClick={() => setDescription([{ type: 'paragraph', content: [] }])}
+                                        >
+                                            <span className="text-sm font-medium">📝 Blank Page</span>
+                                            <span className="text-[10px] text-neutral-400">Start from scratch</span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-neutral-500 uppercase">Description</label>
+                                    <div className="min-h-[100px] border-0 rounded-md">
+                                        <BlockEditor
+                                            key={task.id}
+                                            initialContent={typeof description === "string"
+                                                ? [
+                                                    {
+                                                        type: "paragraph",
+                                                        content: [{ type: "text", text: description, styles: {} }]
+                                                    }
+                                                ]
+                                                : description}
+                                            onChange={(content) => {
+                                                setDescription(content);
+                                                setIsDescriptionDirty(true);
+                                            }}
+                                        />
+                                        {isDescriptionDirty && (
+                                            <div className="text-[10px] text-muted-foreground mt-1 px-1">Saving...</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Assignees */}
                         <div className="space-y-3">
                             <label className="text-xs font-semibold text-neutral-500 uppercase">Assignees</label>
                             <div className="flex flex-wrap gap-2">
-                                {members?.map(member => {
+                                {members?.map((member: any) => {
                                     const isAssigned = currentAssigneeIds.includes(member.id);
                                     return (
                                         <button
@@ -552,10 +672,10 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                                 >
                                     <div className="rounded-lg border overflow-hidden">
                                         <SortableContext
-                                            items={localSubtasks.map(s => s.id)}
+                                            items={localSubtasks.map((s: any) => s.id)}
                                             strategy={verticalListSortingStrategy}
                                         >
-                                            {localSubtasks.map((subtask, index) => (
+                                            {localSubtasks.map((subtask: any, index: number) => (
                                                 <SortableSubtaskRow
                                                     key={subtask.id}
                                                     subtask={subtask}

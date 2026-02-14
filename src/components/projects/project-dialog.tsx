@@ -38,10 +38,25 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Project, ProjectStatus } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { Plus, ChevronsUpDown, Check } from "lucide-react";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface ProjectDialogProps {
-    project?: Project & { lead?: { id: string } | null, squad?: { id: string } | null };
+    project?: Project & { lead?: { id: string } | null, squads?: { id: string }[] };
     trigger?: React.ReactNode;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -57,6 +72,7 @@ export function ProjectDialog({
     const isControlled = controlledOpen !== undefined;
     const open = isControlled ? controlledOpen : internalOpen;
     const setOpen = isControlled ? setControlledOpen : setInternalOpen;
+    const [squadsOpen, setSquadsOpen] = useState(false);
 
     const isEditing = !!project;
     const createProject = useCreateProject();
@@ -65,13 +81,13 @@ export function ProjectDialog({
     const { data: squads } = useSquads();
 
     const form = useForm<CreateProjectInput | UpdateProjectInput>({
-        resolver: zodResolver(isEditing ? updateProjectSchema : createProjectSchema),
+        resolver: zodResolver(isEditing ? updateProjectSchema : createProjectSchema) as any,
         defaultValues: {
             name: "",
             description: "",
             status: "ACTIVE",
             leadId: "",
-            squadId: "",
+            squadIds: [],
         },
     });
 
@@ -84,7 +100,7 @@ export function ProjectDialog({
                     description: project.description || "",
                     status: project.status,
                     leadId: project.leadId || null,
-                    squadId: project.squadId || null,
+                    squadIds: project.squads?.map(s => s.id) || [],
                 });
             } else {
                 form.reset({
@@ -92,7 +108,7 @@ export function ProjectDialog({
                     description: "",
                     status: "ACTIVE",
                     leadId: null,
-                    squadId: null,
+                    squadIds: [],
                 });
             }
         }
@@ -118,9 +134,8 @@ export function ProjectDialog({
             ) : (
                 !isControlled && (
                     <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Project
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                            <Plus className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
                 )
@@ -193,10 +208,10 @@ export function ProjectDialog({
 
                             <FormField
                                 control={form.control}
-                                name="squadId"
+                                name="leadId"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Squad</FormLabel>
+                                        <FormLabel>Project Lead</FormLabel>
                                         <Select
                                             onValueChange={(value) => field.onChange(value === "none" ? null : value)}
                                             defaultValue={field.value || "none"}
@@ -204,14 +219,14 @@ export function ProjectDialog({
                                         >
                                             <FormControl>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select squad" />
+                                                    <SelectValue placeholder="Select lead" />
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="none">No Squad</SelectItem>
-                                                {squads?.map((squad) => (
-                                                    <SelectItem key={squad.id} value={squad.id}>
-                                                        {squad.name}
+                                                <SelectItem value="none">No Lead</SelectItem>
+                                                {members?.map((member) => (
+                                                    <SelectItem key={member.id} value={member.id}>
+                                                        {member.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -224,29 +239,72 @@ export function ProjectDialog({
 
                         <FormField
                             control={form.control}
-                            name="leadId"
+                            name="squadIds"
                             render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Project Lead</FormLabel>
-                                    <Select
-                                        onValueChange={(value) => field.onChange(value === "none" ? null : value)}
-                                        defaultValue={field.value || "none"}
-                                        value={field.value || "none"}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select lead" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="none">No Lead</SelectItem>
-                                            {members?.map((member) => (
-                                                <SelectItem key={member.id} value={member.id}>
-                                                    {member.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Squads</FormLabel>
+                                    <Popover open={squadsOpen} onOpenChange={setSquadsOpen}>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    className={cn(
+                                                        "w-full justify-between",
+                                                        !field.value?.length && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {field.value?.length && squads
+                                                        ? `${field.value.length} selected`
+                                                        : "Select squads"}
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Search squads..." />
+                                                <CommandList>
+                                                    <CommandEmpty>No squad found.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {squads?.map((squad) => (
+                                                            <CommandItem
+                                                                value={squad.name}
+                                                                key={squad.id}
+                                                                onSelect={() => {
+                                                                    const current = field.value || []
+                                                                    const updated = current.includes(squad.id)
+                                                                        ? current.filter((id: string) => id !== squad.id)
+                                                                        : [...current, squad.id]
+                                                                    field.onChange(updated)
+                                                                }}
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        field.value?.includes(squad.id)
+                                                                            ? "opacity-100"
+                                                                            : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {squad.name}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {field.value?.map((squadId: string) => {
+                                            const squad = squads?.find((s) => s.id === squadId);
+                                            return squad ? (
+                                                <Badge key={squadId} variant="secondary" className="mr-1">
+                                                    {squad.name}
+                                                </Badge>
+                                            ) : null;
+                                        })}
+                                    </div>
                                     <FormMessage />
                                 </FormItem>
                             )}

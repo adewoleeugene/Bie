@@ -6,15 +6,16 @@ import { ProjectCalendar } from "@/components/tasks/project-calendar";
 export default async function CalendarPage({
     params,
 }: {
-    params: { projectId: string };
+    params: Promise<{ projectId: string }>;
 }) {
+    const { projectId } = await params;
     const session = await auth();
     if (!session?.user?.email) redirect("/login");
 
     // Fetch tasks
     const tasks = await db.task.findMany({
         where: {
-            projectId: params.projectId,
+            projectId: projectId,
             status: { not: "ARCHIVED" },
             dueDate: { not: null },
         },

@@ -27,9 +27,10 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { TaskStatus, TaskPriority } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { Plus, Calendar as CalendarIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { format } from "date-fns";
 
 interface TaskFormProps {
     projectId?: string;
@@ -41,9 +42,6 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
     const createTask = useCreateTask();
     const { data: members } = useMembers();
     const { data: projects } = useProjects();
-
-    // We use a separate state or watch for projectId to fetch sprints
-    // But since we use useForm, we can watch the field.
 
     const form = useForm<CreateTaskInput>({
         resolver: zodResolver(createTaskSchema) as any,
@@ -62,7 +60,12 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
     });
 
     const watchedProjectId = form.watch("projectId");
-    const { data: sprints } = useSprints(watchedProjectId || undefined);
+    const { data: allSprints } = useSprints();
+    // If a project is selected, show its sprints first, but always show all
+    const sprints = watchedProjectId
+        ? allSprints?.filter((s: any) => s.projectId === watchedProjectId)
+        : allSprints;
+    const hasNoProjectSprints = watchedProjectId && (!sprints || sprints.length === 0);
 
     useEffect(() => {
         if (open) {
@@ -83,10 +86,8 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
 
     const onSubmit = async (data: CreateTaskInput) => {
         try {
-            // Convert date to ISO if present and not already
             const payload = {
                 ...data,
-                // Ensure dates are ISO strings
                 dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
                 startDate: data.startDate ? new Date(data.startDate).toISOString() : undefined,
             };
@@ -97,7 +98,6 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                 form.reset();
             }
         } catch (error) {
-            // Handled by onError in mutation
             console.error(error);
         }
     };
@@ -166,9 +166,9 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                     <FormItem>
                                         <FormLabel>Project</FormLabel>
                                         <Select
-                                            onValueChange={field.onChange}
-                                            defaultValue={field.value || undefined}
-                                            value={field.value || undefined}
+                                            onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                                            defaultValue={field.value || "none"}
+                                            value={field.value || "none"}
                                         >
                                             <FormControl>
                                                 <SelectTrigger>
@@ -176,6 +176,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
+                                                <SelectItem value="none">No Project (General Task)</SelectItem>
                                                 {projects?.map((project) => (
                                                     <SelectItem key={project.id} value={project.id}>
                                                         {project.name}
@@ -191,31 +192,41 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                             <FormField
                                 control={form.control}
                                 name="sprintId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Sprint</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            defaultValue={field.value || undefined}
-                                            value={field.value || undefined}
-                                            disabled={!watchedProjectId || !sprints?.length}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select Sprint" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {sprints?.map((sprint) => (
-                                                    <SelectItem key={sprint.id} value={sprint.id}>
-                                                        {sprint.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={({ field }) => {
+                                    // Show project-specific sprints, or all if project has none
+                                    const displaySprints = hasNoProjectSprints ? allSprints : sprints;
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>Sprint</FormLabel>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                defaultValue={field.value || undefined}
+                                                value={field.value || undefined}
+                                                disabled={!allSprints?.length}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select Sprint" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {displaySprints?.map((sprint: any) => (
+                                                        <SelectItem key={sprint.id} value={sprint.id}>
+                                                            <div className="flex flex-col">
+                                                                <span>{sprint.name}</span>
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {sprint.project?.name ? `${sprint.project.name} · ` : ""}
+                                                                    {format(new Date(sprint.startDate), "MMM d, yyyy")} - {format(new Date(sprint.endDate), "MMM d, yyyy")}
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    );
+                                }}
                             />
                         </div>
 
@@ -304,21 +315,49 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                         <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
-                                name="dueDate"
+                                name="startDate"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Due Date</FormLabel>
+                                        <FormLabel>Start Date</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                type="datetime-local"
-                                                {...field}
-                                                value={field.value || ""}
-                                            />
+                                            <div className="relative">
+                                                <Input
+                                                    type="datetime-local"
+                                                    {...field}
+                                                    value={field.value || ""}
+                                                    className="pl-8"
+                                                />
+                                                <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            </div>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+                            <FormField
+                                control={form.control}
+                                name="dueDate"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Due Date</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Input
+                                                    type="datetime-local"
+                                                    {...field}
+                                                    value={field.value || ""}
+                                                    className="pl-8"
+                                                />
+                                                <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="estimatedHours"
@@ -330,7 +369,10 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                                 type="number"
                                                 placeholder="e.g. 4.5"
                                                 {...field}
-                                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value);
+                                                    field.onChange(isNaN(val) ? undefined : val);
+                                                }}
                                                 value={field.value || ""}
                                             />
                                         </FormControl>

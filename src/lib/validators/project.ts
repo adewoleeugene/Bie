@@ -6,7 +6,7 @@ export const createProjectSchema = z.object({
     description: z.string().optional(),
     status: z.nativeEnum(ProjectStatus).default("ACTIVE"),
     leadId: z.string().optional(),
-    squadId: z.string().optional(),
+    squadIds: z.array(z.string()).optional().default([]),
 });
 
 export const updateProjectSchema = z.object({
@@ -15,7 +15,7 @@ export const updateProjectSchema = z.object({
     description: z.string().optional(),
     status: z.nativeEnum(ProjectStatus).optional(),
     leadId: z.string().nullable().optional(),
-    squadId: z.string().nullable().optional(),
+    squadIds: z.array(z.string()).optional(),
 });
 
 export const deleteProjectSchema = z.object({

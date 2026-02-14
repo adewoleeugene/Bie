@@ -6,8 +6,9 @@ import { WikiNamespace } from "@prisma/client";
 export default async function ProjectWikiIndex({
     params,
 }: {
-    params: { projectId: string };
+    params: Promise<{ projectId: string }>;
 }) {
+    const { projectId } = await params;
     const session = await auth();
     if (!session?.user?.email) {
         redirect("/login");
@@ -35,7 +36,7 @@ export default async function ProjectWikiIndex({
         where: {
             organizationId,
             namespace: WikiNamespace.PROJECT,
-            projectId: params.projectId,
+            projectId: projectId,
             parentPageId: null,
         },
         orderBy: {
@@ -44,7 +45,7 @@ export default async function ProjectWikiIndex({
     });
 
     if (firstPage) {
-        redirect(`/projects/${params.projectId}/wiki/${firstPage.id}`);
+        redirect(`/projects/${projectId}/wiki/${firstPage.id}`);
     }
 
     // No pages yet, show empty state

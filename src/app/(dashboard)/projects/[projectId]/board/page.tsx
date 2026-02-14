@@ -2,6 +2,7 @@
 
 import { KanbanBoard } from "@/components/kanban/board";
 import { TaskForm } from "@/components/tasks/task-form";
+import { TaskFiltersBar, applyTaskFilters, TaskFilters } from "@/components/tasks/task-filters";
 import { useTasks } from "@/hooks/use-tasks";
 import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -42,6 +43,12 @@ export default function BoardPage() {
     const completeSprint = useCompleteSprint();
 
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [taskFilters, setTaskFilters] = useState<TaskFilters>({
+        statuses: [],
+        priorities: [],
+        assigneeIds: [],
+        dateRange: {},
+    });
 
     const isLoading = tasksLoading || sprintsLoading || (!!sprintId && sprintLoading);
 
@@ -61,8 +68,8 @@ export default function BoardPage() {
         router.push(`/projects/${projectId}/sprints`);
     };
 
-    const doneTasks = tasks?.filter(t => t.status === "DONE") || [];
-    const incompleteTasks = tasks?.filter(t => t.status !== "DONE" && t.status !== "ARCHIVED") || [];
+    const doneTasks = tasks?.filter((t: any) => t.status === "DONE") || [];
+    const incompleteTasks = tasks?.filter((t: any) => t.status !== "DONE" && t.status !== "ARCHIVED") || [];
     // Sort sprints: most recent first (by startDate), take top 3
     const sortedSprints = [...(sprints || [])].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     const recentSprints = sortedSprints.slice(0, 3);
@@ -104,18 +111,18 @@ export default function BoardPage() {
                                     <SelectItem value="all">All Tasks</SelectItem>
                                     {recentSprints.map((s) => (
                                         <SelectItem key={s.id} value={s.id}>
-                                            <div className="flex items-center gap-2">
-                                                {s.name}
-                                                {s.status === "ACTIVE" && (
-                                                    <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">
-                                                        Active
-                                                    </Badge>
-                                                )}
-                                                {s.status === "COMPLETED" && (
-                                                    <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                                                        Done
-                                                    </Badge>
-                                                )}
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{s.name}</span>
+                                                    {s.status === "ACTIVE" && (
+                                                        <Badge variant="default" className="h-4 px-1 text-[10px]">
+                                                            Active
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()}
+                                                </span>
                                             </div>
                                         </SelectItem>
                                     ))}
@@ -149,9 +156,12 @@ export default function BoardPage() {
                     </div>
                     <TaskForm projectId={projectId} sprintId={sprintId || undefined} />
                 </div>
+                <div className="px-6 pb-3">
+                    <TaskFiltersBar filters={taskFilters} onFiltersChange={setTaskFilters} />
+                </div>
             </div>
             <div className="flex-1 overflow-hidden">
-                <KanbanBoard tasks={tasks || []} />
+                <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
             </div>
 
             {/* Complete Sprint Dialog */}

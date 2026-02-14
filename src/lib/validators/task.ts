@@ -6,9 +6,9 @@ export const createTaskSchema = z.object({
     description: z.any().optional(),
     status: z.nativeEnum(TaskStatus).default("BACKLOG"),
     priority: z.nativeEnum(TaskPriority).default("P2"),
-    projectId: z.string().optional(),
-    sprintId: z.string().optional(),
-    parentTaskId: z.string().optional(),
+    projectId: z.string().nullable().optional(),
+    sprintId: z.string().nullable().optional(),
+    parentTaskId: z.string().nullable().optional(),
     // Allow any string for dates from form, validate/transform later
     dueDate: z.string().optional(),
     startDate: z.string().optional(),

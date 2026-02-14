@@ -45,7 +45,7 @@ export function SquadDialog({ squad, trigger, open: controlledOpen, onOpenChange
     const { data: members } = useMembers();
 
     const form = useForm<CreateSquadInput | UpdateSquadInput>({
-        resolver: zodResolver(isEditing ? updateSquadSchema : createSquadSchema),
+        resolver: zodResolver(isEditing ? updateSquadSchema : createSquadSchema) as any,
         defaultValues: {
             name: "",
             description: "",
@@ -158,8 +158,8 @@ export function SquadDialog({ squad, trigger, open: controlledOpen, onOpenChange
                                             type="button"
                                             onClick={() => toggleMember(member.id)}
                                             className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${isSelected
-                                                    ? "border-primary bg-primary/10 text-primary"
-                                                    : "border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800"
+                                                ? "border-primary bg-primary/10 text-primary"
+                                                : "border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800"
                                                 }`}
                                         >
                                             <Avatar className="h-5 w-5">

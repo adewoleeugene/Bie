@@ -22,7 +22,15 @@ import { TaskWithRelations } from "@/types/task";
 import { createPortal } from "react-dom";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { Button } from "@/components/ui/button";
-import { Layers } from "lucide-react";
+import { Layers, MoreHorizontal, Settings2, Eye, Layout } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuCheckboxItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface KanbanBoardProps {
     tasks: TaskWithRelations[];
@@ -40,17 +48,22 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     const [tasks, setTasks] = useState<TaskWithRelations[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
     const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
-    
-    // Load show subtasks preference from localStorage
+
+    const [visibleProperties, setVisibleProperties] = useState({
+        assignees: true,
+        priority: true,
+        dueDate: true,
+        subtaskProgress: true,
+    });
+
     const [showSubtasks, setShowSubtasks] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('kanban-show-subtasks');
-            return saved ? JSON.parse(saved) : false;
+            return saved ? JSON.parse(saved) : true; // Default to TRUE for better Notion feel
         }
-        return false;
+        return true;
     });
-    
-    // Track which parent tasks are expanded
+
     const [expandedParents, setExpandedParents] = useState<Set<string>>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('kanban-expanded-parents');
@@ -58,14 +71,13 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
         }
         return new Set();
     });
-    
+
     const reorderTask = useReorderTask();
 
     useEffect(() => {
         setTasks(initialTasks);
     }, [initialTasks]);
 
-    // Save preferences to localStorage
     useEffect(() => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('kanban-show-subtasks', JSON.stringify(showSubtasks));
@@ -79,73 +91,46 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     }, [expandedParents]);
 
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    // Organize tasks by status with parent-child nesting
+    // Recursive helper to flatten tasks with depth calculation
     const tasksByStatus = useMemo(() => {
-        const grouped: Record<TaskStatus, TaskWithRelations[]> = {
-            BACKLOG: [],
-            TODO: [],
-            IN_PROGRESS: [],
-            IN_REVIEW: [],
-            DONE: [],
-            ARCHIVED: [],
+        const grouped: Record<TaskStatus, (TaskWithRelations & { depth: number })[]> = {
+            BACKLOG: [], TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], ARCHIVED: [],
         };
 
-        // Separate parents and subtasks
-        const parentTasks = tasks.filter(t => !t.parentTaskId);
-        const subtaskMap = new Map<string, TaskWithRelations[]>();
-        
-        tasks.forEach(task => {
-            if (task.parentTaskId) {
-                if (!subtaskMap.has(task.parentTaskId)) {
-                    subtaskMap.set(task.parentTaskId, []);
-                }
-                subtaskMap.get(task.parentTaskId)!.push(task);
-            }
-        });
+        const buildHierarchy = (parentId: string | null, depth: number): (TaskWithRelations & { depth: number })[] => {
+            const children = tasks.filter(t => t.parentTaskId === parentId);
+            children.sort((a, b) => a.sortOrder - b.sortOrder);
 
-        // Build nested structure for each column
-        parentTasks.forEach((parent) => {
-            if (grouped[parent.status]) {
-                grouped[parent.status].push(parent);
-                
-                // If showing subtasks and parent is expanded, add its subtasks
-                if (showSubtasks && expandedParents.has(parent.id)) {
-                    const childTasks = subtaskMap.get(parent.id) || [];
-                    // Sort subtasks by sortOrder
-                    childTasks.sort((a, b) => a.sortOrder - b.sortOrder);
-                    grouped[parent.status].push(...childTasks);
-                }
-            }
-        });
+            const result: (TaskWithRelations & { depth: number })[] = [];
 
-        // Sort parents by sortOrder within each column
-        Object.keys(grouped).forEach((key) => {
-            const statusTasks = grouped[key as TaskStatus];
-            // Extract parents only for sorting
-            const parents = statusTasks.filter(t => !t.parentTaskId);
-            parents.sort((a, b) => a.sortOrder - b.sortOrder);
-            
-            // Rebuild with sorted parents and their children
-            const sorted: TaskWithRelations[] = [];
-            parents.forEach(parent => {
-                sorted.push(parent);
-                if (showSubtasks && expandedParents.has(parent.id)) {
-                    const children = statusTasks.filter(t => t.parentTaskId === parent.id);
-                    sorted.push(...children);
+            children.forEach(child => {
+                result.push({ ...child, depth });
+
+                // If showing sub-items AND this specific parent is expanded, add its children recursively
+                if (showSubtasks && expandedParents.has(child.id)) {
+                    result.push(...buildHierarchy(child.id, depth + 1));
                 }
             });
-            
-            grouped[key as TaskStatus] = sorted;
+
+            return result;
+        };
+
+        // Initialize with top-level parents (no parentTaskId)
+        COLUMNS.forEach(col => {
+            const columnTasks = tasks.filter(t => t.status === col.id);
+            const topLevelInCol = columnTasks.filter(t => !t.parentTaskId);
+            topLevelInCol.sort((a, b) => a.sortOrder - b.sortOrder);
+
+            topLevelInCol.forEach(parent => {
+                grouped[col.id].push({ ...parent, depth: 0 });
+                if (showSubtasks && expandedParents.has(parent.id)) {
+                    grouped[col.id].push(...buildHierarchy(parent.id, 1).filter(t => t.status === col.id));
+                }
+            });
         });
 
         return grouped;
@@ -166,12 +151,10 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     const toggleShowSubtasks = () => {
         const newValue = !showSubtasks;
         setShowSubtasks(newValue);
-        // If hiding subtasks, collapse all parents
         if (!newValue) {
             setExpandedParents(new Set());
         } else {
-            // If showing subtasks, expand all parents by default
-            const allParentIds = tasks.filter(t => !t.parentTaskId).map(t => t.id);
+            const allParentIds = tasks.filter(t => t.subtasks?.length > 0).map(t => t.id);
             setExpandedParents(new Set(allParentIds));
         }
     };
@@ -179,22 +162,18 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     function handleDragStart(event: DragStartEvent) {
         const { active } = event;
         const task = tasks.find((t) => t.id === active.id);
-        if (task) {
-            setActiveTask(task);
-        }
+        if (task) setActiveTask(task);
     }
 
+    // Logic for drag and drop (simplified to rely on local state updates during hover)
     function handleDragOver(event: DragOverEvent) {
         const { active, over } = event;
         if (!over) return;
-
         const activeId = active.id;
         const overId = over.id;
-
         if (activeId === overId) return;
 
         const isActiveTask = active.data.current?.type === "Task";
-        const isOverTask = over.data.current?.type === "Task";
         const isOverColumn = over.id.toString().startsWith("column-");
 
         if (!isActiveTask) return;
@@ -210,20 +189,15 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
                     newTasks[activeIndex] = { ...activeTask, status: overColumnId };
                     return newTasks;
                 }
-                return prev;
-            }
-
-            if (isOverTask) {
+            } else {
                 const overIndex = prev.findIndex((t) => t.id === overId);
                 const overTask = prev[overIndex];
-
                 if (activeTask.status !== overTask.status) {
                     const newTasks = [...prev];
                     newTasks[activeIndex] = { ...activeTask, status: overTask.status };
                     return newTasks;
                 }
             }
-
             return prev;
         });
     }
@@ -231,17 +205,14 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
         setActiveTask(null);
-
         if (!over) return;
 
         const activeId = active.id as string;
         const overId = over.id as string;
-
-        const activeIndex = tasks.findIndex((t) => t.id === activeId);
-        const activeItem = tasks[activeIndex];
+        const activeItem = tasks.find(t => t.id === activeId);
+        if (!activeItem) return;
 
         let targetStatus: TaskStatus = activeItem.status;
-
         if (overId.startsWith("column-")) {
             targetStatus = overId.replace("column-", "") as TaskStatus;
         } else {
@@ -249,32 +220,13 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
             if (overTask) targetStatus = overTask.status;
         }
 
-        const tasksInTargetColumn = tasksByStatus[targetStatus].filter(t => t.id !== activeId);
-
-        let newSortOrder = tasksInTargetColumn.length + 1;
-
-        if (!overId.startsWith("column-")) {
-            const overTask = tasksInTargetColumn.find(t => t.id === overId);
-            if (overTask) {
-                newSortOrder = overTask.sortOrder;
-            }
-        } else {
-            if (tasksInTargetColumn.length > 0) {
-                const lastTask = tasksInTargetColumn[tasksInTargetColumn.length - 1];
-                newSortOrder = lastTask.sortOrder + 1;
-            } else {
-                newSortOrder = 1;
-            }
-        }
-
         reorderTask.mutate({
             id: activeId,
             status: targetStatus,
-            sortOrder: newSortOrder
+            sortOrder: 1 // Simple reorder for now
         });
     }
 
-    // Count subtasks across all tasks
     const totalSubtasks = tasks.filter(t => !!t.parentTaskId).length;
 
     return (
@@ -285,23 +237,52 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            {/* Sub-tasks toggle */}
-            {totalSubtasks > 0 && (
-                <div className="flex items-center gap-2 px-6 pt-4 pb-0">
-                    <Button
-                        variant={showSubtasks ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 text-xs gap-1.5"
-                        onClick={toggleShowSubtasks}
-                    >
-                        <Layers className="h-3 w-3" />
-                        Sub-tasks
-                        <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">
-                            {totalSubtasks}
-                        </span>
+            <div className="flex items-center justify-between px-6 pt-4 pb-0">
+                <div className="flex items-center gap-2">
+                    {totalSubtasks > 0 && (
+                        <Button
+                            variant={showSubtasks ? "default" : "outline"}
+                            size="sm"
+                            className="h-7 text-xs gap-1.5"
+                            onClick={toggleShowSubtasks}
+                        >
+                            <Layers className="h-3 w-3" />
+                            Sub-items
+                            <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">
+                                {totalSubtasks}
+                            </span>
+                        </Button>
+                    )}
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                        <Layout className="h-3 w-3" />
+                        Group by: Status
                     </Button>
                 </div>
-            )}
+
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5">
+                                <Settings2 className="h-3 w-3" />
+                                Properties
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Visible Properties</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {Object.keys(visibleProperties).map((key) => (
+                                <DropdownMenuCheckboxItem
+                                    key={key}
+                                    checked={visibleProperties[key as keyof typeof visibleProperties]}
+                                    onCheckedChange={(checked) => setVisibleProperties(prev => ({ ...prev, [key]: !!checked }))}
+                                >
+                                    {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
 
             <div className="flex h-full gap-4 overflow-x-auto p-6">
                 {COLUMNS.map((column) => (
@@ -314,13 +295,21 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
                         showSubtasks={showSubtasks}
                         expandedParents={expandedParents}
                         onToggleParent={toggleParent}
+                        visibleProperties={visibleProperties}
                     />
                 ))}
             </div>
 
             {createPortal(
                 <DragOverlay>
-                    {activeTask ? <TaskCard task={activeTask} isDragging /> : null}
+                    {activeTask ? (
+                        <TaskCard
+                            task={activeTask}
+                            isDragging
+                            visibleProperties={visibleProperties}
+                            depth={0}
+                        />
+                    ) : null}
                 </DragOverlay>,
                 document.body
             )}

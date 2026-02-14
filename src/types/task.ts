@@ -10,6 +10,7 @@ export type TaskWithRelations = Prisma.TaskGetPayload<{
         };
         project: true;
         sprint: true;
+        parentTask: true;
         subtasks: {
             include: {
                 assignees: {
@@ -20,7 +21,9 @@ export type TaskWithRelations = Prisma.TaskGetPayload<{
             };
         };
     };
-}>;
+}> & {
+    depth?: number;
+};
 
 // Simplified task type for components
 export interface TaskDisplay {

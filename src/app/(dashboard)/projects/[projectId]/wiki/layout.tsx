@@ -9,8 +9,9 @@ export default async function ProjectWikiLayout({
     params,
 }: {
     children: React.ReactNode;
-    params: { projectId: string };
+    params: Promise<{ projectId: string }>;
 }) {
+    const { projectId } = await params;
     const session = await auth();
     if (!session?.user?.email) {
         redirect("/login");
@@ -37,7 +38,7 @@ export default async function ProjectWikiLayout({
         where: {
             organizationId,
             namespace: WikiNamespace.PROJECT,
-            projectId: params.projectId,
+            projectId: projectId,
         },
         include: {
             author: true,
@@ -50,8 +51,8 @@ export default async function ProjectWikiLayout({
             <WikiSidebar
                 pages={pages}
                 organizationId={organizationId}
-                projectId={params.projectId}
-                basePath={`/projects/${params.projectId}/wiki`}
+                projectId={projectId}
+                basePath={`/projects/${projectId}/wiki`}
             />
             <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
         </div>

@@ -51,7 +51,10 @@ export default function BacklogPage() {
         );
     }
 
-    const activeSprints = sprints?.filter(s => s.status === 'ACTIVE' || s.status === 'PLANNING') || [];
+    const doneTasks = tasks?.filter((t: any) => t.status === "DONE") || [];
+    const incompleteTasks = tasks?.filter((t: any) => t.status !== "DONE" && t.status !== "ARCHIVED") || [];
+
+    const activeSprints = sprints?.filter((s: any) => s.status === 'ACTIVE' || s.status === 'PLANNING') || [];
 
     return (
         <div className="flex bg-neutral-50/50 dark:bg-neutral-900/50 min-h-full flex-col">
@@ -83,13 +86,19 @@ export default function BacklogPage() {
                                         No active sprints
                                     </DropdownMenuItem>
                                 ) : (
-                                    activeSprints.map((sprint) => (
+                                    activeSprints.map((sprint: any) => (
                                         <DropdownMenuItem
                                             key={sprint.id}
                                             onClick={() => handleAddToSprint(task.id, sprint.id)}
+                                            className="flex flex-col items-start"
                                         >
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            {sprint.name}
+                                            <div className="flex items-center gap-2">
+                                                <Plus className="h-3 w-3" />
+                                                <span>{sprint.name}</span>
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground ml-5">
+                                                {new Date(sprint.startDate).toLocaleDateString()} - {new Date(sprint.endDate).toLocaleDateString()}
+                                            </span>
                                         </DropdownMenuItem>
                                     ))
                                 )}

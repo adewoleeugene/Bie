@@ -5,7 +5,7 @@ import { getTasks, createTask, updateTask, deleteTask, reorderTask } from "@/act
 import { CreateTaskInput, UpdateTaskInput, DeleteTaskInput, ReorderTaskInput } from "@/lib/validators/task";
 import { toast } from "sonner";
 
-export function useTasks(projectId?: string, options?: { sprintId?: string | null }) {
+export function useTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
     return useQuery({
         queryKey: ["tasks", projectId, options?.sprintId],
         queryFn: () => getTasks(projectId, options),

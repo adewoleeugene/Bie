@@ -175,16 +175,22 @@ export async function deleteSprint(
     }
 }
 
-export async function getSprints(projectId: string) {
+export async function getSprints(projectId?: string) {
     try {
         const { organizationId } = await getUserOrganization();
 
         const sprints = await db.sprint.findMany({
             where: {
                 organizationId,
-                projectId,
+                ...(projectId ? { projectId } : {}),
             },
             include: {
+                project: {
+                    select: {
+                        id: true,
+                        name: true,
+                    }
+                },
                 _count: {
                     select: {
                         tasks: true
@@ -195,13 +201,6 @@ export async function getSprints(projectId: string) {
                 endDate: "desc",
             },
         });
-
-        // Custom sort: ACTIVE first, then PLANNING (by start date asc?), then COMPLETED (by end date desc)
-        // But for now simple orderBy endDate desc is fine or status.
-        // Let's refine sorting in memory if needed, but DB sort is cleaner.
-        // Actually, maybe status order: ACTIVE, PLANNING, COMPLETED.
-        // Prisma doesn't sort by enum easily in customized order without raw SQL or multiple queries.
-        // Let's keep date sort for now.
 
         return sprints;
     } catch (error) {

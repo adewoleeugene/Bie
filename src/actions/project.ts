@@ -55,11 +55,13 @@ export async function createProject(
                 status: validated.status,
                 organizationId,
                 leadId: validated.leadId || null,
-                squadId: validated.squadId || null,
+                squads: {
+                    connect: validated.squadIds?.map((id) => ({ id })) || [],
+                },
             },
             include: {
                 lead: true,
-                squad: true,
+                squads: true,
                 _count: {
                     select: { tasks: true },
                 },
@@ -102,11 +104,13 @@ export async function updateProject(
                 description: validated.description,
                 status: validated.status,
                 leadId: validated.leadId,
-                squadId: validated.squadId,
+                squads: {
+                    set: validated.squadIds?.map((id) => ({ id })) || [],
+                },
             },
             include: {
                 lead: true,
-                squad: true,
+                squads: true,
                 _count: {
                     select: { tasks: true },
                 },
@@ -170,7 +174,7 @@ export async function getProjects() {
                 lead: {
                     select: { id: true, name: true, image: true }
                 },
-                squad: {
+                squads: {
                     select: { id: true, name: true }
                 },
                 sprints: {
@@ -207,7 +211,7 @@ export async function getProject(id: string) {
                 lead: {
                     select: { id: true, name: true, image: true, email: true }
                 },
-                squad: {
+                squads: {
                     include: {
                         members: {
                             include: {

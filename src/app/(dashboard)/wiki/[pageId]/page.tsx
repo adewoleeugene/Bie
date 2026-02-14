@@ -6,15 +6,16 @@ import { WikiPageView } from "@/components/wiki/wiki-page-view";
 export default async function WikiPageDetail({
     params,
 }: {
-    params: { pageId: string };
+    params: Promise<{ pageId: string }>;
 }) {
+    const { pageId } = await params;
     const session = await auth();
     if (!session?.user?.email) {
         redirect("/login");
     }
 
     const page = await db.wikiPage.findUnique({
-        where: { id: params.pageId },
+        where: { id: pageId },
         include: {
             author: true,
             versions: {

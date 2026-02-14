@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen } from "lucide-react";
+import { ProjectDialog } from "@/components/projects/project-dialog";
+import { FavoritesSection } from "@/components/layout/favorites-section";
 
 interface Project {
     id: string;
@@ -48,6 +50,16 @@ export function Sidebar({ projects }: SidebarProps) {
                     </Button>
                 </Link>
 
+                <Link href="/sprintboard">
+                    <Button
+                        variant={pathname === "/sprintboard" ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Sprint Board
+                    </Button>
+                </Link>
+
                 <Link href="/squads">
                     <Button
                         variant={pathname === "/squads" || pathname?.startsWith("/squads/") ? "secondary" : "ghost"}
@@ -68,10 +80,18 @@ export function Sidebar({ projects }: SidebarProps) {
                     </Button>
                 </Link>
 
+                {/* Favorites & Recent */}
+                <div className="pt-2">
+                    <FavoritesSection />
+                </div>
+
                 <div className="pt-4">
-                    <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                        Projects
-                    </h3>
+                    <div className="flex items-center justify-between px-3 mb-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                            Projects
+                        </h3>
+                        <ProjectDialog />
+                    </div>
                     <div className="space-y-1">
                         {projects.map((project) => {
                             const isActive = pathname?.includes(project.id);
@@ -152,6 +172,15 @@ export function Sidebar({ projects }: SidebarProps) {
                                                     className="h-8 w-full justify-start text-xs font-normal"
                                                 >
                                                     Calendar
+                                                </Button>
+                                            </Link>
+                                            <Link href={`/projects/${project.id}/timeline`}>
+                                                <Button
+                                                    variant={pathname?.includes("/timeline") ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    className="h-8 w-full justify-start text-xs font-normal"
+                                                >
+                                                    Timeline
                                                 </Button>
                                             </Link>
                                         </div>

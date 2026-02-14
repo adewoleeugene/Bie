@@ -132,23 +132,27 @@ export default function ProjectDashboardPage() {
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Squad</CardTitle>
+                            <CardTitle className="text-sm font-medium">Squads</CardTitle>
                             <Users className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            {project.squad ? (
-                                <div className="space-y-2">
-                                    <Link href={`/squads/${project.squad.id}`} className="text-sm font-medium hover:underline block">
-                                        {project.squad.name}
-                                    </Link>
-                                    <div className="flex -space-x-2">
-                                        {project.squad.members?.slice(0, 4).map((m: any) => (
-                                            <Avatar key={m.user.id} className="h-6 w-6 ring-2 ring-background">
-                                                <AvatarImage src={m.user.image} />
-                                                <AvatarFallback className="text-[10px]">{m.user.name?.substring(0, 2)}</AvatarFallback>
-                                            </Avatar>
-                                        ))}
-                                    </div>
+                            {project.squads && project.squads.length > 0 ? (
+                                <div className="space-y-4">
+                                    {project.squads.map((squad: any) => (
+                                        <div key={squad.id} className="space-y-2">
+                                            <Link href={`/squads/${squad.id}`} className="text-sm font-medium hover:underline block">
+                                                {squad.name}
+                                            </Link>
+                                            <div className="flex -space-x-2">
+                                                {squad.members?.slice(0, 4).map((m: any) => (
+                                                    <Avatar key={m.user.id} className="h-6 w-6 ring-2 ring-background">
+                                                        <AvatarImage src={m.user.image} />
+                                                        <AvatarFallback className="text-[10px]">{m.user.name?.substring(0, 2)}</AvatarFallback>
+                                                    </Avatar>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="text-sm text-muted-foreground">Unassigned</div>

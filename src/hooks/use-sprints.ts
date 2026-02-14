@@ -7,9 +7,8 @@ import { toast } from "sonner";
 
 export function useSprints(projectId?: string) {
     return useQuery({
-        queryKey: ["sprints", projectId],
-        queryFn: () => projectId ? getSprints(projectId) : Promise.resolve([]),
-        enabled: !!projectId,
+        queryKey: ["sprints", projectId || "all"],
+        queryFn: () => getSprints(projectId),
     });
 }
 

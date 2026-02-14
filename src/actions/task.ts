@@ -78,6 +78,7 @@ export async function createTask(
                     },
                 },
                 project: true,
+                parentTask: true,
             },
         });
 
@@ -167,6 +168,7 @@ export async function updateTask(
                     },
                 },
                 project: true,
+                parentTask: true,
             },
         });
 
@@ -312,6 +314,7 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
                 },
                 project: true,
                 sprint: true,
+                parentTask: true,
                 subtasks: {
                     include: {
                         assignees: {

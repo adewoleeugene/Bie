@@ -21,6 +21,10 @@ const updateWikiPageSchema = z.object({
     title: z.string().min(1, "Title is required").optional(),
     content: z.any().optional(),
     parentPageId: z.string().nullable().optional(),
+    published: z.boolean().optional(),
+    slug: z.string().min(3).regex(/^[a-z0-0-]+$/, "Slug must be lowercase alphanumeric with hyphens").nullable().optional(),
+    allowDuplicate: z.boolean().optional(),
+    disallowIndexing: z.boolean().optional(),
 });
 
 export async function createWikiPage(data: z.infer<typeof createWikiPageSchema>) {
@@ -120,6 +124,10 @@ export async function updateWikiPage(data: z.infer<typeof updateWikiPageSchema>)
         if (validated.parentPageId !== undefined) {
             updateData.parentPageId = validated.parentPageId;
         }
+        if (validated.published !== undefined) updateData.published = validated.published;
+        if (validated.slug !== undefined) updateData.slug = validated.slug;
+        if (validated.allowDuplicate !== undefined) updateData.allowDuplicate = validated.allowDuplicate;
+        if (validated.disallowIndexing !== undefined) updateData.disallowIndexing = validated.disallowIndexing;
 
         const page = await db.wikiPage.update({
             where: { id: validated.id },
@@ -142,7 +150,11 @@ export async function updateWikiPage(data: z.infer<typeof updateWikiPageSchema>)
         }
 
         revalidatePath("/wiki");
-        revalidatePath(`/projects/${existingPage.projectId}/wiki`);
+        if (existingPage.projectId) {
+            revalidatePath(`/projects/${existingPage.projectId}/wiki`);
+        }
+        revalidatePath("/published-wiki");
+        revalidatePath(`/published-wiki/${page.id}`);
 
         return { success: true, data: page };
     } catch (error) {
@@ -150,7 +162,10 @@ export async function updateWikiPage(data: z.infer<typeof updateWikiPageSchema>)
         if (error instanceof z.ZodError) {
             return { success: false, error: error.issues[0].message };
         }
-        return { success: false, error: "Failed to update wiki page" };
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update wiki page"
+        };
     }
 }
 
