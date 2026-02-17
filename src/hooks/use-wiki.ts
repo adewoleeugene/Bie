@@ -8,8 +8,12 @@ import {
     createWikiPage,
     updateWikiPage,
     deleteWikiPage,
-    getWikiTemplates,
 } from "@/actions/wiki";
+import {
+    getWikiTemplates,
+    createWikiTemplate,
+    deleteWikiTemplate
+} from "@/actions/wiki-template";
 
 export function useWikiPages(organizationId: string, namespace?: WikiNamespace, projectId?: string) {
     return useQuery({

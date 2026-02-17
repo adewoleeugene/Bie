@@ -2,14 +2,16 @@
 
 import { KanbanBoard } from "@/components/kanban/board";
 import { TaskForm } from "@/components/tasks/task-form";
+import { SmartTaskInput } from "@/components/tasks/smart-task-input";
 import { TaskFiltersBar, applyTaskFilters, TaskFilters } from "@/components/tasks/task-filters";
 import { useTasks } from "@/hooks/use-tasks";
 import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Calendar, CheckCircle2, ExternalLink } from "lucide-react";
+import { Calendar, CheckCircle2, ExternalLink, Download, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
+import { exportTasksToCSV } from "@/lib/export";
 import {
     Select,
     SelectContent,
@@ -154,7 +156,20 @@ export default function BoardPage() {
                             </Button>
                         )}
                     </div>
-                    <TaskForm projectId={projectId} sprintId={sprintId || undefined} />
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportTasksToCSV(applyTaskFilters(tasks || [], taskFilters))}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export CSV
+                        </Button>
+                        <TaskForm projectId={projectId} sprintId={sprintId || undefined} />
+                    </div>
+                </div>
+                <div className="px-6 pb-2">
+                    <SmartTaskInput projectId={projectId} sprintId={sprintId || undefined} />
                 </div>
                 <div className="px-6 pb-3">
                     <TaskFiltersBar filters={taskFilters} onFiltersChange={setTaskFilters} />

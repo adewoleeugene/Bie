@@ -40,10 +40,29 @@ const POMODOROS_BEFORE_LONG_BREAK = 4;
 
 type TimerPhase = "work" | "short_break" | "long_break";
 
-export function PomodoroTimer() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [mode, setMode] = useState<"pomodoro" | "free">("pomodoro");
-    const [selectedTaskId, setSelectedTaskId] = useState<string>("");
+interface PomodoroTimerProps {
+    /** When provided, opens as a controlled dialog for a specific task */
+    preSelectedTaskId?: string | null;
+    preSelectedMode?: "pomodoro" | "free";
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+export function PomodoroTimer({
+    preSelectedTaskId,
+    preSelectedMode,
+    isOpen: externalIsOpen,
+    onClose,
+}: PomodoroTimerProps = {}) {
+    const isControlled = externalIsOpen !== undefined;
+    const [internalIsOpen, setInternalIsOpen] = useState(false);
+    const isOpen = isControlled ? externalIsOpen : internalIsOpen;
+    const setIsOpen = isControlled
+        ? (open: boolean) => { if (!open && onClose) onClose(); }
+        : setInternalIsOpen;
+
+    const [mode, setMode] = useState<"pomodoro" | "free">(preSelectedMode || "pomodoro");
+    const [selectedTaskId, setSelectedTaskId] = useState<string>(preSelectedTaskId || "");
     const [notes, setNotes] = useState("");
 
     // Timer state
@@ -63,6 +82,19 @@ export function PomodoroTimer() {
     const startSession = useStartFocusSession();
     const endSession = useEndFocusSession();
     const { data: activeSession } = useActiveFocusSession();
+
+    // Sync pre-selected values when they change (controlled mode)
+    useEffect(() => {
+        if (preSelectedTaskId) {
+            setSelectedTaskId(preSelectedTaskId);
+        }
+    }, [preSelectedTaskId]);
+
+    useEffect(() => {
+        if (preSelectedMode) {
+            setMode(preSelectedMode);
+        }
+    }, [preSelectedMode]);
 
     // Create audio context for notification sound
     const playNotificationSound = useCallback(() => {
@@ -207,6 +239,9 @@ export function PomodoroTimer() {
         setPhase("work");
         setPomodoroCount(0);
         setNotes("");
+
+        // Close if controlled
+        if (onClose) onClose();
     };
 
     const handleSkipBreak = () => {
@@ -248,6 +283,9 @@ export function PomodoroTimer() {
         }
     };
 
+    // Get name of the currently selected task
+    const selectedTask = tasks?.find((t: any) => t.id === selectedTaskId);
+
     // Calculate progress for the ring
     const totalTime =
         phase === "work"
@@ -259,6 +297,280 @@ export function PomodoroTimer() {
     const circumference = 2 * Math.PI * 90;
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
+    const dialogContent = (
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-orange-500" />
+                    Focus Session
+                </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6">
+                {/* Linked Task Display */}
+                {selectedTask && (
+                    <div className="rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 p-3">
+                        <div className="flex items-center gap-2">
+                            <Target className="h-4 w-4 text-orange-500 shrink-0" />
+                            <span className="font-medium text-sm truncate">{selectedTask.title}</span>
+                        </div>
+                        {(selectedTask as any).project && (
+                            <span className="text-xs text-neutral-500 ml-6">
+                                {(selectedTask as any).project.name}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Mode Selector */}
+                {!sessionActive && (
+                    <div className="flex gap-2">
+                        <Button
+                            variant={mode === "pomodoro" ? "default" : "outline"}
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => setMode("pomodoro")}
+                        >
+                            <Target className="mr-2 h-4 w-4" />
+                            Pomodoro
+                        </Button>
+                        <Button
+                            variant={mode === "free" ? "default" : "outline"}
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => setMode("free")}
+                        >
+                            <Timer className="mr-2 h-4 w-4" />
+                            Free Focus
+                        </Button>
+                    </div>
+                )}
+
+                {/* Timer Display */}
+                <div className="flex flex-col items-center py-4">
+                    {mode === "pomodoro" ? (
+                        <div className="relative">
+                            {/* Progress Ring */}
+                            <svg
+                                className="transform -rotate-90"
+                                width="200"
+                                height="200"
+                            >
+                                <circle
+                                    cx="100"
+                                    cy="100"
+                                    r="90"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    fill="none"
+                                    className="text-neutral-200 dark:text-neutral-800"
+                                />
+                                <circle
+                                    cx="100"
+                                    cy="100"
+                                    r="90"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    fill="none"
+                                    strokeDasharray={circumference}
+                                    strokeDashoffset={strokeDashoffset}
+                                    strokeLinecap="round"
+                                    className={cn(
+                                        "transition-all duration-1000",
+                                        phase === "work" && "text-orange-500",
+                                        phase === "short_break" && "text-green-500",
+                                        phase === "long_break" && "text-blue-500"
+                                    )}
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <div className={cn("flex items-center gap-1 text-xs font-medium mb-1", getPhaseColor())}>
+                                    {getPhaseIcon()}
+                                    {getPhaseLabel()}
+                                </div>
+                                <span className="text-4xl font-mono font-bold tabular-nums">
+                                    {formatTime(timeRemaining)}
+                                </span>
+                                {pomodoroCount > 0 && (
+                                    <div className="flex gap-1 mt-2">
+                                        {Array.from({ length: pomodoroCount }).map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className="h-2 w-2 rounded-full bg-orange-500"
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <span className="text-xs font-medium text-neutral-500 mb-2">
+                                Elapsed Time
+                            </span>
+                            <span className="text-5xl font-mono font-bold tabular-nums">
+                                {formatTime(elapsedSeconds)}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Pomodoro Count */}
+                {mode === "pomodoro" && pomodoroCount > 0 && (
+                    <div className="text-center">
+                        <Badge
+                            variant="secondary"
+                            className="gap-1"
+                        >
+                            <Flame className="h-3 w-3 text-orange-500" />
+                            {pomodoroCount} {pomodoroCount === 1 ? "Pomodoro" : "Pomodoros"} completed
+                        </Badge>
+                    </div>
+                )}
+
+                {/* Task Selector (only if not pre-selected) */}
+                {!sessionActive && !preSelectedTaskId && (
+                    <div className="space-y-3">
+                        <Select
+                            value={selectedTaskId}
+                            onValueChange={setSelectedTaskId}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Link to a task (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">No task</SelectItem>
+                                {tasks?.map((task: any) => (
+                                    <SelectItem key={task.id} value={task.id}>
+                                        {task.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Textarea
+                            placeholder="Session notes (optional)..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                            className="resize-none"
+                        />
+                    </div>
+                )}
+
+                {/* Notes (if pre-selected task, show notes only) */}
+                {!sessionActive && preSelectedTaskId && (
+                    <Textarea
+                        placeholder="Session notes (optional)..."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                        className="resize-none"
+                    />
+                )}
+
+                {/* Controls */}
+                <div className="flex items-center justify-center gap-3">
+                    {!sessionActive ? (
+                        <Button
+                            size="lg"
+                            className="gap-2 bg-orange-500 hover:bg-orange-600 text-white"
+                            onClick={handleStart}
+                            disabled={startSession.isPending}
+                        >
+                            <Play className="h-5 w-5" />
+                            Start {mode === "pomodoro" ? "Pomodoro" : "Focus"}
+                        </Button>
+                    ) : (
+                        <>
+                            {isRunning ? (
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={handlePause}
+                                >
+                                    <Pause className="h-5 w-5" />
+                                    Pause
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="lg"
+                                    className="gap-2 bg-green-500 hover:bg-green-600 text-white"
+                                    onClick={handleStart}
+                                >
+                                    <Play className="h-5 w-5" />
+                                    Resume
+                                </Button>
+                            )}
+
+                            {mode === "pomodoro" && phase !== "work" && (
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={handleSkipBreak}
+                                >
+                                    <SkipForward className="h-5 w-5" />
+                                    Skip Break
+                                </Button>
+                            )}
+
+                            <Button
+                                size="lg"
+                                variant="destructive"
+                                className="gap-2"
+                                onClick={handleStop}
+                                disabled={endSession.isPending}
+                            >
+                                <Square className="h-5 w-5" />
+                                End Session
+                            </Button>
+                        </>
+                    )}
+                </div>
+
+                {/* Session Info */}
+                {sessionActive && (
+                    <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900 p-3 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-neutral-500">Total elapsed</span>
+                            <span className="font-mono tabular-nums font-medium">
+                                {formatTime(elapsedSeconds)}
+                            </span>
+                        </div>
+                        {mode === "pomodoro" && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-neutral-500">Pomodoros</span>
+                                <span className="font-medium">{pomodoroCount}</span>
+                            </div>
+                        )}
+                        <Textarea
+                            placeholder="Add notes..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                            className="resize-none mt-2"
+                        />
+                    </div>
+                )}
+            </div>
+        </DialogContent>
+    );
+
+    // If controlled externally (from Focus page), render without trigger
+    if (isControlled) {
+        return (
+            <>
+                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                    {dialogContent}
+                </Dialog>
+                <audio ref={audioRef} preload="none" />
+            </>
+        );
+    }
+
+    // Standalone mode (top nav trigger)
     return (
         <>
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -288,238 +600,7 @@ export function PomodoroTimer() {
                         {!sessionActive && <span className="text-xs hidden sm:inline">Focus</span>}
                     </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Zap className="h-5 w-5 text-orange-500" />
-                            Focus Session
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-6">
-                        {/* Mode Selector */}
-                        {!sessionActive && (
-                            <div className="flex gap-2">
-                                <Button
-                                    variant={mode === "pomodoro" ? "default" : "outline"}
-                                    size="sm"
-                                    className="flex-1"
-                                    onClick={() => setMode("pomodoro")}
-                                >
-                                    <Target className="mr-2 h-4 w-4" />
-                                    Pomodoro
-                                </Button>
-                                <Button
-                                    variant={mode === "free" ? "default" : "outline"}
-                                    size="sm"
-                                    className="flex-1"
-                                    onClick={() => setMode("free")}
-                                >
-                                    <Timer className="mr-2 h-4 w-4" />
-                                    Free Focus
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* Timer Display */}
-                        <div className="flex flex-col items-center py-4">
-                            {mode === "pomodoro" ? (
-                                <div className="relative">
-                                    {/* Progress Ring */}
-                                    <svg
-                                        className="transform -rotate-90"
-                                        width="200"
-                                        height="200"
-                                    >
-                                        <circle
-                                            cx="100"
-                                            cy="100"
-                                            r="90"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                            fill="none"
-                                            className="text-neutral-200 dark:text-neutral-800"
-                                        />
-                                        <circle
-                                            cx="100"
-                                            cy="100"
-                                            r="90"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                            fill="none"
-                                            strokeDasharray={circumference}
-                                            strokeDashoffset={strokeDashoffset}
-                                            strokeLinecap="round"
-                                            className={cn(
-                                                "transition-all duration-1000",
-                                                phase === "work" && "text-orange-500",
-                                                phase === "short_break" && "text-green-500",
-                                                phase === "long_break" && "text-blue-500"
-                                            )}
-                                        />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        <div className={cn("flex items-center gap-1 text-xs font-medium mb-1", getPhaseColor())}>
-                                            {getPhaseIcon()}
-                                            {getPhaseLabel()}
-                                        </div>
-                                        <span className="text-4xl font-mono font-bold tabular-nums">
-                                            {formatTime(timeRemaining)}
-                                        </span>
-                                        {pomodoroCount > 0 && (
-                                            <div className="flex gap-1 mt-2">
-                                                {Array.from({ length: pomodoroCount }).map((_, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="h-2 w-2 rounded-full bg-orange-500"
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center">
-                                    <span className="text-xs font-medium text-neutral-500 mb-2">
-                                        Elapsed Time
-                                    </span>
-                                    <span className="text-5xl font-mono font-bold tabular-nums">
-                                        {formatTime(elapsedSeconds)}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Pomodoro Count */}
-                        {mode === "pomodoro" && pomodoroCount > 0 && (
-                            <div className="text-center">
-                                <Badge
-                                    variant="secondary"
-                                    className="gap-1"
-                                >
-                                    <Flame className="h-3 w-3 text-orange-500" />
-                                    {pomodoroCount} {pomodoroCount === 1 ? "Pomodoro" : "Pomodoros"} completed
-                                </Badge>
-                            </div>
-                        )}
-
-                        {/* Task Selector */}
-                        {!sessionActive && (
-                            <div className="space-y-3">
-                                <Select
-                                    value={selectedTaskId}
-                                    onValueChange={setSelectedTaskId}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Link to a task (optional)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">No task</SelectItem>
-                                        {tasks?.map((task) => (
-                                            <SelectItem key={task.id} value={task.id}>
-                                                {task.title}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <Textarea
-                                    placeholder="Session notes (optional)..."
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    rows={2}
-                                    className="resize-none"
-                                />
-                            </div>
-                        )}
-
-                        {/* Controls */}
-                        <div className="flex items-center justify-center gap-3">
-                            {!sessionActive ? (
-                                <Button
-                                    size="lg"
-                                    className="gap-2 bg-orange-500 hover:bg-orange-600 text-white"
-                                    onClick={handleStart}
-                                    disabled={startSession.isPending}
-                                >
-                                    <Play className="h-5 w-5" />
-                                    Start {mode === "pomodoro" ? "Pomodoro" : "Focus"}
-                                </Button>
-                            ) : (
-                                <>
-                                    {isRunning ? (
-                                        <Button
-                                            size="lg"
-                                            variant="outline"
-                                            className="gap-2"
-                                            onClick={handlePause}
-                                        >
-                                            <Pause className="h-5 w-5" />
-                                            Pause
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            size="lg"
-                                            className="gap-2 bg-green-500 hover:bg-green-600 text-white"
-                                            onClick={handleStart}
-                                        >
-                                            <Play className="h-5 w-5" />
-                                            Resume
-                                        </Button>
-                                    )}
-
-                                    {mode === "pomodoro" && phase !== "work" && (
-                                        <Button
-                                            size="lg"
-                                            variant="outline"
-                                            className="gap-2"
-                                            onClick={handleSkipBreak}
-                                        >
-                                            <SkipForward className="h-5 w-5" />
-                                            Skip Break
-                                        </Button>
-                                    )}
-
-                                    <Button
-                                        size="lg"
-                                        variant="destructive"
-                                        className="gap-2"
-                                        onClick={handleStop}
-                                        disabled={endSession.isPending}
-                                    >
-                                        <Square className="h-5 w-5" />
-                                        End Session
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Session Info */}
-                        {sessionActive && (
-                            <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900 p-3 space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-neutral-500">Total elapsed</span>
-                                    <span className="font-mono tabular-nums font-medium">
-                                        {formatTime(elapsedSeconds)}
-                                    </span>
-                                </div>
-                                {mode === "pomodoro" && (
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-neutral-500">Pomodoros</span>
-                                        <span className="font-medium">{pomodoroCount}</span>
-                                    </div>
-                                )}
-                                <Textarea
-                                    placeholder="Add notes..."
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    rows={2}
-                                    className="resize-none mt-2"
-                                />
-                            </div>
-                        )}
-                    </div>
-                </DialogContent>
+                {dialogContent}
             </Dialog>
 
             {/* Hidden audio element */}

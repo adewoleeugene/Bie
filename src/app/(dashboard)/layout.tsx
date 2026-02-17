@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 import { getProjects } from "@/actions/project";
+import { DashboardClientProviders } from "@/components/layout/dashboard-client-providers";
+import { AssistantChat } from "@/components/ai/assistant-chat";
 
 export default async function DashboardLayout({
     children,
@@ -37,7 +39,9 @@ export default async function DashboardLayout({
 
     return (
         <div className="flex h-screen overflow-hidden">
-            <Sidebar projects={projects} />
+            <div className="hidden md:block">
+                <Sidebar projects={projects} />
+            </div>
             <div className="flex flex-1 flex-col overflow-hidden">
                 <TopNav
                     user={{
@@ -46,10 +50,13 @@ export default async function DashboardLayout({
                         image: user.image,
                     }}
                     organizationName={organization.name}
+                    projects={projects}
                 />
                 <main className="flex-1 overflow-auto bg-neutral-50 dark:bg-neutral-900">
                     {children}
                 </main>
+                <AssistantChat />
+                <DashboardClientProviders />
             </div>
         </div>
     );

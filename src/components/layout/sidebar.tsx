@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen, Zap, Clock, Sun, Timer } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen, Zap, Clock, Sun, Timer, TrendingUp } from "lucide-react";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
 
@@ -47,6 +47,16 @@ export function Sidebar({ projects }: SidebarProps) {
                     >
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Dashboard
+                    </Button>
+                </Link>
+
+                <Link href="/analytics">
+                    <Button
+                        variant={pathname === "/analytics" ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                    >
+                        <TrendingUp className="mr-2 h-4 w-4" />
+                        Analytics
                     </Button>
                 </Link>
 
@@ -217,6 +227,16 @@ export function Sidebar({ projects }: SidebarProps) {
                                                     className="h-8 w-full justify-start text-xs font-normal"
                                                 >
                                                     Timeline
+                                                </Button>
+                                            </Link>
+                                            <Link href={`/projects/${project.id}/automation`}>
+                                                <Button
+                                                    variant={pathname?.includes("/automation") ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    className="h-8 w-full justify-start text-xs font-normal"
+                                                >
+                                                    <Zap className="mr-2 h-3 w-3" />
+                                                    Automation
                                                 </Button>
                                             </Link>
                                         </div>

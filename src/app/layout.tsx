@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChristBase - Project Management & Productivity",
+  title: {
+    default: "ChristBase - Project Management",
+    template: "%s | ChristBase",
+  },
   description: "Internal project management and productivity platform for Christex Foundation",
 };
 

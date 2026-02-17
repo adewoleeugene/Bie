@@ -2,6 +2,14 @@ import { getTasks } from "@/actions/task";
 import { getProjects } from "@/actions/project";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Circle, Clock, FolderKanban } from "lucide-react";
+import { Metadata } from "next";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+    title: "Dashboard",
+    description: "Overview of your tasks and projects",
+};
 
 export default async function DashboardPage() {
     const [tasks, projects] = await Promise.all([getTasks(), getProjects()]);

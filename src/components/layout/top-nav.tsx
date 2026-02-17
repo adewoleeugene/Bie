@@ -12,8 +12,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Sidebar } from "@/components/layout/sidebar";
 
 interface TopNavProps {
     user: {
@@ -22,9 +24,10 @@ interface TopNavProps {
         image?: string | null;
     };
     organizationName: string;
+    projects: any[];
 }
 
-export function TopNav({ user, organizationName }: TopNavProps) {
+export function TopNav({ user, organizationName, projects }: TopNavProps) {
     const initials = user.name
         ?.split(" ")
         .map((n) => n[0])
@@ -34,10 +37,21 @@ export function TopNav({ user, organizationName }: TopNavProps) {
     return (
         <div className="flex h-16 items-center justify-between border-b bg-white px-6 dark:bg-neutral-950">
             <div className="flex items-center gap-4">
-                <h2 className="text-sm font-medium text-neutral-500">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <button className="block md:hidden">
+                            <Menu className="h-6 w-6" />
+                        </button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-64">
+                        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                        <Sidebar projects={projects} />
+                    </SheetContent>
+                </Sheet>
+                <h2 className="text-sm font-medium text-neutral-500 hidden sm:block">
                     {organizationName}
                 </h2>
-                <div className="w-[300px]">
+                <div className="w-[200px] sm:w-[300px]">
                     <SearchDialog />
                 </div>
             </div>

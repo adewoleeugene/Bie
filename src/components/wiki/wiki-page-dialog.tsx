@@ -59,7 +59,7 @@ export function WikiPageDialog({
 
         let content = null;
         if (selectedTemplateId && selectedTemplateId !== "none" && templates) {
-            const template = templates.find((t) => t.id === selectedTemplateId);
+            const template = templates.find((t: any) => t.id === selectedTemplateId);
             if (template) {
                 content = template.content;
             }
@@ -150,9 +150,9 @@ export function WikiPageDialog({
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">None (Blank Page)</SelectItem>
-                                        {templates.map((template) => (
+                                        {templates.map((template: any) => (
                                             <SelectItem key={template.id} value={template.id}>
-                                                {template.title}
+                                                {template.name || template.title}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

@@ -20,10 +20,11 @@ import {
 } from "@/components/ui/select";
 import { TaskStatus, TaskPriority } from "@prisma/client";
 import { format } from "date-fns";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskWithRelations } from "@/types/task";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import { exportTasksToCSV } from "@/lib/export";
 
 interface TaskTableProps {
     tasks: TaskWithRelations[];
@@ -105,39 +106,51 @@ export function TaskTable({ tasks, actionColumn }: TaskTableProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-4">
-                <Select
-                    value={statusFilter}
-                    onValueChange={(value) => setStatusFilter(value as TaskStatus | "ALL")}
-                >
-                    <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL">All Statuses</SelectItem>
-                        <SelectItem value="BACKLOG">Backlog</SelectItem>
-                        <SelectItem value="TODO">To Do</SelectItem>
-                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                        <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                        <SelectItem value="DONE">Done</SelectItem>
-                    </SelectContent>
-                </Select>
+            <div className="flex gap-4 items-center justify-between">
+                <div className="flex gap-4">
+                    <Select
+                        value={statusFilter}
+                        onValueChange={(value) => setStatusFilter(value as TaskStatus | "ALL")}
+                    >
+                        <SelectTrigger className="w-48">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">All Statuses</SelectItem>
+                            <SelectItem value="BACKLOG">Backlog</SelectItem>
+                            <SelectItem value="TODO">To Do</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                            <SelectItem value="DONE">Done</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                <Select
-                    value={priorityFilter}
-                    onValueChange={(value) => setPriorityFilter(value as TaskPriority | "ALL")}
+                    <Select
+                        value={priorityFilter}
+                        onValueChange={(value) => setPriorityFilter(value as TaskPriority | "ALL")}
+                    >
+                        <SelectTrigger className="w-48">
+                            <SelectValue placeholder="Filter by priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">All Priorities</SelectItem>
+                            <SelectItem value="P0">P0 - Critical</SelectItem>
+                            <SelectItem value="P1">P1 - High</SelectItem>
+                            <SelectItem value="P2">P2 - Medium</SelectItem>
+                            <SelectItem value="P3">P3 - Low</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportTasksToCSV(filteredAndSortedTasks)}
+                    className="ml-auto"
                 >
-                    <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filter by priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL">All Priorities</SelectItem>
-                        <SelectItem value="P0">P0 - Critical</SelectItem>
-                        <SelectItem value="P1">P1 - High</SelectItem>
-                        <SelectItem value="P2">P2 - Medium</SelectItem>
-                        <SelectItem value="P3">P3 - Low</SelectItem>
-                    </SelectContent>
-                </Select>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                </Button>
             </div>
 
             <div className="rounded-md border">

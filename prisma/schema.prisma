@@ -100,6 +100,7 @@ model Organization {
   notifications Notification[]
   favorites     Favorite[]
   recentItems   RecentItem[]
+  wikiTemplates WikiTemplate[]
 }
 
 model User {
@@ -127,6 +128,8 @@ model User {
   recentItems    RecentItem[]
   accounts       Account[]
   sessions       Session[]
+  createdAutomationRules AutomationRule[]
+  wikiTemplates WikiTemplate[] @relation("WikiTemplateAuthor")
 }
 
 model Account {
@@ -220,6 +223,7 @@ model Project {
   sprints      Sprint[]
   tasks        Task[]
   wikiPages    WikiPage[]
+  automationRules AutomationRule[]
 
   @@index([organizationId])
 }
@@ -389,6 +393,22 @@ model WikiPage {
   @@index([parentPageId])
 }
 
+model WikiTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  content        Json
+  organizationId String
+  authorId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  author       User         @relation("WikiTemplateAuthor", fields: [authorId], references: [id])
+
+  @@index([organizationId])
+}
+
 model WikiPageVersion {
   id         String   @id @default(cuid())
   pageId     String
@@ -454,4 +474,27 @@ model RecentItem {
   @@unique([userId, itemType, itemId])
   @@index([userId])
   @@index([organizationId])
+}
+
+model AutomationRule {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  triggerType    String       // e.g., "STATUS_CHANGE", "PRIORITY_CHANGE"
+  triggerValue   String       // e.g., "DONE", "P0" (The value that triggers the rule)
+  actionType     String       // e.g., "ASSIGN_USER", "ADD_COMMENT"
+  actionValue    String       // e.g., userId, "Great job!"
+  isActive       Boolean      @default(true)
+  
+  projectId      String?
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  creatorId      String
+  creator        User         @relation(fields: [creatorId], references: [id])
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([projectId])
+  @@index([creatorId])
 }

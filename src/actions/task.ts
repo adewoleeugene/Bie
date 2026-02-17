@@ -15,6 +15,7 @@ import {
 } from "@/lib/validators/task";
 import { Task, ActivityAction, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { processAutomationRules } from "@/actions/automation";
 
 // Helper to get user's organization
 async function getUserOrganization() {
@@ -190,6 +191,16 @@ export async function updateTask(
                 action,
             },
         });
+
+        // Trigger Automation Rules (Fire and forget)
+        if (task.projectId) {
+            if (validated.status !== undefined && existingTask.status !== validated.status) {
+                processAutomationRules(task.id, task.projectId, "STATUS_CHANGE", validated.status, userId).catch(e => console.error(e));
+            }
+            if (validated.priority !== undefined && existingTask.priority !== validated.priority) {
+                processAutomationRules(task.id, task.projectId, "PRIORITY_CHANGE", validated.priority, userId).catch(e => console.error(e));
+            }
+        }
 
         revalidatePath("/");
         return { success: true, data: task };
