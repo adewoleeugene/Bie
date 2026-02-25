@@ -115,28 +115,46 @@ export function AssistantChat() {
             return;
         }
 
-        // Default mock response (fallback)
-        setTimeout(() => {
-            let responseText = "I'm still learning, but I can help you manage your tasks.";
+        try {
+            const history = [...messages, userMsg].filter(m => m.id !== "welcome").map(m => ({
+                id: m.id,
+                role: m.role,
+                content: m.content
+            }));
 
-            if (lowerInput.includes("analytics") || lowerInput.includes("report")) {
-                responseText = "You can view detailed project metrics in the Analytics dashboard.";
-            } else if (lowerInput.includes("sprint")) {
-                responseText = "Check the Sprint Board to see active sprint progress.";
-            } else if (lowerInput.includes("hello") || lowerInput.includes("hi")) {
-                responseText = "Hello! Ready to get some work done? Try asking me to 'Create task ...'";
+            const response = await fetch("/api/ai/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: history,
+                    systemInstruction: "You are ChristAI, a helpful project management assistant for ChristBase. You help the user manage tasks, projects, and navigate the system. Keep responses concise and friendly."
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || "Failed to generate AI response");
             }
+
+            const data = await response.json();
 
             const botMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: responseText,
+                content: data.message,
                 timestamp: new Date(),
             };
-
             setMessages((prev) => [...prev, botMsg]);
+        } catch (error: any) {
+            setMessages((prev) => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: `Error: ${error.message}. Is your GEMINI_API_KEY set in .env?`,
+                timestamp: new Date(),
+            }]);
+        } finally {
             setIsTyping(false);
-        }, 1000);
+        }
     };
 
     if (!isOpen) {

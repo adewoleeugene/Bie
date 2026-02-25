@@ -7,7 +7,7 @@ import { ChevronRight, ChevronDown, FileText, Plus, Loader2 } from "lucide-react
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { createWikiPage } from "@/actions/wiki";
+import { WikiPageDialog } from "./wiki-page-dialog";
 
 type WikiPageWithChildren = WikiPage & {
     author: User;
@@ -51,19 +51,9 @@ function WikiTreeItem({
     const handleQuickAdd = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        setIsCreating(true);
-        const result = await createWikiPage({
-            title: "Untitled",
-            organizationId,
-            projectId,
-            parentPageId: page.id,
-            namespace: page.namespace,
-        });
-        if (result.success && result.data) {
-            router.push(`${basePath}/${result.data.id}`);
-            router.refresh();
-        }
-        setIsCreating(false);
+        // The actual open state config lives as part of WikiPageDialog which we will render inline or we can use a controlled dialog approach.
+        // For simplicity we will embed the dialog directly returning it from button click
+        // But since this is a list item, we better manage 'openDialogForContext' via local state holding parentId
     };
 
     return (
@@ -101,13 +91,20 @@ function WikiTreeItem({
                     {page.title}
                 </Link>
                 {!readOnly && (
-                    <button
-                        onClick={handleQuickAdd}
-                        disabled={isCreating}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors disabled:opacity-50"
-                    >
-                        {isCreating ? <Loader2 className="h-3 w-3 animate-spin text-neutral-400" /> : <Plus className="h-3 w-3 text-neutral-500" />}
-                    </button>
+                    <WikiPageDialog
+                        organizationId={organizationId}
+                        projectId={projectId}
+                        parentPageId={page.id}
+                        namespace={page.namespace}
+                        trigger={
+                            <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors disabled:opacity-50"
+                            >
+                                <Plus className="h-3 w-3 text-neutral-500" />
+                            </button>
+                        }
+                    />
                 )}
             </div>
             {hasChildren && isExpanded && (
@@ -142,18 +139,7 @@ export function WikiSidebar({
     const [isCreatingRoot, setIsCreatingRoot] = useState(false);
 
     const handleQuickAddRoot = async () => {
-        setIsCreatingRoot(true);
-        const result = await createWikiPage({
-            title: "Untitled",
-            organizationId,
-            projectId,
-            namespace: projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY,
-        });
-        if (result.success && result.data) {
-            router.push(`${basePath}/${result.data.id}`);
-            router.refresh();
-        }
-        setIsCreatingRoot(false);
+        // Obsolete function, replaced by WikiPageDialog usage below
     };
 
     // Build tree structure
@@ -182,13 +168,16 @@ export function WikiSidebar({
                 <div className="flex items-center justify-between">
                     <h2 className="font-bold text-neutral-900 dark:text-neutral-100 px-2 tracking-tight text-sm uppercase opacity-50">Wiki</h2>
                     {!readOnly && (
-                        <button
-                            onClick={handleQuickAddRoot}
-                            disabled={isCreatingRoot}
-                            className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded transition-colors"
-                        >
-                            {isCreatingRoot ? <Loader2 className="h-4 w-4 animate-spin text-neutral-400" /> : <Plus className="h-4 w-4 text-neutral-500" />}
-                        </button>
+                        <WikiPageDialog
+                            organizationId={organizationId}
+                            projectId={projectId}
+                            namespace={projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY}
+                            trigger={
+                                <button className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded transition-colors">
+                                    <Plus className="h-4 w-4 text-neutral-500" />
+                                </button>
+                            }
+                        />
                     )}
                 </div>
 
@@ -207,14 +196,16 @@ export function WikiSidebar({
                     {rootPages.length === 0 && (
                         <div className="px-3 py-8 text-center">
                             <p className="text-xs text-neutral-400">No pages yet.</p>
-                            <Button
-                                variant="link"
-                                size="sm"
-                                className="text-xs"
-                                onClick={handleQuickAddRoot}
-                            >
-                                Create your first page
-                            </Button>
+                            <WikiPageDialog
+                                organizationId={organizationId}
+                                projectId={projectId}
+                                namespace={projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY}
+                                trigger={
+                                    <Button variant="link" size="sm" className="text-xs">
+                                        Create your first page
+                                    </Button>
+                                }
+                            />
                         </div>
                     )}
                 </div>
