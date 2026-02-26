@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ChristBase - Project Management",
-    template: "%s | ChristBase",
+    default: "Bie - Project Management",
+    template: "%s | Bie",
   },
   description: "Internal project management and productivity platform for Christex Foundation",
 };

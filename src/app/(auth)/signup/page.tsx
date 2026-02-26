@@ -9,7 +9,7 @@ export default function SignupPage() {
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-3xl font-bold">Create Account</CardTitle>
                     <CardDescription>
-                        Sign up to get started with ChristBase
+                        Sign up to get started with Bie
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

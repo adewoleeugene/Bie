@@ -33,7 +33,7 @@ export function Sidebar({ projects }: SidebarProps) {
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-white dark:bg-neutral-50 dark:text-neutral-900">
                         <span className="text-lg font-bold">C</span>
                     </div>
-                    <span className="text-xl font-bold">ChristBase</span>
+                    <span className="text-xl font-bold">Bie</span>
                 </Link>
             </div>
 

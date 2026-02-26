@@ -9,8 +9,8 @@ import Image from "next/image";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-    title: "ChristBase Wiki",
-    description: "Published documentation and wiki for ChristBase",
+    title: "Bie Wiki",
+    description: "Published documentation and wiki for Bie",
 };
 
 export default async function PublishedWikiLayout({
@@ -91,7 +91,7 @@ export default async function PublishedWikiLayout({
                         <footer className="mt-auto border-t py-8 px-12 opacity-50 hover:opacity-100 transition-opacity">
                             <div className="flex items-center gap-2 text-sm">
                                 <span>Powered by</span>
-                                <span className="font-bold tracking-tight">ChristBase</span>
+                                <span className="font-bold tracking-tight">Bie</span>
                             </div>
                         </footer>
                     </div>

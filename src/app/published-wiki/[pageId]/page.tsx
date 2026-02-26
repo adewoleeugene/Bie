@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     if (!page) return { title: "Wiki Page" };
 
     return {
-        title: `${page.title} | ChristBase Wiki`,
-        description: `View ${page.title} on ChristBase Wiki`,
+        title: `${page.title} | Bie Wiki`,
+        description: `View ${page.title} on Bie Wiki`,
     };
 }
 

@@ -31,7 +31,7 @@ export function AssistantChat() {
         {
             id: "welcome",
             role: "assistant",
-            content: "Hi! I'm ChristAI, your project assistant. How can I help you today?",
+            content: "Hi! I'm BieAI, your project assistant. How can I help you today?",
             timestamp: new Date(),
         },
     ]);
@@ -127,7 +127,7 @@ export function AssistantChat() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     messages: history,
-                    systemInstruction: "You are ChristAI, a helpful project management assistant for ChristBase. You help the user manage tasks, projects, and navigate the system. Keep responses concise and friendly."
+                    systemInstruction: "You are BieAI, a helpful project management assistant for Bie. You help the user manage tasks, projects, and navigate the system. Keep responses concise and friendly."
                 })
             });
 
@@ -176,7 +176,7 @@ export function AssistantChat() {
                         <Bot className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                        <CardTitle className="text-sm font-bold">ChristAI Assistant</CardTitle>
+                        <CardTitle className="text-sm font-bold">BieAI Assistant</CardTitle>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                             Online

@@ -14,7 +14,7 @@ export default async function PublishedWikiPage() {
                 <div className="text-center space-y-4">
                     <h1 className="text-2xl font-bold">Organization Not Found</h1>
                     <p className="text-muted-foreground">
-                        The ChristBase wiki is currently unconfigured.
+                        The Bie wiki is currently unconfigured.
                     </p>
                 </div>
             </div>
@@ -42,7 +42,7 @@ export default async function PublishedWikiPage() {
     return (
         <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4">
-                <h1 className="text-2xl font-bold">Welcome to the ChristBase Wiki</h1>
+                <h1 className="text-2xl font-bold">Welcome to the Bie Wiki</h1>
                 <p className="text-muted-foreground">
                     There are no published pages yet.
                 </p>

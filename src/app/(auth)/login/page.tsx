@@ -11,7 +11,7 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-neutral-950 dark:to-neutral-900">
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1 text-center">
-                    <CardTitle className="text-3xl font-bold">ChristBase</CardTitle>
+                    <CardTitle className="text-3xl font-bold">Bie</CardTitle>
                     <CardDescription>
                         Sign in to access your workspace
                     </CardDescription>

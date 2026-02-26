@@ -12,13 +12,10 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Define model params
-        const modelParams: any = { model: "gemini-1.5-flash" };
-        if (systemInstruction) {
-            modelParams.systemInstruction = systemInstruction;
-        }
-
-        const model = genAI.getGenerativeModel(modelParams);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: systemInstruction || "You are BieAI, a helpful project management assistant."
+        });
 
         // Format history for Gemini (needs "user" or "model" roles)
         const formattedHistory = messages.slice(0, -1).map((m: any) => ({
