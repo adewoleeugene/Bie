@@ -42,7 +42,16 @@ export const reorderTaskSchema = z.object({
     sortOrder: z.number().int().nonnegative(),
 });
 
+export const bulkReorderTasksSchema = z.object({
+    tasks: z.array(z.object({
+        id: z.string(),
+        status: z.nativeEnum(TaskStatus).optional(),
+        sortOrder: z.number().int().nonnegative(),
+    }))
+});
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type DeleteTaskInput = z.infer<typeof deleteTaskSchema>;
 export type ReorderTaskInput = z.infer<typeof reorderTaskSchema>;
+export type BulkReorderTasksInput = z.infer<typeof bulkReorderTasksSchema>;

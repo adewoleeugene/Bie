@@ -12,6 +12,8 @@ import {
     UpdateTaskInput,
     DeleteTaskInput,
     ReorderTaskInput,
+    BulkReorderTasksInput,
+    bulkReorderTasksSchema,
 } from "@/lib/validators/task";
 import { Task, ActivityAction, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -291,6 +293,40 @@ export async function reorderTask(
         return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to reorder task",
+        };
+    }
+}
+
+export async function bulkReorderTasks(
+    input: BulkReorderTasksInput
+): Promise<ActionResult> {
+    try {
+        const validated = bulkReorderTasksSchema.parse(input);
+        const { userId, organizationId } = await getUserOrganization();
+
+        // Perform updates in a transaction
+        await db.$transaction(
+            validated.tasks.map((taskInfo) => {
+                const data: any = { sortOrder: taskInfo.sortOrder };
+                if (taskInfo.status) {
+                    data.status = taskInfo.status;
+                }
+
+                return db.task.update({
+                    where: { id: taskInfo.id },
+                    data,
+                });
+            })
+        );
+
+        // Optionally, one could create activity logs here for status changes if needed 
+        revalidatePath("/");
+        return { success: true, data: undefined };
+    } catch (error) {
+        console.error("Bulk reorder tasks error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to reorder tasks",
         };
     }
 }

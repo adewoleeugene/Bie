@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { WikiNamespace } from "@prisma/client";
@@ -24,7 +22,9 @@ import {
 } from "@/components/ui/select";
 import { createWikiPage } from "@/actions/wiki";
 import { useWikiTemplates } from "@/hooks/use-wiki";
-import { Plus } from "lucide-react";
+import { Plus, FileText, Layout, Info, Check } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface WikiPageDialogProps {
     organizationId: string;
@@ -57,6 +57,8 @@ export function WikiPageDialog({
         e.preventDefault();
         setLoading(true);
 
+        const loadingToast = toast.loading("Creating page...");
+
         let content = null;
         if (selectedTemplateId && selectedTemplateId !== "none" && templates) {
             const template = templates.find((t: any) => t.id === selectedTemplateId);
@@ -65,29 +67,41 @@ export function WikiPageDialog({
             }
         }
 
-        const result = await createWikiPage({
-            title,
-            content,
-            organizationId,
-            projectId: selectedNamespace === WikiNamespace.PROJECT ? projectId : undefined,
-            parentPageId,
-            namespace: selectedNamespace,
-            template: isTemplate,
-        });
+        try {
+            const result = await createWikiPage({
+                title,
+                content,
+                organizationId,
+                projectId: selectedNamespace === WikiNamespace.PROJECT ? projectId : undefined,
+                parentPageId,
+                namespace: selectedNamespace,
+                template: isTemplate,
+            });
 
-        setLoading(false);
-
-        if (result.success) {
-            setOpen(false);
-            setTitle("");
-            setIsTemplate(false);
-            setSelectedTemplateId("none");
-            if (onSuccess) {
-                onSuccess();
+            if (result.success) {
+                toast.success("Page created successfully", { id: loadingToast });
+                setOpen(false);
+                setTitle("");
+                setIsTemplate(false);
+                setSelectedTemplateId("none");
+                if (onSuccess) {
+                    onSuccess();
+                }
+                router.refresh();
+                // Navigate to the new page
+                if (result.data) {
+                    const basePath = selectedNamespace === WikiNamespace.PROJECT && projectId
+                        ? `/projects/${projectId}/wiki`
+                        : "/wiki";
+                    router.push(`${basePath}/${result.data.id}`);
+                }
+            } else {
+                toast.error(result.error || "Failed to create page", { id: loadingToast });
             }
-            router.refresh();
-        } else {
-            alert(result.error);
+        } catch (error) {
+            toast.error("An unexpected error occurred", { id: loadingToast });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -95,52 +109,62 @@ export function WikiPageDialog({
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
+                    <Button size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
                         New Page
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent>
-                <form onSubmit={handleSubmit}>
+            <DialogContent className="sm:max-w-[425px]">
+                <form onSubmit={handleSubmit} className="space-y-6">
                     <DialogHeader>
-                        <DialogTitle>Create New Wiki Page</DialogTitle>
+                        <DialogTitle className="text-xl">Create New Wiki Page</DialogTitle>
                         <DialogDescription>
-                            Create a new page in your wiki. You can start blank or use a template.
+                            Organize your documents. Start with a blank page or use a preset template.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+
+                    <div className="space-y-4 py-2">
                         <div className="space-y-2">
-                            <Label htmlFor="title">Page Title</Label>
-                            <Input
-                                id="title"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Enter page title"
-                                required
-                            />
+                            <Label htmlFor="title" className="text-sm font-semibold">Page Title</Label>
+                            <div className="relative">
+                                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="title"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Project Roadmap"
+                                    required
+                                    className="pl-9"
+                                    autoFocus
+                                />
+                            </div>
                         </div>
+
                         {!projectId && (
                             <div className="space-y-2">
-                                <Label htmlFor="namespace">Namespace</Label>
+                                <Label htmlFor="namespace" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Location</Label>
                                 <Select
                                     value={selectedNamespace}
                                     onValueChange={(value) => setSelectedNamespace(value as WikiNamespace)}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue />
+                                    <SelectTrigger className="w-full">
+                                        <div className="flex items-center gap-2">
+                                            <Layout className="h-4 w-4 text-muted-foreground" />
+                                            <SelectValue />
+                                        </div>
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={WikiNamespace.COMPANY}>Company Wiki</SelectItem>
-                                        <SelectItem value={WikiNamespace.PROJECT}>Project Wiki</SelectItem>
+                                        <SelectItem value={WikiNamespace.COMPANY}>Company-wide Wiki</SelectItem>
+                                        <SelectItem value={WikiNamespace.PROJECT}>Specific Project Wiki</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                         )}
 
-                        {!isTemplate && templates && templates.length > 0 && (
+                        {templates && templates.length > 0 && (
                             <div className="space-y-2">
-                                <Label htmlFor="template">Use Template (Optional)</Label>
+                                <Label htmlFor="template" className="text-sm font-semibold">Template</Label>
                                 <Select
                                     value={selectedTemplateId}
                                     onValueChange={setSelectedTemplateId}
@@ -149,10 +173,14 @@ export function WikiPageDialog({
                                         <SelectValue placeholder="Select a template" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">None (Blank Page)</SelectItem>
+                                        <SelectItem value="none">
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <span>Blank Page</span>
+                                            </div>
+                                        </SelectItem>
                                         {templates.map((template: any) => (
                                             <SelectItem key={template.id} value={template.id}>
-                                                {template.name || template.title}
+                                                {template.title}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -160,24 +188,33 @@ export function WikiPageDialog({
                             </div>
                         )}
 
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id="template"
-                                checked={isTemplate}
-                                onChange={(e) => setIsTemplate(e.target.checked)}
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <Label htmlFor="template" className="cursor-pointer">
-                                Save as template
-                            </Label>
+                        <div className="flex items-center justify-between p-3 rounded-lg border bg-neutral-50 dark:bg-neutral-900 border-dashed">
+                            <div className="flex items-center gap-2">
+                                <Layout className="h-4 w-4 text-primary/60" />
+                                <div className="flex flex-col">
+                                    <Label htmlFor="template-mode" className="text-sm cursor-pointer select-none">Save as template</Label>
+                                    <span className="text-[10px] text-muted-foreground">Make this available for others to reuse</span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsTemplate(!isTemplate)}
+                                className={cn(
+                                    "h-5 w-5 rounded border transition-colors flex items-center justify-center",
+                                    isTemplate ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"
+                                )}
+                                id="template-mode"
+                            >
+                                {isTemplate && <Check className="h-3 w-3" />}
+                            </button>
                         </div>
                     </div>
+
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading}>
+                        <Button type="submit" disabled={loading} className="px-8 shadow-sm">
                             {loading ? "Creating..." : "Create Page"}
                         </Button>
                     </DialogFooter>

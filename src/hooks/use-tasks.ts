@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTasks, createTask, updateTask, deleteTask, reorderTask } from "@/actions/task";
-import { CreateTaskInput, UpdateTaskInput, DeleteTaskInput, ReorderTaskInput } from "@/lib/validators/task";
+import { getTasks, createTask, updateTask, deleteTask, reorderTask, bulkReorderTasks } from "@/actions/task";
+import { CreateTaskInput, UpdateTaskInput, DeleteTaskInput, ReorderTaskInput, BulkReorderTasksInput } from "@/lib/validators/task";
 import { toast } from "sonner";
 
 export function useTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
@@ -120,6 +120,46 @@ export function useReorderTask() {
                 queryClient.setQueryData(["tasks"], context.previousTasks);
             }
             toast.error("Failed to reorder task");
+        },
+    });
+}
+
+export function useBulkReorderTasks() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: BulkReorderTasksInput) => bulkReorderTasks(input),
+        onMutate: async (input) => {
+            // Optimistic update
+            await queryClient.cancelQueries({ queryKey: ["tasks"] });
+            const previousTasks = queryClient.getQueryData(["tasks"]);
+
+            // Input is array of { id, status, sortOrder }
+            queryClient.setQueryData(["tasks"], (old: any) => {
+                if (!old) return old;
+                return old.map((task: any) => {
+                    const update = input.tasks.find(t => t.id === task.id);
+                    if (update) {
+                        return { ...task, ...update };
+                    }
+                    return task;
+                });
+            });
+
+            return { previousTasks };
+        },
+        onSuccess: (result) => {
+            if (!result.success) {
+                toast.error(result.error);
+            }
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        },
+        onError: (_error, _variables, context) => {
+            // Rollback on error
+            if (context?.previousTasks) {
+                queryClient.setQueryData(["tasks"], context.previousTasks);
+            }
+            toast.error("Failed to reorder tasks");
         },
     });
 }

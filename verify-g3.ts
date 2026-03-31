@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import dotenv from "dotenv";
 import path from "path";
 
@@ -9,13 +10,16 @@ async function verifyGemini3() {
     if (!apiKey) return;
 
     console.log("🔍 Verifying Gemini 3 Flash Preview...");
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const google = createGoogleGenerativeAI({
+        apiKey: apiKey,
+    });
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-        const result = await model.generateContent("WORKING?");
-        const response = await result.response;
-        console.log("✅ Success! Gemini 3 Response:", response.text().trim());
+        const { text } = await generateText({
+            model: google("gemini-3-flash-preview"),
+            prompt: "WORKING?",
+        });
+        console.log("✅ Success! Gemini 3 Response:", text.trim());
     } catch (err: any) {
         console.error("❌ Gemini 3 failed. Error:", err.message);
     }

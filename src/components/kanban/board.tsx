@@ -13,11 +13,11 @@ import {
     useSensors,
     closestCorners,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
 import { TaskStatus } from "@prisma/client";
 import { KanbanColumn } from "./column";
 import { TaskCard } from "./task-card";
-import { useReorderTask } from "@/hooks/use-tasks";
+import { useBulkReorderTasks } from "@/hooks/use-tasks";
 import { TaskWithRelations } from "@/types/task";
 import { createPortal } from "react-dom";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
@@ -72,7 +72,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
         return new Set();
     });
 
-    const reorderTask = useReorderTask();
+    const bulkReorderTasks = useBulkReorderTasks();
 
     useEffect(() => {
         setTasks(initialTasks);
@@ -165,7 +165,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
         if (task) setActiveTask(task);
     }
 
-    // Logic for drag and drop (simplified to rely on local state updates during hover)
+    // Logic for drag over: just updates status visually if moved to empty column
     function handleDragOver(event: DragOverEvent) {
         const { active, over } = event;
         if (!over) return;
@@ -186,7 +186,9 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
                 const overColumnId = over.id.toString().replace("column-", "") as TaskStatus;
                 if (activeTask.status !== overColumnId) {
                     const newTasks = [...prev];
-                    newTasks[activeIndex] = { ...activeTask, status: overColumnId };
+                    // Move to end of new column temporarily
+                    const highestOrder = Math.max(0, ...newTasks.filter(t => t.status === overColumnId).map(t => t.sortOrder));
+                    newTasks[activeIndex] = { ...activeTask, status: overColumnId, sortOrder: highestOrder + 1 };
                     return newTasks;
                 }
             } else {
@@ -194,7 +196,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
                 const overTask = prev[overIndex];
                 if (activeTask.status !== overTask.status) {
                     const newTasks = [...prev];
-                    newTasks[activeIndex] = { ...activeTask, status: overTask.status };
+                    newTasks[activeIndex] = { ...activeTask, status: overTask.status, sortOrder: overTask.sortOrder };
                     return newTasks;
                 }
             }
@@ -209,6 +211,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
 
         const activeId = active.id as string;
         const overId = over.id as string;
+
         const activeItem = tasks.find(t => t.id === activeId);
         if (!activeItem) return;
 
@@ -220,10 +223,50 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
             if (overTask) targetStatus = overTask.status;
         }
 
-        reorderTask.mutate({
-            id: activeId,
-            status: targetStatus,
-            sortOrder: 1 // Simple reorder for now
+        // We calculate new order array for targetStatus
+        setTasks((prev) => {
+            let workingTasks = [...prev];
+
+            // First ensure active task is in target status
+            const activeIndexFlat = workingTasks.findIndex((t) => t.id === activeId);
+            if (workingTasks[activeIndexFlat].status !== targetStatus) {
+                workingTasks[activeIndexFlat] = { ...workingTasks[activeIndexFlat], status: targetStatus };
+            }
+
+            // Get all tasks in target column
+            const targetColTasks = workingTasks.filter(t => t.status === targetStatus);
+            targetColTasks.sort((a, b) => a.sortOrder - b.sortOrder);
+
+            const activeIndex = targetColTasks.findIndex(t => t.id === activeId);
+            const overIndex = targetColTasks.findIndex(t => t.id === overId);
+
+            let newTargetColTasks = targetColTasks;
+
+            if (activeIndex !== overIndex && overIndex !== -1) {
+                // Moving within same column or precisely placing it inside
+                newTargetColTasks = arrayMove(targetColTasks, activeIndex, overIndex);
+            } else if (overIndex === -1 && overId.startsWith("column-")) {
+                // If dropped directly onto empty column container, arrayMove is not needed, active item is already in targetColTasks
+            }
+
+            // After move, reassign numeric sortOrder to array index securely
+            const bulkUpdatePayload = newTargetColTasks.map((task, index) => ({
+                id: task.id,
+                status: targetStatus,
+                sortOrder: index,
+            }));
+
+            // Issue background API call to persist (will optimistic update again but essentially a no-op visually)
+            bulkReorderTasks.mutate({ tasks: bulkUpdatePayload });
+
+            // Update local memory with the 0,1,2 sort orders so it doesn't snap back
+            return workingTasks.map(t => {
+                const updatedConfig = bulkUpdatePayload.find(b => b.id === t.id);
+                if (updatedConfig) {
+                    return { ...t, status: updatedConfig.status, sortOrder: updatedConfig.sortOrder };
+                }
+                return t;
+            });
         });
     }
 

@@ -1,50 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { WikiPage, User, WikiPageVersion } from "@prisma/client";
-import { BlockEditor } from "@/components/wiki/block-editor";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { updateWikiPage, deleteWikiPage } from "@/actions/wiki";
 import {
-    Edit2,
-    Save,
-    X,
+    MoreVertical,
+    History,
     Trash2,
-    Clock,
-    User as UserIcon,
+    ExternalLink,
     Globe,
-    Link as LinkIcon,
-    ChevronRight,
-    FileText,
+    Lock,
+    Copy,
+    ChevronRight
 } from "lucide-react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { formatDistanceToNow } from "date-fns";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { BlockEditor } from "./block-editor";
+import { deleteWikiPage, updateWikiPage } from "@/actions/wiki";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { getWikiPagePath } from "@/actions/wiki-path";
-import React from "react";
-
-type WikiPageWithDetails = WikiPage & {
-    author: User;
-    versions?: (WikiPageVersion & { editedBy: User })[];
-    published: boolean;
-};
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
 interface WikiPageViewProps {
-    page: WikiPageWithDetails;
+    page: WikiPage & {
+        author: User;
+        versions: (WikiPageVersion & { editedBy: User })[];
+    };
     readOnly?: boolean;
 }
 
@@ -53,257 +43,262 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(page.title);
     const [content, setContent] = useState(page.content);
-    const [showHistory, setShowHistory] = useState(false);
     const [isPublished, setIsPublished] = useState(page.published);
     const [path, setPath] = useState<{ id: string; title: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Sync state with props when page changes
     useEffect(() => {
         setTitle(page.title);
         setContent(page.content);
         setIsPublished(page.published);
-
-        // Auto-enter edit mode if page is "Untitled" (likely just created)
         if (page.title === "Untitled" && !readOnly) {
             setIsEditing(true);
         }
+    }, [page.id, page.title, page.content, page.published, readOnly]);
 
+    useEffect(() => {
         async function fetchPath() {
-            const res = await getWikiPagePath(page.id);
-            if (res.success && res.path) {
-                setPath(res.path);
+            if (page.id) {
+                const result = await getWikiPagePath(page.id);
+                if (result.success && result.path) {
+                    setPath(result.path);
+                }
             }
         }
         fetchPath();
-    }, [page, readOnly]);
+    }, [page.id]);
 
-    const handleSave = async () => {
+    const handleSave = async (newContent?: string) => {
+        if (readOnly) return;
         setIsSaving(true);
-        try {
-            const result = await updateWikiPage({
-                id: page.id,
-                title,
-                content,
-            });
-
-            if (result.success) {
-                setIsEditing(false);
-                router.refresh();
-                toast.success("Page saved successfully");
-            } else {
-                toast.error(result.error);
-            }
-        } catch (error) {
-            toast.error("Failed to save page");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleTogglePublished = async (checked: boolean) => {
-        setIsPublished(checked);
         const result = await updateWikiPage({
             id: page.id,
-            published: checked,
+            title,
+            content: newContent ?? content,
+            published: isPublished,
         });
+        setIsSaving(false);
 
-        if (!result.success) {
-            setIsPublished(!checked);
-            toast.error(result.error);
-        } else {
+        if (result.success) {
+            toast.success("Page saved");
+            if (newContent) setContent(newContent);
             router.refresh();
-            toast.success(checked ? "Page published" : "Page unpublished");
+        } else {
+            toast.error(result.error || "Failed to save page");
         }
     };
 
     const handleDelete = async () => {
+        if (readOnly) return;
+        const confirmed = confirm("Are you sure you want to delete this page?");
+        if (!confirmed) return;
+
         const result = await deleteWikiPage(page.id);
         if (result.success) {
+            toast.success("Page deleted");
             router.push("/wiki");
         } else {
-            alert(result.error);
+            toast.error(result.error);
         }
     };
 
-    const handleCancel = () => {
-        setTitle(page.title);
-        setContent(page.content);
-        setIsEditing(false);
+    const copyPublicLink = () => {
+        const url = `${window.location.protocol}//${window.location.host}/published-wiki/${page.id}`;
+        navigator.clipboard.writeText(url);
+        toast.success("Public link copied to clipboard");
+    };
+
+    const togglePublished = async () => {
+        if (readOnly) return;
+        const newPublished = !isPublished;
+        setIsPublished(newPublished);
+        const result = await updateWikiPage({
+            id: page.id,
+            published: newPublished,
+        });
+        if (result.success) {
+            toast.success(newPublished ? "Page published" : "Page unpublished");
+            router.refresh();
+        } else {
+            setIsPublished(!newPublished);
+            toast.error(result.error);
+        }
     };
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-background">
-            {/* Header */}
-            <div className={cn(
-                "px-4 py-3 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-20",
-                readOnly ? "border-none" : "border-b"
-            )}>
-                <div className="flex-1 min-w-0">
-                    {/* Notion-style Breadcrumbs */}
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground/60 mb-1 overflow-x-auto no-scrollbar whitespace-nowrap">
-                        <Link href={readOnly ? "/published-wiki" : "/wiki"} className="hover:text-foreground transition-colors flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            {readOnly ? "Wiki" : "Dashboard"}
-                        </Link>
-                        {path.slice(0, -1).map((item) => (
-                            <React.Fragment key={item.id}>
-                                <ChevronRight className="h-3 w-3 shrink-0" />
-                                <Link
-                                    href={`${readOnly ? "/published-wiki" : "/wiki"}/${item.id}`}
-                                    className="hover:text-foreground transition-colors"
-                                >
-                                    {item.title}
-                                </Link>
-                            </React.Fragment>
-                        ))}
-                    </div>
+        <div className="flex flex-col min-h-full bg-background selection:bg-primary/10">
+            {/* Contextual Header / Breadcrumbs */}
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 backdrop-blur-md px-6 lg:px-12">
+                <nav className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground overflow-hidden whitespace-nowrap">
+                    {path.map((item, index) => (
+                        <div key={item.id} className="flex items-center gap-1.5 shrink-0">
+                            {index > 0 && <ChevronRight className="h-3 w-3 opacity-40 shrink-0" />}
+                            <Link
+                                href={`${readOnly ? "/published-wiki" : "/wiki"}/${item.id}`}
+                                className={cn(
+                                    "hover:text-foreground transition-colors max-w-[120px] truncate",
+                                    index === path.length - 1 && "text-foreground font-semibold"
+                                )}
+                            >
+                                {item.title}
+                            </Link>
+                        </div>
+                    ))}
+                </nav>
 
-                    <div className="flex items-center gap-3">
-                        {isEditing ? (
-                            <Input
+                <div className="flex items-center gap-2">
+                    {isSaving && (
+                        <span className="text-[10px] text-muted-foreground animate-pulse mr-2">Saving...</span>
+                    )}
+
+                    {!readOnly && (
+                        <Badge
+                            variant={isPublished ? "default" : "outline"}
+                            className={cn(
+                                "gap-1 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-wider",
+                                isPublished ? "bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400" : "bg-muted"
+                            )}
+                        >
+                            {isPublished ? <Globe className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+                            {isPublished ? "Published" : "Draft"}
+                        </Badge>
+                    )}
+
+                    {!readOnly && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-2 text-xs font-medium"
+                            onClick={() => setIsEditing(!isEditing)}
+                        >
+                            {isEditing ? "View mode" : "Edit mode"}
+                        </Button>
+                    )}
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {!readOnly && (
+                                <>
+                                    <DropdownMenuItem onClick={togglePublished}>
+                                        {isPublished ? (
+                                            <>
+                                                <Lock className="mr-2 h-4 w-4" />
+                                                Unpublish Page
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Globe className="mr-2 h-4 w-4" />
+                                                Publish Page
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
+
+                            {isPublished && (
+                                <DropdownMenuItem onClick={copyPublicLink}>
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    Copy Public Link
+                                </DropdownMenuItem>
+                            )}
+
+                            {isPublished && (
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/published-wiki/${page.id}`} target="_blank">
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        View Public Page
+                                    </Link>
+                                </DropdownMenuItem>
+                            )}
+
+                            {!readOnly && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Page
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </header>
+
+            {/* Content Area */}
+            <main className="flex-1 overflow-auto">
+                <div className="max-w-4xl mx-auto py-12 lg:py-20 px-8 lg:px-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="mb-10 space-y-4">
+                        {isEditing && !readOnly ? (
+                            <input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="text-xl font-bold h-9 px-2"
-                                placeholder="Page title"
+                                onBlur={() => handleSave()}
+                                className="w-full text-4xl lg:text-5xl font-black bg-transparent border-none outline-none focus:ring-0 placeholder:opacity-20"
+                                placeholder="Untitled"
                             />
                         ) : (
-                            <h1 className={cn(
-                                "font-bold tracking-tight text-foreground truncate",
-                                readOnly ? "text-4xl" : "text-2xl"
-                            )}>
+                            <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight">
                                 {page.title}
                             </h1>
                         )}
-                        {!readOnly && isPublished && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium uppercase tracking-wider shrink-0">
-                                <Globe className="h-3 w-3" />
-                                Published
-                            </div>
-                        )}
-                    </div>
-                    {!readOnly && (
-                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground/60">
-                            <div className="flex items-center gap-1">
-                                <UserIcon className="h-3 w-3" />
+
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
+                            <div className="flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                    {page.author.name?.charAt(0)}
+                                </div>
                                 <span>{page.author.name}</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                <span>
-                                    Modified {formatDistanceToNow(new Date(page.updatedAt))} ago
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                {!readOnly && (
-                    <div className="flex items-center gap-4">
-                        <Button
-                            variant={isPublished ? "secondary" : "default"}
-                            size="sm"
-                            onClick={() => handleTogglePublished(!isPublished)}
-                            className="mr-2"
-                        >
-                            {isPublished ? "Unpublish" : "Publish"}
-                        </Button>
-                        {isPublished && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    const url = `${window.location.protocol}//wiki.${window.location.host.replace('wiki.', '')}/${page.id}`;
-                                    navigator.clipboard.writeText(url);
-                                    toast.success("Public link copied to clipboard");
-                                }}
-                            >
-                                <LinkIcon className="h-4 w-4 mr-2" />
-                                Copy Link
-                            </Button>
-                        )}
-                        <div className="flex items-center gap-2">
-                            {isEditing ? (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleCancel}
-                                        disabled={isSaving}
-                                    >
-                                        <X className="h-4 w-4 mr-2" />
-                                        Cancel
-                                    </Button>
-                                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        {isSaving ? "Saving..." : "Save"}
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsEditing(true)}
-                                    >
-                                        <Edit2 className="h-4 w-4 mr-2" />
-                                        Edit
-                                    </Button>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="outline" size="sm">
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete Page</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Are you sure you want to delete this page? This action
-                                                    cannot be undone.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={handleDelete}>
-                                                    Delete
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </>
-                            )}
+                            <span className="opacity-20">•</span>
+                            <span>Last edited {formatDistanceToNow(new Date(page.updatedAt))} ago</span>
                         </div>
                     </div>
-                )}
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-6">
-                <BlockEditor
-                    initialContent={content}
-                    onChange={setContent}
-                    editable={isEditing}
-                />
-            </div>
-
-            {/* Version History Sidebar */}
-            {page.versions && page.versions.length > 0 && !isEditing && !readOnly && (
-                <div className="border-l w-64 p-4 overflow-auto">
-                    <h3 className="font-semibold mb-4">Version History</h3>
-                    <div className="space-y-3">
-                        {page.versions.map((version: WikiPageVersion & { editedBy: User }) => (
-                            <div
-                                key={version.id}
-                                className="text-sm p-2 rounded-md hover:bg-accent cursor-pointer"
-                            >
-                                <div className="font-medium">{version.editedBy.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(version.createdAt))} ago
-                                </div>
-                            </div>
-                        ))}
+                    <div className={cn(
+                        "prose prose-neutral dark:prose-invert max-w-none min-h-[500px]",
+                        !isEditing && "leading-relaxed"
+                    )}>
+                        <BlockEditor
+                            initialContent={content}
+                            onChange={(newContent) => handleSave(newContent)}
+                            editable={isEditing && !readOnly}
+                        />
                     </div>
                 </div>
+            </main>
+
+            {/* Version Footer (Only in Edit Mode) */}
+            {!readOnly && isEditing && page.versions && page.versions.length > 0 && (
+                <footer className="border-t bg-muted/30 px-12 py-4 mt-auto">
+                    <div className="flex items-center justify-between max-w-4xl mx-auto">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <History className="h-3.5 w-3.5" />
+                            <span>Version History ({page.versions.length})</span>
+                        </div>
+                        <div className="flex -space-x-1.5">
+                            {Array.from(new Set(page.versions.map(v => v.editedBy.id))).slice(0, 5).map(userId => {
+                                const user = page.versions.find(v => v.editedBy.id === userId)?.editedBy;
+                                return (
+                                    <div
+                                        key={userId}
+                                        className="h-6 w-6 rounded-full border-2 border-background bg-slate-200 flex items-center justify-center text-[8px] font-bold"
+                                        title={user?.name || "Editor"}
+                                    >
+                                        {user?.name?.charAt(0)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </footer>
             )}
         </div>
     );
