@@ -1,227 +1,220 @@
-# ChristBase - Phase 1 MVP
+# ChristBase
 
-Internal project management and productivity platform for Christex Foundation.
+All-in-one project management and productivity platform for Christex Foundation. Built with Next.js and deployable as both a web app (Vercel) and a desktop app (Electron).
 
-## 🚀 Phase 1 Features
+## Features
 
-- ✅ Google OAuth authentication
-- ✅ Task CRUD operations
-- ✅ Kanban board with drag-and-drop
-- ✅ Table view with sorting and filtering
-- ✅ Project management
-- ✅ Multi-user support
-- ✅ Organization-scoped data
+### Task Management
+- Kanban board with drag-and-drop (dnd-kit) across 5 status columns
+- Table view with sorting and filtering by status, priority, assignee, and date range
+- Task detail sheets with rich description editor, subtasks, comments, and activity audit trail
+- Priority levels (P0-P3), multi-assignee support, due dates, and file attachments
 
-## 🛠️ Tech Stack
+### Projects & Sprints
+- Per-project dashboards with board, table, calendar, timeline, backlog, and sprint views
+- Sprint planning and velocity tracking
+- Automation rules per project
 
-- **Framework**: Next.js 14+ (App Router, Server Components, Server Actions)
-- **Language**: TypeScript (strict mode)
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js v5 with Google OAuth
-- **UI**: Tailwind CSS + shadcn/ui
-- **Drag & Drop**: dnd-kit
-- **State Management**: TanStack Query (React Query)
-- **Validation**: Zod
-- **Hosting**: Vercel + managed Postgres
+### Wiki & Knowledge Base
+- Hierarchical wiki pages with BlockNote rich-text editor
+- Page versioning, icons, cover images, and published/private visibility
+- Mentions (@user, @date, @page), block-level threaded comments, and backlinks
+- Wiki templates and page analytics (views, viewers)
 
-## 📋 Prerequisites
+### Custom Databases
+- Notion-style databases with 14 property types (text, number, select, multi-select, date, checkbox, person, URL, email, image, relation, rollup, status, formula)
+- Table, board, gallery, calendar, and timeline views
+- Row detail sheets with relations and rollups
 
-- Node.js 18+ and npm
+### Focus & Pomodoro
+- Pomodoro timer (25-min sessions) linked to tasks
+- Focus session history and duration tracking
+
+### Time Tracking
+- Manual and automatic time entries tied to tasks
+- Estimate vs. actual comparison
+
+### Daily Planner
+- "My Day" view for planning the current day's work
+- AI-assisted plan picker
+
+### Analytics
+- Task completion trends, status distribution, sprint velocity
+- Team productivity metrics and project progress
+- Date range filtering and export
+
+### AI Assistant
+- Streaming chat assistant (BieAI) with natural language task creation
+- Voice input support and task name resolution
+
+### Chat & Messaging
+- Group conversations and direct messages
+- Real-time updates via SSE streaming
+
+### Squads
+- Team/squad management with member assignment
+
+### Search, Favorites & Recents
+- Global search across tasks, projects, wiki pages
+- Favorites and recent items in the sidebar
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router, Server Components, Server Actions) |
+| Language | TypeScript (strict mode) |
+| Database | PostgreSQL + Prisma 7 |
+| Auth | NextAuth.js v5 (Google OAuth + email/password) |
+| UI | Tailwind CSS 4 + shadcn/ui + Radix UI |
+| Rich Editor | BlockNote |
+| Charts | Recharts |
+| Drag & Drop | dnd-kit |
+| State | TanStack Query v5 |
+| Validation | Zod + React Hook Form |
+| AI | AI SDK (@ai-sdk/react) |
+| Desktop | Electron 40 + electron-builder |
+| Hosting | Vercel + managed Postgres |
+
+## Prerequisites
+
+- Node.js 18+
 - PostgreSQL database
-- Google OAuth credentials
+- Google OAuth credentials (for Google sign-in)
 
-## 🔧 Setup Instructions
+## Setup
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Set Up Database
+### 2. Configure environment variables
 
-Update `.env` with your PostgreSQL connection string:
+Create a `.env` file:
 
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/christbase?schema=public"
-```
 
-### 3. Configure Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-6. Update `.env`:
-
-```env
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-NEXTAUTH_SECRET="your-secret-key-change-this-in-production"
+
+NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-### 4. Initialize Database
+For Google OAuth setup:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create OAuth 2.0 credentials
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+
+### 3. Initialize the database
 
 ```bash
-# Generate Prisma Client
 npx prisma generate
-
-# Run migrations
-npx prisma migrate dev --name init
-
-# Seed database with sample data
+npx prisma migrate dev
 npx prisma db seed
 ```
 
-This will create:
-- 1 organization (Christex Foundation)
-- 8 users
-- 3 projects
-- 2 sprints
-- 20 tasks with random assignments
-
-### 5. Run Development Server
+### 4. Run the app
 
 ```bash
+# Web
 npm run dev
+
+# Desktop (Electron)
+npm run dev:desktop
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with Google.
+Open [http://localhost:3000](http://localhost:3000).
 
-## 📁 Project Structure
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start Next.js dev server |
+| `npm run dev:desktop` | Start dev server + Electron |
+| `npm run build` | Production build (generates Prisma client + Next.js build) |
+| `npm run build:desktop` | Build + package Electron app |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+## Project Structure
 
 ```
-christbase/
-├── prisma/
-│   ├── schema.prisma       # Database schema
-│   ├── migrations/         # Database migrations
-│   └── seed.ts            # Seed script
-├── src/
-│   ├── app/
-│   │   ├── (auth)/        # Auth pages (login)
-│   │   ├── (dashboard)/   # Protected dashboard pages
-│   │   └── api/auth/      # NextAuth API routes
-│   ├── components/
-│   │   ├── ui/            # shadcn/ui components
-│   │   ├── kanban/        # Kanban board components
-│   │   ├── tasks/         # Task-related components
-│   │   └── layout/        # Layout components
-│   ├── lib/
-│   │   ├── db.ts          # Prisma client singleton
-│   │   ├── auth.ts        # NextAuth configuration
-│   │   ├── utils.ts       # Utility functions
-│   │   └── validators/    # Zod schemas
-│   ├── actions/           # Server actions
-│   ├── hooks/             # React hooks (TanStack Query)
-│   └── types/             # TypeScript types
-└── public/
+src/
+├── app/
+│   ├── (auth)/              # Login & signup pages
+│   ├── (dashboard)/         # All authenticated routes
+│   │   ├── dashboard/       # Home dashboard
+│   │   ├── my-day/          # Daily planner
+│   │   ├── projects/        # Projects with sub-views
+│   │   ├── sprintboard/     # Sprint kanban board
+│   │   ├── wiki/            # Wiki pages
+│   │   ├── databases/       # Custom databases
+│   │   ├── focus/           # Pomodoro & focus sessions
+│   │   ├── time-tracking/   # Time entries
+│   │   ├── analytics/       # Charts & metrics
+│   │   ├── squads/          # Team management
+│   │   ├── chat/            # Messaging
+│   │   ├── settings/        # User & org settings
+│   │   └── trash/           # Soft-deleted items
+│   ├── api/                 # Auth, AI, and chat endpoints
+│   └── published-wiki/      # Public wiki access
+├── actions/                 # Server actions (25+)
+├── components/              # React components (100+)
+│   ├── ui/                  # shadcn/ui primitives
+│   ├── kanban/              # Board, column, task card
+│   ├── tasks/               # Task detail, comments, filters
+│   ├── wiki/                # Editor, sidebar, page view
+│   ├── databases/           # Database views & cells
+│   ├── focus/               # Pomodoro timer, session list
+│   ├── analytics/           # Charts & metric cards
+│   ├── ai/                  # Assistant chat
+│   └── layout/              # Sidebar, top nav, providers
+├── hooks/                   # Custom hooks (20+, TanStack Query)
+├── lib/                     # Auth, DB, validators, utils, AI/NLP
+└── types/                   # TypeScript type definitions
+prisma/
+├── schema.prisma            # 38 models with multi-tenancy
+├── migrations/              # Database migrations
+└── seed.ts                  # Seed script
 ```
 
-## 🎯 Key Features
+## Architecture
 
-### Kanban Board
-- Drag-and-drop tasks between columns
-- Real-time optimistic updates
-- Status-based columns (Backlog, To Do, In Progress, In Review, Done)
-- Priority badges and assignee avatars
+- **Multi-tenant**: All queries scoped by `organizationId`
+- **Server Components by default**: `"use client"` only where interactivity is needed
+- **Server Actions for mutations**: No traditional API routes for CRUD
+- **ActionResult pattern**: `{ success: boolean; data: T; error?: string }`
+- **Zod validation** on all server action inputs
+- **Optimistic UI** with TanStack Query for instant feedback and rollback
+- **Soft deletes** via `deletedAt` for recoverable deletion
+- **38 Prisma models** covering tasks, wiki, databases, focus, time tracking, chat, notifications, and more
 
-### Table View
-- Sortable by title, priority, due date, status
-- Filterable by status and priority
-- Assignee avatars
-- Due date display
+## Coding Conventions
 
-### Task Management
-- Create, edit, delete tasks
-- Assign to multiple users
-- Set priority (P0-P3)
-- Set due dates
-- Add descriptions
-- Link to projects
+- `@/` path alias for all imports
+- `kebab-case` filenames, `PascalCase` components, `camelCase` functions
+- Tailwind + shadcn/ui for styling (no custom CSS files beyond `globals.css`)
 
-## 🔒 Security & Architecture
+## Development Workflow
 
-- **Multi-tenant from day one**: All queries scoped by `organizationId`
-- **Server-side validation**: Zod schemas on all server actions
-- **Type-safe**: TypeScript strict mode, no `any` types
-- **Protected routes**: Authentication required for dashboard
-- **Optimistic UI**: Instant feedback with rollback on error
-
-## 📝 Coding Conventions
-
-- Server Components by default
-- `"use client"` only for interactivity
-- Server actions for all mutations (no API routes for CRUD)
-- Zod validation on every server action
-- ActionResult pattern: `{ success: true; data: T } | { success: false; error: string }`
-- Tailwind + shadcn/ui only (no custom CSS)
-- `@/` path alias for imports
-- `kebab-case` for files, `PascalCase` for components, `camelCase` for functions
-
-## 🚫 What's NOT in Phase 1
-
-- Sprints UI
-- Comments
-- Wiki/Docs
-- Focus timer
-- Time tracking
-- Analytics
-- AI features
-
-These will be added in subsequent phases.
-
-## 📊 Database Schema
-
-16 models with full multi-tenancy support:
-- Organization
-- User
-- OrganizationMember
-- Squad & SquadMember
-- Project
-- Sprint
-- Task & TaskAssignee
-- Comment
-- TaskActivity
-- FocusSession
-- TimeEntry
-- WikiPage & WikiPageVersion
-- Notification
-
-## 🔄 Development Workflow
-
-1. Make changes to code
-2. Prisma schema changes? Run `npx prisma migrate dev`
-3. Test locally with `npm run dev`
-4. Build for production: `npm run build`
+1. Make changes
+2. If the Prisma schema changed: `npx prisma migrate dev`
+3. Test locally: `npm run dev`
+4. Build: `npm run build`
 5. Deploy to Vercel
 
-## 📚 Resources
+## Troubleshooting
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Prisma Documentation](https://www.prisma.io/docs)
-- [NextAuth.js Documentation](https://next-auth.js.org/)
-- [shadcn/ui Documentation](https://ui.shadcn.com/)
-- [TanStack Query Documentation](https://tanstack.com/query)
+**Database connection issues** - Verify `DATABASE_URL` in `.env` and ensure PostgreSQL is running.
 
-## 🐛 Troubleshooting
+**Google OAuth not working** - Check that the redirect URI matches exactly and credentials are correct.
 
-### Database connection issues
-- Verify `DATABASE_URL` in `.env`
-- Ensure PostgreSQL is running
-- Check firewall settings
+**Build errors** - Run `npx prisma generate`, then clear `.next` (`rm -rf .next`) and retry.
 
-### Google OAuth not working
-- Verify redirect URI matches exactly
-- Check client ID and secret
-- Ensure Google+ API is enabled
-
-### Build errors
-- Run `npx prisma generate`
-- Clear `.next` folder: `rm -rf .next`
-- Reinstall dependencies: `rm -rf node_modules && npm install`
-
-## 📄 License
+## License
 
 Internal use only - Christex Foundation

@@ -78,14 +78,14 @@ export default function BoardPage() {
 
     if (isLoading) {
         return (
-            <div className="p-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <Skeleton className="h-8 w-32" />
-                    <Skeleton className="h-10 w-32" />
+            <div className="p-8">
+                <div className="mb-6 space-y-3">
+                    <Skeleton className="h-3 w-32 bg-white/[0.05]" />
+                    <Skeleton className="h-9 w-64 bg-white/[0.05]" />
                 </div>
                 <div className="flex gap-4">
                     {[1, 2, 3, 4, 5].map((i) => (
-                        <Skeleton key={i} className="h-96 w-80" />
+                        <Skeleton key={i} className="h-[420px] w-[300px] rounded-2xl bg-white/[0.04]" />
                     ))}
                 </div>
             </div>
@@ -94,45 +94,64 @@ export default function BoardPage() {
 
     return (
         <div className="flex h-full flex-col">
-            <div className="border-b bg-white p-6 dark:bg-neutral-950">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-2xl font-bold">Board View</h1>
+            <header className="border-b border-[color:var(--border)] px-8 pb-3 pt-5">
+                <div className="flex items-center justify-between gap-6">
+                    <div className="min-w-0">
+                        <div className="mono mb-1.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                            Board
+                            {sprint && (
+                                <>
+                                    <span className="text-neutral-700">/</span>
+                                    <span style={{ color: "var(--bz-amber)" }}>{sprint.name}</span>
+                                </>
+                            )}
+                        </div>
+                        <h1 className="truncate text-[26px] font-semibold leading-none tracking-tight text-white">
+                            {sprint?.name ?? "All tasks."}
+                        </h1>
+                    </div>
 
-                        {/* Sprint Selector */}
-                        <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <Select
-                                value={sprintId || "all"}
-                                onValueChange={handleSprintChange}
-                            >
-                                <SelectTrigger className="w-[200px]">
-                                    <SelectValue placeholder="Select Sprint" />
+                    <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--border)] bg-white/[0.02] pl-3 pr-1 py-1">
+                            <Calendar className="h-3.5 w-3.5 text-neutral-500" />
+                            <span className="mono text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                                Sprint
+                            </span>
+                            <Select value={sprintId || "all"} onValueChange={handleSprintChange}>
+                                <SelectTrigger className="h-7 min-w-[180px] border-none bg-transparent text-[12px] focus:ring-0">
+                                    <SelectValue placeholder="Select sprint" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Tasks</SelectItem>
+                                <SelectContent className="border-[color:var(--border)] bg-[color:var(--popover)]">
+                                    <SelectItem value="all">All tasks</SelectItem>
                                     {recentSprints.map((s) => (
                                         <SelectItem key={s.id} value={s.id}>
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-medium">{s.name}</span>
+                                                    <span className="text-xs font-medium">{s.name}</span>
                                                     {s.status === "ACTIVE" && (
-                                                        <Badge variant="default" className="h-4 px-1 text-[10px]">
+                                                        <span
+                                                            className="rounded-full px-1.5 text-[9px] font-semibold uppercase tracking-wider"
+                                                            style={{
+                                                                color: "var(--bz-amber)",
+                                                                background: "color-mix(in oklab, var(--bz-amber) 14%, transparent)",
+                                                                border: "1px solid color-mix(in oklab, var(--bz-amber) 35%, transparent)",
+                                                            }}
+                                                        >
                                                             Active
-                                                        </Badge>
+                                                        </span>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()}
+                                                <span className="mono text-[10px] text-neutral-500">
+                                                    {new Date(s.startDate).toLocaleDateString()} — {new Date(s.endDate).toLocaleDateString()}
                                                 </span>
                                             </div>
                                         </SelectItem>
                                     ))}
                                     {sortedSprints.length > 3 && (
-                                        <div className="border-t px-2 py-1.5">
+                                        <div className="border-t border-[color:var(--border)] px-2 py-1.5">
                                             <Link
                                                 href={`/projects/${projectId}/sprints`}
-                                                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                className="flex items-center gap-2 text-xs text-neutral-500 transition-colors hover:text-white"
                                             >
                                                 <ExternalLink className="h-3 w-3" />
                                                 View all sprints
@@ -143,38 +162,38 @@ export default function BoardPage() {
                             </Select>
                         </div>
 
-                        {/* Complete Sprint Button */}
                         {sprintId && sprint?.status !== "COMPLETED" && (
-                            <Button
-                                variant="outline"
-                                size="sm"
+                            <button
+                                type="button"
                                 onClick={() => setShowCompleteDialog(true)}
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium transition-colors hover:bg-white/[0.04]"
+                                style={{ color: "var(--bz-green)" }}
                             >
-                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                Complete Sprint
-                            </Button>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Complete sprint
+                            </button>
                         )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
+
+                        <button
+                            type="button"
                             onClick={() => exportTasksToCSV(applyTaskFilters(tasks || [], taskFilters))}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
                         >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export CSV
-                        </Button>
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </button>
+
                         <TaskForm projectId={projectId} sprintId={sprintId || undefined} />
                     </div>
                 </div>
-                <div className="px-6 pb-2">
-                    <SmartTaskInput projectId={projectId} sprintId={sprintId || undefined} />
-                </div>
-                <div className="px-6 pb-3">
+
+                <div className="mt-3 flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                        <SmartTaskInput projectId={projectId} sprintId={sprintId || undefined} />
+                    </div>
                     <TaskFiltersBar filters={taskFilters} onFiltersChange={setTaskFilters} />
                 </div>
-            </div>
+            </header>
             <div className="flex-1 overflow-hidden">
                 <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
             </div>
@@ -193,7 +212,7 @@ export default function BoardPage() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleCompleteSprint}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-[color:var(--bz-green)] text-black hover:bg-[color:var(--bz-green)]/85"
                         >
                             Complete Sprint
                         </AlertDialogAction>

@@ -91,6 +91,10 @@ export interface EndFocusSessionInput {
     notes?: string | null;
     pomodoroCount?: number;
     completed?: boolean;
+    /** Override the computed wall-clock duration (in minutes). Used when the
+     *  client tracked pause/resume locally and only wants to count active
+     *  focused time. */
+    durationMinutes?: number;
 }
 
 export async function endFocusSession(
@@ -115,9 +119,13 @@ export async function endFocusSession(
         }
 
         const endedAt = new Date();
-        const duration = Math.round(
+        const wallClock = Math.round(
             (endedAt.getTime() - existingSession.startedAt.getTime()) / 1000 / 60
         );
+        const duration =
+            typeof input.durationMinutes === "number" && input.durationMinutes >= 0
+                ? Math.min(input.durationMinutes, wallClock)
+                : wallClock;
 
         const session = await db.focusSession.update({
             where: { id: input.sessionId },
@@ -170,7 +178,11 @@ export async function getActiveFocusSession(): Promise<FocusSession | null> {
                 endedAt: null,
             },
             include: {
-                task: true,
+                task: {
+                    include: {
+                        project: true,
+                    },
+                },
             },
         });
 
@@ -202,6 +214,7 @@ export async function getFocusSessions(options?: {
                         title: true,
                         status: true,
                         priority: true,
+                        project: { select: { id: true, name: true } },
                     },
                 },
             },

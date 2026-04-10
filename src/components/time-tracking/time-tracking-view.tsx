@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useTimeEntries, useTimeTrackingStats, useCreateTimeEntry, useDeleteTimeEntry } from "@/hooks/use-time-entries";
 import { useTasks } from "@/hooks/use-tasks";
+import { EstimateVsActual } from "./estimate-vs-actual";
 
 function formatDuration(minutes: number): string {
     if (minutes < 60) return `${minutes}m`;
@@ -296,6 +297,9 @@ export function TimeTrackingView() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Estimate vs Actual */}
+            <EstimateVsActual />
 
             {/* Time Entries List */}
             <Card>

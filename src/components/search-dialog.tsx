@@ -11,6 +11,7 @@ import {
     Search,
     FileText,
     CheckCircle2,
+    Database,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -44,6 +45,14 @@ export function SearchDialog() {
 
         document.addEventListener("keydown", down);
         return () => document.removeEventListener("keydown", down);
+    }, []);
+
+    // External open trigger — any component can call openCommandPalette()
+    // (or dispatch a window event) to open this dialog.
+    React.useEffect(() => {
+        const handler = () => setOpen(true);
+        window.addEventListener("command-palette:open", handler);
+        return () => window.removeEventListener("command-palette:open", handler);
     }, []);
 
     React.useEffect(() => {
@@ -100,6 +109,8 @@ export function SearchDialog() {
                                 >
                                     {result.type === "page" ? (
                                         <FileText className="mr-2 h-4 w-4" />
+                                    ) : result.type === "database" ? (
+                                        <Database className="mr-2 h-4 w-4" />
                                     ) : (
                                         <CheckCircle2 className="mr-2 h-4 w-4" />
                                     )}

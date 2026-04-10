@@ -80,6 +80,56 @@ enum NotificationType {
   COMMENT
 }
 
+enum AttachmentParent {
+  TASK
+  COMMENT
+  WIKI_PAGE
+  MESSAGE
+  DATABASE_ROW
+}
+
+enum MentionTargetType {
+  USER
+  WIKI_PAGE
+  DATE
+  EVERYONE
+}
+
+enum DatabasePropertyType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTI_SELECT
+  DATE
+  CHECKBOX
+  PERSON
+  URL
+  EMAIL
+  IMAGE
+  RELATION
+  ROLLUP
+  STATUS
+  FORMULA
+}
+
+enum DatabaseViewType {
+  TABLE
+  BOARD
+  GALLERY
+  CALENDAR
+  TIMELINE
+}
+
+enum ResourceVisibility {
+  ORG
+  PRIVATE
+}
+
+enum ResourceMemberRole {
+  VIEWER
+  EDITOR
+}
+
 // ─── Models ──────────────────────────────────────────────
 
 model Organization {
@@ -101,6 +151,11 @@ model Organization {
   favorites     Favorite[]
   recentItems   RecentItem[]
   wikiTemplates WikiTemplate[]
+  notificationPreferences NotificationPreference[]
+  conversations Conversation[]
+  attachments   Attachment[]
+  databases     WikiDatabase[]
+  reflections   DailyReflection[]
 }
 
 model User {
@@ -130,6 +185,16 @@ model User {
   sessions       Session[]
   createdAutomationRules AutomationRule[]
   wikiTemplates WikiTemplate[] @relation("WikiTemplateAuthor")
+  notificationPreferences NotificationPreference[]
+  conversationMembers ConversationMember[]
+  messages Message[]
+  attachments Attachment[]
+  blockComments BlockComment[] @relation("BlockCommentAuthor")
+  createdDatabases WikiDatabase[] @relation("WikiDatabaseCreator")
+  wikiPageViews  WikiPageAnalytics[] @relation("WikiPageViewer")
+  reflections    DailyReflection[]  @relation("DailyReflectionAuthor")
+  databaseMemberships WikiDatabaseMember[] @relation("WikiDatabaseMemberUser")
+  wikiPageMemberships WikiPageMember[] @relation("WikiPageMemberUser")
 }
 
 model Account {
@@ -366,6 +431,8 @@ model TimeEntry {
 model WikiPage {
   id             String        @id @default(cuid())
   title          String
+  icon           String?       /// Emoji or icon identifier (e.g. "📄", "rocket")
+  coverImage     String?       /// URL of the page cover image
   content        Json?
   namespace      WikiNamespace @default(COMPANY)
   organizationId String
@@ -378,6 +445,9 @@ model WikiPage {
   slug           String?       @unique
   allowDuplicate Boolean       @default(false)
   disallowIndexing Boolean     @default(false)
+  visibility     ResourceVisibility @default(ORG)
+  /// Soft-delete marker.
+  deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -387,10 +457,63 @@ model WikiPage {
   childPages   WikiPage[]      @relation("WikiPageTree")
   author       User            @relation("WikiPageAuthor", fields: [authorId], references: [id])
   versions     WikiPageVersion[]
+  mentions     WikiMention[]   @relation("WikiMentionSource")
+  blockComments BlockComment[] @relation("WikiPageBlockComments")
+  members      WikiPageMember[]
+  analytics    WikiPageAnalytics[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([parentPageId])
+}
+
+model DailyReflection {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  date           DateTime /// Normalized to start-of-day UTC
+  content        String   @default("")
+  mood           Int?     /// 1–5 scale (1=rough, 5=great)
+  energyLevel    Int?     /// 1–5 scale
+  highlights     String?  /// What went well
+  improvements   String?  /// What to do better tomorrow
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation("DailyReflectionAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model WikiPageAnalytics {
+  id         String   @id @default(cuid())
+  pageId     String
+  userId     String
+  viewedAt   DateTime @default(now())
+
+  page WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User     @relation("WikiPageViewer", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([userId])
+  @@index([pageId, userId])
+}
+
+model WikiPageMember {
+  id        String             @id @default(cuid())
+  pageId    String
+  userId    String
+  role      ResourceMemberRole @default(EDITOR)
+  createdAt DateTime           @default(now())
+
+  page WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User     @relation("WikiPageMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, userId])
+  @@index([userId])
 }
 
 model WikiTemplate {
@@ -474,6 +597,243 @@ model RecentItem {
   @@unique([userId, itemType, itemId])
   @@index([userId])
   @@index([organizationId])
+}
+
+model Conversation {
+    id             String   @id @default(cuid())
+    name           String?
+    isGroup        Boolean  @default(false)
+    organizationId String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    members      ConversationMember[]
+    messages     Message[]
+
+    @@index([organizationId])
+}
+
+model ConversationMember {
+    conversationId String
+    userId         String
+    joinedAt       DateTime @default(now())
+    lastReadAt     DateTime @default(now())
+
+    conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([conversationId, userId])
+    @@index([userId])
+}
+
+model Message {
+    id             String   @id @default(cuid())
+    body           String
+    conversationId String
+    senderId       String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+    @@index([conversationId, createdAt])
+    @@index([senderId])
+}
+
+model NotificationPreference {
+    id             String           @id @default(cuid())
+    userId         String
+    organizationId String
+    type           NotificationType
+    inApp          Boolean          @default(true)
+    email          Boolean          @default(false)
+
+    user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, organizationId, type])
+    @@index([userId])
+}
+
+model Attachment {
+  id             String           @id @default(cuid())
+  organizationId String
+  uploaderId     String
+  parentType     AttachmentParent
+  parentId       String
+  key            String           // S3 object key
+  filename       String
+  mimeType       String
+  size           Int
+  width          Int?
+  height         Int?
+  ready          Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploader     User         @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([parentType, parentId])
+  @@index([uploaderId])
+}
+
+model WikiDatabase {
+  id             String             @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  createdById    String
+  visibility     ResourceVisibility @default(ORG)
+  /// Soft-delete marker. Non-null = in trash. Null = active.
+  deletedAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                 @relation("WikiDatabaseCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  properties   DatabaseProperty[]
+  rows         DatabaseRow[]
+  views        DatabaseView[]
+  members      WikiDatabaseMember[]
+
+  @@index([organizationId])
+}
+
+model WikiDatabaseMember {
+  id         String             @id @default(cuid())
+  databaseId String
+  userId     String
+  role       ResourceMemberRole @default(EDITOR)
+  createdAt  DateTime           @default(now())
+
+  database WikiDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  user     User         @relation("WikiDatabaseMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([databaseId, userId])
+  @@index([userId])
+}
+
+model DatabaseProperty {
+  id         String               @id @default(cuid())
+  databaseId String
+  name       String
+  type       DatabasePropertyType
+  config     Json?
+  sortOrder  Int                  @default(0)
+  createdAt  DateTime             @default(now())
+
+  database  WikiDatabase           @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  values    DatabaseValue[]
+  relations DatabaseRowRelation[]
+
+  @@index([databaseId])
+}
+
+model DatabaseRow {
+  id         String   @id @default(cuid())
+  databaseId String
+  sortOrder  Int      @default(0)
+  /// BlockNote document for the row's long-form body. Notion-style: every
+  /// row is a first-class page with both properties and a content area.
+  content    Json?
+  /// Cached rollup results, keyed by ROLLUP property id. Invalidated by
+  /// `cleanRollupCacheForRow` whenever a write could change the result.
+  /// Schema: { [rollupPropertyId]: RollupValue }
+  rollupCache Json?
+  /// Soft-delete marker.
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  database          WikiDatabase          @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  values            DatabaseValue[]
+  relationsFrom     DatabaseRowRelation[] @relation("RelationFromRow")
+  relationsTo       DatabaseRowRelation[] @relation("RelationToRow")
+
+  @@index([databaseId])
+}
+
+/// Edge in a relation between two rows. The `propertyId` always refers to a
+/// RELATION property living on the *source* (from) database. Reading "all
+/// rows that point to row X via property P" is just a query on
+/// `(toRowId, propertyId)` and is the basis for rollups.
+model DatabaseRowRelation {
+  id         String @id @default(cuid())
+  propertyId String
+  fromRowId  String
+  toRowId    String
+
+  property DatabaseProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  fromRow  DatabaseRow      @relation("RelationFromRow", fields: [fromRowId], references: [id], onDelete: Cascade)
+  toRow    DatabaseRow      @relation("RelationToRow", fields: [toRowId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, fromRowId, toRowId])
+  @@index([fromRowId, propertyId])
+  @@index([toRowId, propertyId])
+}
+
+model DatabaseValue {
+  id         String @id @default(cuid())
+  rowId      String
+  propertyId String
+  value      Json
+
+  row      DatabaseRow      @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  property DatabaseProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([rowId, propertyId])
+  @@index([propertyId])
+}
+
+model DatabaseView {
+  id         String           @id @default(cuid())
+  databaseId String
+  name       String
+  type       DatabaseViewType
+  config     Json?
+  sortOrder  Int              @default(0)
+  createdAt  DateTime         @default(now())
+
+  database WikiDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId])
+}
+
+model BlockComment {
+  id              String    @id @default(cuid())
+  pageId          String
+  blockId         String
+  authorId        String
+  body            String
+  resolved        Boolean   @default(false)
+  parentCommentId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  page          WikiPage       @relation("WikiPageBlockComments", fields: [pageId], references: [id], onDelete: Cascade)
+  author        User           @relation("BlockCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parentComment BlockComment?  @relation("BlockCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       BlockComment[] @relation("BlockCommentReplies")
+
+  @@index([pageId, blockId])
+  @@index([authorId])
+}
+
+model WikiMention {
+  id           String            @id @default(cuid())
+  sourcePageId String
+  targetType   MentionTargetType
+  targetId     String            // userId, wikiPageId, or ISO date string
+  blockId      String?           // BlockNote block id, for jump-to-context
+  createdAt    DateTime          @default(now())
+
+  sourcePage WikiPage @relation("WikiMentionSource", fields: [sourcePageId], references: [id], onDelete: Cascade)
+
+  @@index([sourcePageId])
+  @@index([targetType, targetId])
 }
 
 model AutomationRule {

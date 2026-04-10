@@ -1,13 +1,12 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import {
-    SortableContext,
-    verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TaskStatus } from "@prisma/client";
 import { TaskCard } from "./task-card";
 import { TaskWithRelations } from "@/types/task";
+import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
 
 interface KanbanColumnProps {
     id: TaskStatus;
@@ -25,6 +24,15 @@ interface KanbanColumnProps {
     };
 }
 
+const STATUS_ACCENT: Record<string, string> = {
+    BACKLOG: "#858585",
+    TODO: "var(--bz-blue)",
+    IN_PROGRESS: "var(--bz-amber)",
+    IN_REVIEW: "var(--bz-pink)",
+    DONE: "var(--bz-green)",
+    ARCHIVED: "#474747",
+};
+
 export function KanbanColumn({
     id,
     title,
@@ -33,26 +41,57 @@ export function KanbanColumn({
     showSubtasks,
     expandedParents,
     onToggleParent,
-    visibleProperties
+    visibleProperties,
 }: KanbanColumnProps) {
-    const { setNodeRef } = useDroppable({
-        id: `column-${id}`,
-    });
+    const { setNodeRef, isOver } = useDroppable({ id: `column-${id}` });
+    const accent = STATUS_ACCENT[id] ?? "var(--bz-blue)";
+    const isEmpty = tasks.length === 0;
 
     return (
-        <div className="flex w-[320px] flex-col gap-3 rounded-xl bg-neutral-100/50 dark:bg-neutral-900/50 p-4">
-            <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+        <div
+            className={cn(
+                "flex w-[300px] shrink-0 flex-col rounded-2xl border transition-colors",
+                "border-[color:var(--border)] bg-white/[0.015]",
+                isOver && "border-[color:var(--bz-blue)]/70 bg-white/[0.04]",
+            )}
+        >
+            {/* Column header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-2xl border-b border-[color:var(--border)] bg-[color:var(--card)]/70 px-4 py-3 backdrop-blur">
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: accent, boxShadow: `0 0 10px ${accent}` }}
+                    />
+                    <h3 className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
                         {title}
                     </h3>
-                    <span className="rounded-full bg-neutral-200 dark:bg-neutral-800 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                        {tasks.length}
+                    <span className="mono text-[11px] text-neutral-500">
+                        {String(tasks.length).padStart(2, "0")}
                     </span>
                 </div>
+                <button
+                    type="button"
+                    className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white"
+                    aria-label={`Add task to ${title}`}
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                </button>
             </div>
 
-            <div ref={setNodeRef} className="flex flex-1 flex-col gap-3 min-h-[150px]">
+            {/* Accent rail */}
+            <div
+                aria-hidden
+                className="h-[2px] w-full"
+                style={{
+                    background: `linear-gradient(90deg, ${accent}, transparent)`,
+                    opacity: isOver ? 1 : 0.55,
+                }}
+            />
+
+            <div
+                ref={setNodeRef}
+                className="flex flex-1 flex-col gap-1 p-2 min-h-[200px]"
+            >
                 <SortableContext
                     items={tasks.map((t) => t.id)}
                     strategy={verticalListSortingStrategy}
@@ -71,6 +110,16 @@ export function KanbanColumn({
                         />
                     ))}
                 </SortableContext>
+
+                {isEmpty && (
+                    <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--border)] p-6 text-center">
+                        <div
+                            className="mb-2 h-1 w-8 rounded-full opacity-50"
+                            style={{ background: accent }}
+                        />
+                        <p className="text-[11px] text-neutral-600">Drop tasks here</p>
+                    </div>
+                )}
             </div>
         </div>
     );

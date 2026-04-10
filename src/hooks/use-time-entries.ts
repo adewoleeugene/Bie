@@ -5,6 +5,7 @@ import {
     deleteTimeEntry,
     getTimeEntries,
     getTimeTrackingStats,
+    getEstimateVsActual,
     CreateTimeEntryInput,
     UpdateTimeEntryInput,
 } from "@/actions/time-entries";
@@ -25,6 +26,13 @@ export function useTimeTrackingStats() {
     return useQuery({
         queryKey: ["time-tracking-stats"],
         queryFn: () => getTimeTrackingStats(),
+    });
+}
+
+export function useEstimateVsActual(projectId?: string) {
+    return useQuery({
+        queryKey: ["estimate-vs-actual", projectId],
+        queryFn: () => getEstimateVsActual(projectId),
     });
 }
 

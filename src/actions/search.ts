@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { WikiNamespace } from "@prisma/client";
 
 export type SearchResult = {
-    type: "page" | "task";
+    type: "page" | "task" | "database";
     id: string;
     title: string;
     subtitle?: string;
@@ -44,7 +44,7 @@ export async function globalSearch(query: string): Promise<{
         }
 
         // Parallel search
-        const [wikiPages, tasks] = await Promise.all([
+        const [wikiPages, tasks, databases] = await Promise.all([
             db.wikiPage.findMany({
                 where: {
                     organizationId,
@@ -78,6 +78,21 @@ export async function globalSearch(query: string): Promise<{
                     sprint: {
                         select: { name: true },
                     },
+                },
+            }),
+            db.wikiDatabase.findMany({
+                where: {
+                    organizationId,
+                    name: {
+                        contains: query,
+                        mode: "insensitive",
+                    },
+                },
+                take: 5,
+                select: {
+                    id: true,
+                    name: true,
+                    _count: { select: { rows: true } },
                 },
             }),
         ]);
@@ -132,6 +147,17 @@ export async function globalSearch(query: string): Promise<{
                 title: task.title,
                 subtitle,
                 url,
+            });
+        });
+
+        // Process Databases
+        databases.forEach((d) => {
+            results.push({
+                type: "database",
+                id: d.id,
+                title: d.name,
+                subtitle: `${d._count.rows} rows · Database`,
+                url: `/databases/${d.id}`,
             });
         });
 

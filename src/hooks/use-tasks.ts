@@ -53,7 +53,8 @@ export function useUpdateTask() {
         onSuccess: (result) => {
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: ["tasks"] });
-                toast.success("Task updated successfully");
+                // Silent success — inline edits (assignee toggle, status, dates)
+                // fire this hook constantly; toasting on every one is noisy.
             } else {
                 toast.error(result.error);
             }

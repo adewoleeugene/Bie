@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useFavorites, useRecentItems } from "@/hooks/use-favorites";
 import { Button } from "@/components/ui/button";
-import { Star, Clock, FolderKanban, CheckSquare, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { Star, Clock, FolderKanban, CheckSquare, BookOpen, Database, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
     project: <FolderKanban className="h-3.5 w-3.5 text-blue-500" />,
     task: <CheckSquare className="h-3.5 w-3.5 text-green-500" />,
     wiki_page: <BookOpen className="h-3.5 w-3.5 text-purple-500" />,
+    database: <Database className="h-3.5 w-3.5 text-indigo-500" />,
 };
 
 export function FavoritesSection() {

@@ -218,6 +218,53 @@ export async function getTimeEntries(options?: {
     }
 }
 
+export interface EstimateVsActualItem {
+    taskId: string;
+    taskTitle: string;
+    projectName: string | null;
+    estimatedHours: number;
+    actualMinutes: number;
+}
+
+export async function getEstimateVsActual(projectId?: string): Promise<EstimateVsActualItem[]> {
+    try {
+        const { userId, organizationId } = await getUserOrganization();
+
+        const where: Record<string, unknown> = {
+            organizationId,
+            estimatedHours: { not: null },
+        };
+        if (projectId) where.projectId = projectId;
+
+        const tasks = await db.task.findMany({
+            where,
+            select: {
+                id: true,
+                title: true,
+                estimatedHours: true,
+                project: { select: { name: true } },
+                timeEntries: { select: { duration: true } },
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 30,
+        });
+
+        return tasks
+            .filter((t) => t.estimatedHours != null)
+            .map((t) => ({
+                taskId: t.id,
+                taskTitle: t.title,
+                projectName: t.project?.name || null,
+                estimatedHours: t.estimatedHours!,
+                actualMinutes: t.timeEntries.reduce((sum, e) => sum + (e.duration || 0), 0),
+            }))
+            .filter((t) => t.actualMinutes > 0 || t.estimatedHours > 0);
+    } catch (error) {
+        console.error("Get estimate vs actual error:", error);
+        return [];
+    }
+}
+
 export async function getTimeTrackingStats(): Promise<{
     todayMinutes: number;
     weekMinutes: number;

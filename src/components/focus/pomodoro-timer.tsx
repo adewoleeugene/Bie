@@ -16,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -29,14 +30,23 @@ import {
     SkipForward,
     Target,
     Zap,
+    Minus,
+    Maximize2,
 } from "lucide-react";
 import { useStartFocusSession, useEndFocusSession, useActiveFocusSession } from "@/hooks/use-focus-sessions";
 import { useTasks } from "@/hooks/use-tasks";
+import { toast } from "sonner";
 
-const POMODORO_WORK = 25 * 60; // 25 minutes in seconds
-const POMODORO_SHORT_BREAK = 5 * 60; // 5 minutes
-const POMODORO_LONG_BREAK = 15 * 60; // 15 minutes
+const DEFAULT_WORK = 25;
+const DEFAULT_SHORT_BREAK = 5;
+const DEFAULT_LONG_BREAK = 15;
 const POMODOROS_BEFORE_LONG_BREAK = 4;
+
+function getStoredDuration(key: string, fallback: number): number {
+    if (typeof window === "undefined") return fallback;
+    const stored = localStorage.getItem(key);
+    return stored ? parseInt(stored, 10) || fallback : fallback;
+}
 
 type TimerPhase = "work" | "short_break" | "long_break";
 
@@ -56,14 +66,46 @@ export function PomodoroTimer({
 }: PomodoroTimerProps = {}) {
     const isControlled = externalIsOpen !== undefined;
     const [internalIsOpen, setInternalIsOpen] = useState(false);
-    const isOpen = isControlled ? externalIsOpen : internalIsOpen;
-    const setIsOpen = isControlled
-        ? (open: boolean) => { if (!open && onClose) onClose(); }
-        : setInternalIsOpen;
+    const [isMinimized, setIsMinimized] = useState(false);
+    const dialogOpen = (isControlled ? externalIsOpen : internalIsOpen) && !isMinimized;
+
+    const handleDialogOpenChange = (open: boolean) => {
+        if (!open) {
+            // If a session is active, minimize instead of closing so state is preserved
+            if (sessionActive) {
+                setIsMinimized(true);
+                return;
+            }
+            if (isControlled) {
+                if (onClose) onClose();
+            } else {
+                setInternalIsOpen(false);
+            }
+        } else {
+            setIsMinimized(false);
+            if (!isControlled) setInternalIsOpen(true);
+        }
+    };
 
     const [mode, setMode] = useState<"pomodoro" | "free">(preSelectedMode || "pomodoro");
     const [selectedTaskId, setSelectedTaskId] = useState<string>(preSelectedTaskId || "");
     const [notes, setNotes] = useState("");
+
+    // Configurable durations (stored in localStorage)
+    const [workMinutes, setWorkMinutes] = useState(() => getStoredDuration("pomodoro-work", DEFAULT_WORK));
+    const [shortBreakMinutes, setShortBreakMinutes] = useState(() => getStoredDuration("pomodoro-short-break", DEFAULT_SHORT_BREAK));
+    const [longBreakMinutes, setLongBreakMinutes] = useState(() => getStoredDuration("pomodoro-long-break", DEFAULT_LONG_BREAK));
+    const [showSettings, setShowSettings] = useState(false);
+
+    const POMODORO_WORK = workMinutes * 60;
+    const POMODORO_SHORT_BREAK = shortBreakMinutes * 60;
+    const POMODORO_LONG_BREAK = longBreakMinutes * 60;
+
+    const saveDuration = (key: string, value: number, setter: (v: number) => void) => {
+        const clamped = Math.max(1, Math.min(120, value));
+        setter(clamped);
+        localStorage.setItem(key, String(clamped));
+    };
 
     // Timer state
     const [isRunning, setIsRunning] = useState(false);
@@ -132,6 +174,50 @@ export function PomodoroTimer({
         playNotificationSound();
     }, [playNotificationSound]);
 
+    // Adopt an existing active session (e.g. orphaned from a previous page load)
+    const adoptedRef = useRef(false);
+    useEffect(() => {
+        if (adoptedRef.current) return;
+        if (sessionActive) return;
+        const active = activeSession && "id" in (activeSession as object) ? (activeSession as { id: string; startedAt: string | Date; type: string; taskId?: string | null; pomodoroCount?: number }) : null;
+        if (!active) return;
+
+        adoptedRef.current = true;
+        const startedAt = new Date(active.startedAt);
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000));
+        const adoptedMode: "pomodoro" | "free" = active.type === "POMODORO" ? "pomodoro" : "free";
+
+        setMode(adoptedMode);
+        if (active.taskId) setSelectedTaskId(active.taskId);
+        setSessionActive(true);
+        setElapsedSeconds(elapsedSec);
+        setPomodoroCount(active.pomodoroCount ?? 0);
+
+        if (adoptedMode === "pomodoro") {
+            // Reconstruct which phase we're in based on elapsed time through cycles
+            const workSec = POMODORO_WORK;
+            const shortSec = POMODORO_SHORT_BREAK;
+            const longSec = POMODORO_LONG_BREAK;
+            const cycleUntilLong = POMODOROS_BEFORE_LONG_BREAK * workSec + (POMODOROS_BEFORE_LONG_BREAK - 1) * shortSec + longSec;
+            let remaining = elapsedSec % cycleUntilLong;
+            let currentPhase: TimerPhase = "work";
+            let timeLeft = workSec;
+            for (let i = 0; i < POMODOROS_BEFORE_LONG_BREAK; i++) {
+                if (remaining < workSec) { currentPhase = "work"; timeLeft = workSec - remaining; break; }
+                remaining -= workSec;
+                const breakSec = i === POMODOROS_BEFORE_LONG_BREAK - 1 ? longSec : shortSec;
+                if (remaining < breakSec) { currentPhase = i === POMODOROS_BEFORE_LONG_BREAK - 1 ? "long_break" : "short_break"; timeLeft = breakSec - remaining; break; }
+                remaining -= breakSec;
+            }
+            setPhase(currentPhase);
+            setTimeRemaining(timeLeft);
+        }
+        setIsRunning(true);
+        // Auto-open the dialog so the user sees their adopted session
+        if (!isControlled) setInternalIsOpen(true);
+        setIsMinimized(false);
+    }, [activeSession, sessionActive, POMODORO_WORK, POMODORO_SHORT_BREAK, POMODORO_LONG_BREAK, isControlled]);
+
     // Timer logic
     useEffect(() => {
         if (isRunning) {
@@ -195,21 +281,28 @@ export function PomodoroTimer({
     const handleStart = async () => {
         if (!sessionActive) {
             // Start a new focus session
-            const result = await startSession.mutateAsync({
-                taskId: selectedTaskId || null,
-                type: mode === "pomodoro" ? "POMODORO" : "FREE",
-                notes: notes || null,
-            });
+            try {
+                const taskIdToSend = selectedTaskId && selectedTaskId !== "none" ? selectedTaskId : null;
+                const result = await startSession.mutateAsync({
+                    taskId: taskIdToSend,
+                    type: mode === "pomodoro" ? "POMODORO" : "FREE",
+                    notes: notes || null,
+                });
 
-            if (result.success) {
-                setSessionActive(true);
-                setIsRunning(true);
-                setElapsedSeconds(0);
-                if (mode === "pomodoro") {
-                    setTimeRemaining(POMODORO_WORK);
-                    setPhase("work");
-                    setPomodoroCount(0);
+                if (result.success) {
+                    setSessionActive(true);
+                    setIsRunning(true);
+                    setElapsedSeconds(0);
+                    if (mode === "pomodoro") {
+                        setTimeRemaining(POMODORO_WORK);
+                        setPhase("work");
+                        setPomodoroCount(0);
+                    }
+                } else {
+                    toast.error(result.error || "Failed to start focus session");
                 }
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Failed to start focus session");
             }
         } else {
             setIsRunning(true);
@@ -303,6 +396,17 @@ export function PomodoroTimer({
                 <DialogTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-orange-500" />
                     Focus Session
+                    {sessionActive && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-auto h-7 w-7 p-0"
+                            onClick={() => setIsMinimized(true)}
+                            title="Minimize"
+                        >
+                            <Minus className="h-4 w-4" />
+                        </Button>
+                    )}
                 </DialogTitle>
             </DialogHeader>
 
@@ -343,6 +447,65 @@ export function PomodoroTimer({
                             <Timer className="mr-2 h-4 w-4" />
                             Free Focus
                         </Button>
+                    </div>
+                )}
+
+                {/* Pomodoro Duration Settings */}
+                {!sessionActive && mode === "pomodoro" && (
+                    <div>
+                        <button
+                            className="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 flex items-center gap-1"
+                            onClick={() => setShowSettings(!showSettings)}
+                        >
+                            <Timer className="h-3 w-3" />
+                            {showSettings ? "Hide" : "Customize"} durations
+                        </button>
+                        {showSettings && (
+                            <div className="grid grid-cols-3 gap-3 mt-3">
+                                <div>
+                                    <label className="text-[11px] font-medium text-neutral-500 block mb-1">Work</label>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={120}
+                                            value={workMinutes}
+                                            onChange={(e) => saveDuration("pomodoro-work", parseInt(e.target.value) || DEFAULT_WORK, setWorkMinutes)}
+                                            className="h-8 text-sm"
+                                        />
+                                        <span className="text-[11px] text-neutral-400">min</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium text-neutral-500 block mb-1">Short Break</label>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={120}
+                                            value={shortBreakMinutes}
+                                            onChange={(e) => saveDuration("pomodoro-short-break", parseInt(e.target.value) || DEFAULT_SHORT_BREAK, setShortBreakMinutes)}
+                                            className="h-8 text-sm"
+                                        />
+                                        <span className="text-[11px] text-neutral-400">min</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium text-neutral-500 block mb-1">Long Break</label>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={120}
+                                            value={longBreakMinutes}
+                                            onChange={(e) => saveDuration("pomodoro-long-break", parseInt(e.target.value) || DEFAULT_LONG_BREAK, setLongBreakMinutes)}
+                                            className="h-8 text-sm"
+                                        />
+                                        <span className="text-[11px] text-neutral-400">min</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -558,13 +721,39 @@ export function PomodoroTimer({
         </DialogContent>
     );
 
+    // Floating minimized pill — visible whenever a session is active and the dialog is minimized
+    const minimizedPill = sessionActive && isMinimized ? (
+        <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            className={cn(
+                "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-orange-200 bg-white dark:bg-neutral-900 dark:border-orange-900/40 shadow-lg px-4 py-2 hover:shadow-xl transition-shadow",
+                getPhaseColor()
+            )}
+            title="Restore focus timer"
+        >
+            {getPhaseIcon()}
+            <span className="font-mono tabular-nums text-sm font-semibold">
+                {mode === "pomodoro" ? formatTime(timeRemaining) : formatTime(elapsedSeconds)}
+            </span>
+            {isRunning && (
+                <span className="flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                </span>
+            )}
+            <Maximize2 className="h-3.5 w-3.5 opacity-60" />
+        </button>
+    ) : null;
+
     // If controlled externally (from Focus page), render without trigger
     if (isControlled) {
         return (
             <>
-                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
                     {dialogContent}
                 </Dialog>
+                {minimizedPill}
                 <audio ref={audioRef} preload="none" />
             </>
         );
@@ -573,7 +762,7 @@ export function PomodoroTimer({
     // Standalone mode (top nav trigger)
     return (
         <>
-            <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
                 <DialogTrigger asChild>
                     <Button
                         variant="ghost"
@@ -602,6 +791,8 @@ export function PomodoroTimer({
                 </DialogTrigger>
                 {dialogContent}
             </Dialog>
+
+            {minimizedPill}
 
             {/* Hidden audio element */}
             <audio ref={audioRef} preload="none" />

@@ -15,9 +15,10 @@ import {
     BulkReorderTasksInput,
     bulkReorderTasksSchema,
 } from "@/lib/validators/task";
-import { Task, ActivityAction, Prisma } from "@prisma/client";
+import { Task, ActivityAction, Prisma, NotificationType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { processAutomationRules } from "@/actions/automation";
+import { sendNotifications } from "@/lib/notifications";
 
 // Helper to get user's organization
 async function getUserOrganization() {
@@ -93,6 +94,19 @@ export async function createTask(
                 metadata: { isCreation: true },
             },
         });
+
+        // Notify assigned users
+        if (validated.assigneeIds.length > 0) {
+            sendNotifications({
+                recipientIds: validated.assigneeIds,
+                excludeUserId: userId,
+                organizationId,
+                type: NotificationType.ASSIGNED,
+                title: `You were assigned to "${task.title}"`,
+                body: task.project ? `Project: ${(task.project as { name: string }).name}` : undefined,
+                linkUrl: task.projectId ? `/projects/${task.projectId}/board` : "/dashboard",
+            }).catch((e) => console.error("Notification error:", e));
+        }
 
         revalidatePath("/");
         return { success: true, data: task };
@@ -193,6 +207,18 @@ export async function updateTask(
                 action,
             },
         });
+
+        // Notify newly assigned users
+        if (validated.assigneeIds !== undefined) {
+            sendNotifications({
+                recipientIds: validated.assigneeIds,
+                excludeUserId: userId,
+                organizationId,
+                type: NotificationType.ASSIGNED,
+                title: `You were assigned to "${task.title}"`,
+                linkUrl: task.projectId ? `/projects/${task.projectId}/board` : "/dashboard",
+            }).catch((e) => console.error("Notification error:", e));
+        }
 
         // Trigger Automation Rules (Fire and forget)
         if (task.projectId) {

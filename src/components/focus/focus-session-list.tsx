@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,12 @@ import {
     ChevronUp,
     FolderOpen,
     AlertCircle,
+    Maximize2,
 } from "lucide-react";
 import { useFocusSessions, useFocusStats, useDeleteFocusSession } from "@/hooks/use-focus-sessions";
 import { useTasks } from "@/hooks/use-tasks";
 import { PomodoroTimer } from "./pomodoro-timer";
+import { FocusAIStrip } from "./focus-ai-strip";
 
 function formatDuration(minutes: number): string {
     if (minutes < 60) return `${minutes}m`;
@@ -67,6 +70,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function FocusSessionList() {
+    const router = useRouter();
     const { data: sessions, isLoading: sessionsLoading } = useFocusSessions({ limit: 50 });
     const { data: stats } = useFocusStats();
     const { data: allTasks, isLoading: tasksLoading } = useTasks();
@@ -78,6 +82,8 @@ export function FocusSessionList() {
     const [showHistory, setShowHistory] = useState(false);
     const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
     const [focusMode, setFocusMode] = useState<"pomodoro" | "free">("pomodoro");
+
+    const enterDeepFocus = () => router.push("/focus/session");
 
     const isLoading = sessionsLoading || tasksLoading;
 
@@ -163,6 +169,14 @@ export function FocusSessionList() {
                     </p>
                 </div>
             </div>
+
+            {/* BieAI copilot strip — one-tap focus actions */}
+            <FocusAIStrip
+                onStartFocus={(taskId) => {
+                    setFocusTaskId(taskId);
+                    setFocusMode("pomodoro");
+                }}
+            />
 
             {/* Stats Cards */}
             {stats && (
@@ -530,12 +544,23 @@ export function FocusSessionList() {
 
             {/* Inline Pomodoro Timer — opens when a task is selected */}
             {focusTaskId && (
-                <PomodoroTimer
-                    preSelectedTaskId={focusTaskId}
-                    preSelectedMode={focusMode}
-                    isOpen={true}
-                    onClose={() => setFocusTaskId(null)}
-                />
+                <>
+                    <PomodoroTimer
+                        preSelectedTaskId={focusTaskId}
+                        preSelectedMode={focusMode}
+                        isOpen={true}
+                        onClose={() => setFocusTaskId(null)}
+                    />
+                    <div className="flex justify-center">
+                        <Button
+                            onClick={enterDeepFocus}
+                            className="bg-gradient-to-r from-orange-600 to-pink-600 text-white hover:from-orange-700 hover:to-pink-700"
+                        >
+                            <Maximize2 className="mr-2 h-4 w-4" />
+                            Enter deep focus mode
+                        </Button>
+                    </div>
+                </>
             )}
         </div>
     );

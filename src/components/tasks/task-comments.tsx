@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow } from "date-fns";
 import { SendHorizonal } from "lucide-react";
+import { AttachmentPanel } from "@/components/attachments/attachment-panel";
+import { AttachmentParent } from "@prisma/client";
 
 interface TaskCommentsProps {
     taskId: string;
@@ -53,6 +55,11 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
                                 <div className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap rounded-md bg-neutral-50 p-2 dark:bg-neutral-900">
                                     {comment.body}
                                 </div>
+                                <AttachmentPanel
+                                    parentType={AttachmentParent.COMMENT}
+                                    parentId={comment.id}
+                                    compact
+                                />
                             </div>
                         </div>
                     ))

@@ -47,10 +47,10 @@ interface TaskCardProps {
 }
 
 const priorityColors = {
-    P0: "bg-red-500",
-    P1: "bg-orange-500",
-    P2: "bg-yellow-500",
-    P3: "bg-blue-500",
+    P0: "bg-[color:var(--bz-red)] shadow-[0_0_8px_var(--bz-red)]",
+    P1: "bg-[color:var(--bz-amber)] shadow-[0_0_8px_var(--bz-amber)]",
+    P2: "bg-[color:var(--bz-peri)]",
+    P3: "bg-[color:var(--bz-mint)]",
 };
 
 export function TaskCard({
@@ -112,7 +112,7 @@ export function TaskCard({
     const indentationStyle = {
         marginLeft: `${depth * 24}px`,
         width: "auto",
-        flex: "1 1 0%",
+        flex: "0 0 auto",
     };
 
     if (isDragging) {
@@ -126,8 +126,8 @@ export function TaskCard({
                 )}
             >
                 <Card className="cursor-grabbing">
-                    <CardContent className="p-3">
-                        <div className="space-y-2">
+                    <CardContent className="p-2">
+                        <div className="space-y-1">
                             <div className="flex items-start justify-between gap-2">
                                 <h4 className="text-sm font-medium leading-tight">{task.title}</h4>
                                 {visibleProperties.priority && (
@@ -155,12 +155,13 @@ export function TaskCard({
                 <Card
                     onClick={onClick}
                     className={cn(
-                        "group relative cursor-grab hover:ring-2 hover:ring-primary/50 active:cursor-grabbing transition-all",
-                        depth > 0 && "border-l-2 border-l-primary/30 bg-neutral-50/50 dark:bg-neutral-900/50"
+                        "group relative cursor-grab border-[color:var(--border)] bg-[color:var(--card)] transition-all",
+                        "hover:border-[color:var(--bz-blue)]/60 hover:shadow-[0_8px_24px_-12px_rgba(0,153,255,0.45)] active:cursor-grabbing",
+                        depth > 0 && "border-l-[3px] border-l-[color:var(--bz-blue)]/60 bg-white/[0.02]",
                     )}
                 >
-                    <CardContent className="p-3">
-                        <div className="space-y-2">
+                    <CardContent className="p-2">
+                        <div className="space-y-1">
                             <div className="flex items-start gap-2">
                                 {/* Chevron for parents with subtasks */}
                                 {hasSubtasks && showSubtasks && (
@@ -194,7 +195,7 @@ export function TaskCard({
                             </div>
 
                             {task.description && typeof task.description === 'string' && (
-                                <p className="line-clamp-2 text-xs text-neutral-500 ml-6">
+                                <p className="line-clamp-1 text-[11px] leading-snug text-neutral-500 ml-6">
                                     {task.description}
                                 </p>
                             )}
@@ -206,11 +207,13 @@ export function TaskCard({
                                         <span>{subtaskDoneCount}/{subtaskCount} sub-tasks</span>
                                         <span>{subtaskProgress}%</span>
                                     </div>
-                                    <div className="h-1 w-full rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.05]">
                                         <div
                                             className={cn(
                                                 "h-full rounded-full transition-all duration-300",
-                                                subtaskProgress === 100 ? "bg-green-500" : "bg-primary"
+                                                subtaskProgress === 100
+                                                    ? "bg-[color:var(--bz-green)] shadow-[0_0_10px_var(--bz-green)]"
+                                                    : "bg-[color:var(--bz-blue)] shadow-[0_0_10px_var(--bz-blue)]",
                                             )}
                                             style={{ width: `${subtaskProgress}%` }}
                                         />
@@ -261,7 +264,7 @@ export function TaskCard({
                                         Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        className="text-red-600 focus:text-red-600"
+                                        className="text-[color:var(--bz-red)] focus:text-[color:var(--bz-red)]"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setShowDeleteDialog(true);
@@ -288,7 +291,7 @@ export function TaskCard({
                         <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDelete}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-[color:var(--bz-red)] hover:bg-[color:var(--bz-red)]/85"
                         >
                             Delete
                         </AlertDialogAction>

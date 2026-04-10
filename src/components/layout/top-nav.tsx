@@ -35,58 +35,59 @@ export function TopNav({ user, organizationName, projects }: TopNavProps) {
         .toUpperCase() || "U";
 
     return (
-        <div className="flex h-16 items-center justify-between border-b bg-white px-6 dark:bg-neutral-950">
+        <div className="flex h-14 items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--background)]/70 px-5 backdrop-blur-xl">
             <div className="flex items-center gap-4">
                 <Sheet>
                     <SheetTrigger asChild>
-                        <button className="block md:hidden">
-                            <Menu className="h-6 w-6" />
+                        <button className="block rounded-md p-1.5 text-neutral-400 hover:bg-white/[0.05] hover:text-white md:hidden">
+                            <Menu className="h-5 w-5" />
                         </button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-64">
+                    <SheetContent side="left" className="w-[260px] border-[color:var(--border)] bg-[color:var(--sidebar)] p-0">
                         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                         <Sidebar projects={projects} />
                     </SheetContent>
                 </Sheet>
-                <h2 className="text-sm font-medium text-neutral-500 hidden sm:block">
+                <span className="mono hidden text-[10px] uppercase tracking-[0.18em] text-neutral-500 sm:inline">
                     {organizationName}
-                </h2>
-                <div className="w-[200px] sm:w-[300px]">
+                </span>
+                <div className="hidden h-4 w-px bg-[color:var(--border)] sm:block" />
+                <div className="w-[220px] sm:w-[320px]">
                     <SearchDialog />
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                {/* Pomodoro Timer */}
+            <div className="flex items-center gap-1.5">
                 <PomodoroTimer />
-
-                {/* Notification Bell */}
                 <NotificationBell />
 
-                {/* User Menu */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-3 rounded-lg p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-                            <div className="text-right">
-                                <p className="text-sm font-medium">{user.name}</p>
-                                <p className="text-xs text-neutral-500">{user.email}</p>
+                        <button className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.04]">
+                            <div className="hidden text-right sm:block">
+                                <p className="text-[12px] font-medium leading-tight text-white">{user.name}</p>
+                                <p className="mono text-[10px] leading-tight text-neutral-500">{user.email}</p>
                             </div>
-                            <Avatar>
+                            <Avatar className="h-8 w-8 ring-1 ring-[color:var(--border)]">
                                 <AvatarImage src={user.image || undefined} alt={user.name || ""} />
-                                <AvatarFallback>{initials}</AvatarFallback>
+                                <AvatarFallback className="bg-[color:var(--secondary)] text-[11px] text-white">
+                                    {initials}
+                                </AvatarFallback>
                             </Avatar>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
+                    <DropdownMenuContent align="end" className="w-56 border-[color:var(--border)] bg-[color:var(--popover)]">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                            My account
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                         <DropdownMenuItem>
                             <User className="mr-2 h-4 w-4" />
                             Profile
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                         <DropdownMenuItem
-                            className="text-red-600"
+                            className="text-[color:var(--bz-red)] focus:text-[color:var(--bz-red)]"
                             onClick={() => signOut({ callbackUrl: "/login" })}
                         >
                             <LogOut className="mr-2 h-4 w-4" />

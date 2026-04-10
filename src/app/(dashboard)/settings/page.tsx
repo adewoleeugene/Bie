@@ -7,12 +7,25 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useNotificationPreferences, useUpdateNotificationPreference } from "@/hooks/use-notification-preferences";
 
 export default function SettingsPage() {
     const { data: session, update } = useSession();
     const [name, setName] = useState(session?.user?.name || "");
     const [loading, setLoading] = useState(false);
+    const { data: notifPrefs } = useNotificationPreferences();
+    const updatePref = useUpdateNotificationPreference();
+
+    const NOTIF_TYPE_LABELS: Record<string, string> = {
+        MENTION: "Mentions",
+        DUE_SOON: "Due Soon Reminders",
+        OVERDUE: "Overdue Alerts",
+        ASSIGNED: "Task Assignments",
+        COMMENT: "Comments",
+    };
 
     const handleSaveProfile = async () => {
         setLoading(true);
@@ -67,6 +80,47 @@ export default function SettingsPage() {
                     <Button onClick={handleSaveProfile} disabled={loading}>
                         {loading ? "Saving..." : "Save Changes"}
                     </Button>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardDescription>Choose which notifications you receive.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-[1fr,80px,80px] gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
+                            <span>Type</span>
+                            <span className="text-center">In-App</span>
+                            <span className="text-center">Email</span>
+                        </div>
+                        {notifPrefs?.map((pref) => (
+                            <div key={pref.type} className="grid grid-cols-[1fr,80px,80px] gap-2 items-center">
+                                <span className="text-sm font-medium">
+                                    {NOTIF_TYPE_LABELS[pref.type] || pref.type}
+                                </span>
+                                <div className="flex justify-center">
+                                    <Switch
+                                        checked={pref.inApp}
+                                        onCheckedChange={(checked) =>
+                                            updatePref.mutate({ type: pref.type, field: "inApp", value: checked })
+                                        }
+                                    />
+                                </div>
+                                <div className="flex justify-center">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div>
+                                                <Switch checked={false} disabled />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Coming soon</TooltipContent>
+                                    </Tooltip>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
 

@@ -23,6 +23,7 @@ import { createPortal } from "react-dom";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Layers, MoreHorizontal, Settings2, Eye, Layout } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -280,54 +281,69 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <div className="flex items-center justify-between px-6 pt-4 pb-0">
+            <div className="flex items-center justify-between border-b border-[color:var(--border)] px-6 py-2.5">
                 <div className="flex items-center gap-2">
                     {totalSubtasks > 0 && (
-                        <Button
-                            variant={showSubtasks ? "default" : "outline"}
-                            size="sm"
-                            className="h-7 text-xs gap-1.5"
+                        <button
+                            type="button"
                             onClick={toggleShowSubtasks}
+                            className={cn(
+                                "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition-colors",
+                                showSubtasks
+                                    ? "border-transparent bg-[color:var(--bz-blue)] text-black"
+                                    : "border-[color:var(--border)] text-neutral-300 hover:bg-white/[0.04] hover:text-white",
+                            )}
                         >
                             <Layers className="h-3 w-3" />
                             Sub-items
-                            <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">
+                            <span
+                                className={cn(
+                                    "mono ml-0.5 rounded px-1 text-[10px]",
+                                    showSubtasks ? "bg-black/25 text-black" : "bg-white/10 text-neutral-400",
+                                )}
+                            >
                                 {totalSubtasks}
                             </span>
-                        </Button>
+                        </button>
                     )}
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                    <button
+                        type="button"
+                        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[color:var(--border)] px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+                    >
                         <Layout className="h-3 w-3" />
-                        Group by: Status
-                    </Button>
+                        Group: Status
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5">
-                                <Settings2 className="h-3 w-3" />
-                                Properties
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>Visible Properties</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {Object.keys(visibleProperties).map((key) => (
-                                <DropdownMenuCheckboxItem
-                                    key={key}
-                                    checked={visibleProperties[key as keyof typeof visibleProperties]}
-                                    onCheckedChange={(checked) => setVisibleProperties(prev => ({ ...prev, [key]: !!checked }))}
-                                >
-                                    {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-white"
+                        >
+                            <Settings2 className="h-3 w-3" />
+                            Properties
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 border-[color:var(--border)] bg-[color:var(--popover)]">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                            Visible properties
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-[color:var(--border)]" />
+                        {Object.keys(visibleProperties).map((key) => (
+                            <DropdownMenuCheckboxItem
+                                key={key}
+                                checked={visibleProperties[key as keyof typeof visibleProperties]}
+                                onCheckedChange={(checked) => setVisibleProperties(prev => ({ ...prev, [key]: !!checked }))}
+                            >
+                                {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
-            <div className="flex h-full gap-4 overflow-x-auto p-6">
+            <div className="scrollbar-thin flex h-full gap-4 overflow-x-auto px-6 py-5">
                 {COLUMNS.map((column) => (
                     <KanbanColumn
                         key={column.id}

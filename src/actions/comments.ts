@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { ActivityAction } from "@prisma/client";
+import { ActivityAction, NotificationType } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { sendNotifications } from "@/lib/notifications";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -89,6 +90,28 @@ export async function createComment(taskId: string, body: string) {
                 action: ActivityAction.COMMENTED,
             },
         });
+
+        // Notify task assignees about the comment
+        const task = await db.task.findUnique({
+            where: { id: taskId },
+            include: {
+                assignees: { select: { userId: true } },
+                organization: { select: { id: true } },
+            },
+        });
+
+        if (task) {
+            const assigneeIds = task.assignees.map((a) => a.userId);
+            sendNotifications({
+                recipientIds: assigneeIds,
+                excludeUserId: userId,
+                organizationId: task.organizationId,
+                type: NotificationType.COMMENT,
+                title: `New comment on "${task.title}"`,
+                body: body.length > 100 ? body.slice(0, 100) + "..." : body,
+                linkUrl: task.projectId ? `/projects/${task.projectId}/board` : "/dashboard",
+            }).catch((e) => console.error("Notification error:", e));
+        }
 
         revalidatePath("/");
         return { success: true, data: comment };

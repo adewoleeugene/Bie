@@ -40,6 +40,8 @@ import { Clock, Trash2, Plus, X, GripVertical, ChevronRight, Maximize2, Hash } f
 import { TaskStatus, TaskPriority } from "@prisma/client";
 import { TaskWithRelations } from "@/types/task";
 import { TaskComments } from "@/components/tasks/task-comments";
+import { AttachmentPanel } from "@/components/attachments/attachment-panel";
+import { AttachmentParent } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import {
     DndContext,
@@ -417,9 +419,9 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-8 py-10">
+                    <div className="flex-1 overflow-y-auto px-8 py-8">
                         {/* Task Title */}
-                        <div className="mb-8">
+                        <div className="mb-5">
                             {isEditingTitle ? (
                                 <Input
                                     defaultValue={task.title}
@@ -438,7 +440,7 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                         </div>
 
                         {/* Notion-style Property List */}
-                        <div className="space-y-px mb-12">
+                        <div className="space-y-px mb-5">
                             <div className="grid grid-cols-[140px_1fr] items-center group py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors rounded-sm px-1">
                                 <label className="text-sm text-neutral-500 flex items-center gap-2">
                                     <div className="w-4 h-4 rounded-sm bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[10px] text-blue-600">ST</div>
@@ -536,7 +538,7 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                         </div>
 
                         {/* Description */}
-                        <div className="space-y-4">
+                        <div className="space-y-2 mb-4">
                             {!description || (Array.isArray(description) && description.length === 0) ? (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                                     <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Start from a Template</h4>
@@ -576,9 +578,9 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-1.5">
+                                <div className="space-y-1">
                                     <label className="text-xs font-semibold text-neutral-500 uppercase">Description</label>
-                                    <div className="min-h-[100px] border-0 rounded-md">
+                                    <div className="border-0 rounded-md">
                                         <BlockEditor
                                             key={task.id}
                                             initialContent={typeof description === "string"
@@ -743,6 +745,13 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                                     Add a sub-task
                                 </button>
                             )}
+                        </div>
+
+                        <div className="border-t pt-6">
+                            <AttachmentPanel
+                                parentType={AttachmentParent.TASK}
+                                parentId={task.id}
+                            />
                         </div>
 
                         <div className="border-t pt-6">

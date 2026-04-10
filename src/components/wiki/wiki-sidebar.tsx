@@ -1,11 +1,15 @@
+"use client";
+
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { WikiPage, User, WikiNamespace } from "@prisma/client";
-import { ChevronRight, ChevronDown, FileText, Plus, Hash, Folder } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Plus, Hash, Folder, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { WikiPageDialog } from "./wiki-page-dialog";
+import { WikiSearch } from "./wiki-search";
+import { WikiTemplatesDialog } from "./wiki-templates-dialog";
 
 type WikiPageWithChildren = WikiPage & {
     author: User;
@@ -75,7 +79,9 @@ function WikiTreeItem({
                         <div className="w-4.5" />
                     )}
 
-                    {level === 0 ? (
+                    {page.icon ? (
+                        <span className="h-4 w-4 shrink-0 text-center text-sm leading-4">{page.icon}</span>
+                    ) : level === 0 ? (
                         <Folder className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/50")} />
                     ) : (
                         <FileText className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/50")} />
@@ -159,6 +165,16 @@ export function WikiSidebar({
         return rootNodes;
     }, [rawPages]);
 
+    const router = useRouter();
+
+    const handleUseTemplate = (content: any, title: string) => {
+        // Store template content in sessionStorage for the new page dialog to use
+        sessionStorage.setItem("wiki-template-content", JSON.stringify(content));
+        sessionStorage.setItem("wiki-template-title", title);
+        // Trigger the new page dialog programmatically
+        // For now, just navigate to create a new page
+    };
+
     return (
         <div className="w-72 border-r bg-muted/30 flex flex-col h-full overflow-hidden">
             <div className="p-4 flex flex-col gap-6">
@@ -182,6 +198,24 @@ export function WikiSidebar({
                         />
                     )}
                 </div>
+
+                {/* Wiki Search */}
+                <WikiSearch organizationId={organizationId} basePath={basePath} />
+
+                {/* Templates */}
+                {!readOnly && (
+                    <WikiTemplatesDialog
+                        organizationId={organizationId}
+                        onUseTemplate={handleUseTemplate}
+                    />
+                )}
+
+                {!readOnly && (
+                    <Link href="/wiki/trash" className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Trash
+                    </Link>
+                )}
 
                 <div className="flex flex-col gap-1 overflow-y-auto pr-2 custom-scrollbar">
                     {tree.map((page) => (

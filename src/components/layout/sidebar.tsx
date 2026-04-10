@@ -2,20 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { FolderKanban, LayoutDashboard, Settings, Users, BookOpen, Zap, Clock, Sun, Timer, TrendingUp } from "lucide-react";
+import {
+    FolderKanban,
+    LayoutDashboard,
+    Settings,
+    Users,
+    BookOpen,
+    Zap,
+    Clock,
+    Sun,
+    TrendingUp,
+    MessageSquare,
+    Database,
+    Trash2,
+    PanelLeftClose,
+    PanelLeft,
+    Notebook,
+    Plus,
+} from "lucide-react";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
 
 interface Project {
     id: string;
     name: string;
-    _count?: {
-        tasks: number;
-    };
+    _count?: { tasks: number };
     sprints?: { id: string; name: string }[];
 }
 
@@ -23,244 +36,226 @@ interface SidebarProps {
     projects: Project[];
 }
 
+type NavItem = {
+    href: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    accent: string; // Blitzit chip color
+    match?: (p: string | null) => boolean;
+};
+
+const PRIMARY: NavItem[] = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard, accent: "var(--bz-blue)", match: (p) => p === "/" },
+    { href: "/my-day", label: "Today", icon: Sun, accent: "var(--bz-amber)" },
+    { href: "/focus", label: "Focus", icon: Zap, accent: "var(--bz-pink)" },
+    { href: "/time-tracking", label: "Hours", icon: Clock, accent: "var(--bz-mint)" },
+    { href: "/sprintboard", label: "Sprints", icon: LayoutDashboard, accent: "var(--bz-lime)" },
+    { href: "/analytics", label: "Insights", icon: TrendingUp, accent: "var(--bz-peri)" },
+];
+
+const SECONDARY: NavItem[] = [
+    { href: "/wiki", label: "Wiki", icon: BookOpen, accent: "var(--bz-mint)", match: (p) => !!p?.startsWith("/wiki") },
+    { href: "/databases", label: "Databases", icon: Database, accent: "var(--bz-blue)", match: (p) => !!p?.startsWith("/databases") },
+    { href: "/squads", label: "Squads", icon: Users, accent: "var(--bz-lime)", match: (p) => !!p?.startsWith("/squads") },
+    { href: "/chat", label: "Chat", icon: MessageSquare, accent: "var(--bz-pink)" },
+    { href: "/reflections", label: "Journal", icon: Notebook, accent: "var(--bz-amber)", match: (p) => !!p?.startsWith("/reflections") },
+    { href: "/trash", label: "Trash", icon: Trash2, accent: "var(--bz-amber)", match: (p) => !!p?.startsWith("/trash") },
+];
+
+function NavRow({
+    item,
+    active,
+    collapsed,
+}: {
+    item: NavItem;
+    active: boolean;
+    collapsed: boolean;
+}) {
+    const Icon = item.icon;
+    return (
+        <Link
+            href={item.href}
+            title={collapsed ? item.label : undefined}
+            className={cn(
+                "group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all",
+                "text-neutral-400 hover:text-white hover:bg-white/[0.04]",
+                active && "text-white bg-white/[0.06]",
+            )}
+        >
+            {/* Active accent bar */}
+            <span
+                aria-hidden
+                className={cn(
+                    "absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r-full transition-all",
+                    active ? "w-[3px]" : "w-0 group-hover:w-[2px]",
+                )}
+                style={{ background: item.accent, boxShadow: active ? `0 0 12px ${item.accent}` : undefined }}
+            />
+            <span
+                className="shrink-0"
+                style={active ? { color: item.accent } : undefined}
+            >
+                <Icon className="h-[18px] w-[18px] transition-colors" />
+            </span>
+            {!collapsed && <span className="truncate font-medium tracking-tight">{item.label}</span>}
+        </Link>
+    );
+}
+
 export function Sidebar({ projects }: SidebarProps) {
     const pathname = usePathname();
+    const [collapsed, setCollapsed] = useState(false);
+
+    const isActive = (item: NavItem) =>
+        item.match ? item.match(pathname) : pathname === item.href;
 
     return (
-        <div className="flex h-full w-64 flex-col border-r bg-neutral-50/50 dark:bg-neutral-900/50">
-            <div className="p-6">
-                <Link href="/" className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-white dark:bg-neutral-50 dark:text-neutral-900">
-                        <span className="text-lg font-bold">C</span>
+        <aside
+            className={cn(
+                "flex h-full flex-col border-r border-[color:var(--border)] bg-[color:var(--sidebar)] transition-[width] duration-200",
+                collapsed ? "w-[68px]" : "w-[244px]",
+            )}
+        >
+            {/* Brand */}
+            <div className="flex items-center justify-between px-3 pt-4 pb-3">
+                <Link href="/" className="flex items-center gap-2.5 px-1.5">
+                    <div
+                        className="relative flex h-8 w-8 items-center justify-center rounded-[10px] text-white font-bold"
+                        style={{
+                            background: "linear-gradient(135deg, var(--bz-blue), #006bff)",
+                            boxShadow: "0 4px 16px -4px rgba(0,153,255,0.55), inset 0 1px 0 rgba(255,255,255,0.2)",
+                        }}
+                    >
+                        B
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[color:var(--bz-mint)] ring-2 ring-[color:var(--sidebar)]" />
                     </div>
-                    <span className="text-xl font-bold">Bie</span>
+                    {!collapsed && (
+                        <div className="leading-none">
+                            <div className="text-[15px] font-semibold tracking-tight text-white">Bie</div>
+                            <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                                Christex Foundation
+                            </div>
+                        </div>
+                    )}
                 </Link>
+                <button
+                    type="button"
+                    onClick={() => setCollapsed((c) => !c)}
+                    className="rounded-md p-1.5 text-neutral-500 hover:bg-white/[0.05] hover:text-white"
+                    aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                >
+                    {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                </button>
             </div>
 
-            <Separator />
+            <div className="bz-divider mx-3" />
 
-            <nav className="flex-1 space-y-1 p-4">
-                <Link href="/">
-                    <Button
-                        variant={pathname === "/" ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        Dashboard
-                    </Button>
-                </Link>
+            {/* Nav */}
+            <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-3">
+                {!collapsed && (
+                    <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                        Workspace
+                    </div>
+                )}
+                <div className="space-y-0.5">
+                    {PRIMARY.map((item) => (
+                        <NavRow key={item.href} item={item} active={isActive(item)} collapsed={collapsed} />
+                    ))}
+                </div>
 
-                <Link href="/analytics">
-                    <Button
-                        variant={pathname === "/analytics" ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <TrendingUp className="mr-2 h-4 w-4" />
-                        Analytics
-                    </Button>
-                </Link>
-
-                <Link href="/sprintboard">
-                    <Button
-                        variant={pathname === "/sprintboard" ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        Sprint Board
-                    </Button>
-                </Link>
-
-                <Link href="/squads">
-                    <Button
-                        variant={pathname === "/squads" || pathname?.startsWith("/squads/") ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <Users className="mr-2 h-4 w-4" />
-                        Squads
-                    </Button>
-                </Link>
-
-                <Link href="/wiki">
-                    <Button
-                        variant={pathname === "/wiki" || pathname?.startsWith("/wiki/") ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <BookOpen className="mr-2 h-4 w-4" />
-                        Wiki
-                    </Button>
-                </Link>
-
-                {/* Productivity Section */}
-                <div className="pt-4">
-                    <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                        Productivity
-                    </h3>
-                    <div className="space-y-1">
-                        <Link href="/my-day">
-                            <Button
-                                variant={pathname === "/my-day" ? "secondary" : "ghost"}
-                                className="w-full justify-start"
-                            >
-                                <Sun className="mr-2 h-4 w-4" />
-                                My Day
-                            </Button>
-                        </Link>
-                        <Link href="/focus">
-                            <Button
-                                variant={pathname === "/focus" ? "secondary" : "ghost"}
-                                className="w-full justify-start"
-                            >
-                                <Zap className="mr-2 h-4 w-4" />
-                                Focus Sessions
-                            </Button>
-                        </Link>
-                        <Link href="/time-tracking">
-                            <Button
-                                variant={pathname === "/time-tracking" ? "secondary" : "ghost"}
-                                className="w-full justify-start"
-                            >
-                                <Clock className="mr-2 h-4 w-4" />
-                                Time Tracking
-                            </Button>
-                        </Link>
+                <div className="mt-5">
+                    {!collapsed && (
+                        <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                            Knowledge
+                        </div>
+                    )}
+                    <div className="space-y-0.5">
+                        {SECONDARY.map((item) => (
+                            <NavRow key={item.href} item={item} active={isActive(item)} collapsed={collapsed} />
+                        ))}
                     </div>
                 </div>
 
-                {/* Favorites & Recent */}
-                <div className="pt-2">
-                    <FavoritesSection />
-                </div>
+                {!collapsed && (
+                    <div className="mt-5">
+                        <FavoritesSection />
+                    </div>
+                )}
 
-                <div className="pt-4">
-                    <div className="flex items-center justify-between px-3 mb-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                            Projects
-                        </h3>
+                {/* Projects */}
+                <div className="mt-5">
+                    <div className="mb-1.5 flex items-center justify-between px-2">
+                        {!collapsed && (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                                Projects
+                            </span>
+                        )}
                         <ProjectDialog />
                     </div>
-                    <div className="space-y-1">
-                        {projects.map((project) => {
-                            const isActive = pathname?.includes(project.id);
+                    <div className="space-y-0.5">
+                        {projects.map((project, idx) => {
+                            const accent = [
+                                "var(--bz-blue)",
+                                "var(--bz-mint)",
+                                "var(--bz-lime)",
+                                "var(--bz-pink)",
+                                "var(--bz-amber)",
+                                "var(--bz-peri)",
+                            ][idx % 6];
+                            const active = pathname?.includes(project.id) ?? false;
                             return (
-                                <div key={project.id} className="space-y-1">
-                                    <Link href={`/projects/${project.id}`}>
-                                        <Button
-                                            variant={isActive ? "secondary" : "ghost"}
-                                            className="w-full justify-start"
-                                        >
-                                            <FolderKanban className="mr-2 h-4 w-4" />
-                                            <span className="flex-1 truncate text-left">
-                                                {project.name}
-                                            </span>
+                                <Link
+                                    key={project.id}
+                                    href={`/projects/${project.id}`}
+                                    title={collapsed ? project.name : undefined}
+                                    className={cn(
+                                        "group relative flex items-center gap-3 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
+                                        "text-neutral-400 hover:bg-white/[0.04] hover:text-white",
+                                        active && "bg-white/[0.06] text-white",
+                                    )}
+                                >
+                                    <span
+                                        className="h-2 w-2 shrink-0 rounded-[3px]"
+                                        style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
+                                    />
+                                    {!collapsed && (
+                                        <>
+                                            <span className="flex-1 truncate font-medium">{project.name}</span>
                                             {project._count && (
-                                                <span className="text-xs text-neutral-500">
+                                                <span className="mono text-[11px] text-neutral-500">
                                                     {project._count.tasks}
                                                 </span>
                                             )}
-                                        </Button>
-                                    </Link>
-                                    {isActive && (
-                                        <div className="ml-4 space-y-1 border-l pl-2">
-                                            <Link href={`/projects/${project.id}/board`}>
-                                                <Button
-                                                    variant={pathname?.includes("/board") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Board
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/table`}>
-                                                <Button
-                                                    variant={pathname?.includes("/table") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Table
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/sprints`}>
-                                                <Button
-                                                    variant={pathname?.includes("/sprints") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    <span className="flex-1 text-left">Sprints</span>
-                                                    {project.sprints && project.sprints.length > 0 && (
-                                                        <Badge variant="default" className="ml-2 h-4 px-1 text-[10px]">
-                                                            Active
-                                                        </Badge>
-                                                    )}
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/backlog`}>
-                                                <Button
-                                                    variant={pathname?.includes("/backlog") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Backlog
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/wiki`}>
-                                                <Button
-                                                    variant={pathname?.includes("/wiki") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Wiki
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/calendar`}>
-                                                <Button
-                                                    variant={pathname?.includes("/calendar") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Calendar
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/timeline`}>
-                                                <Button
-                                                    variant={pathname?.includes("/timeline") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    Timeline
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/automation`}>
-                                                <Button
-                                                    variant={pathname?.includes("/automation") ? "secondary" : "ghost"}
-                                                    size="sm"
-                                                    className="h-8 w-full justify-start text-xs font-normal"
-                                                >
-                                                    <Zap className="mr-2 h-3 w-3" />
-                                                    Automation
-                                                </Button>
-                                            </Link>
-                                        </div>
+                                        </>
                                     )}
-                                </div>
+                                </Link>
                             );
                         })}
+                        {projects.length === 0 && !collapsed && (
+                            <div className="px-2.5 py-2 text-[12px] text-neutral-600">
+                                No projects yet
+                            </div>
+                        )}
                     </div>
                 </div>
             </nav>
 
-            <Separator />
+            <div className="bz-divider mx-3" />
 
-            <div className="p-4">
-                <Link href="/settings">
-                    <Button
-                        variant={pathname === "/settings" ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                    >
-                        <Settings className="mr-2 h-4 w-4" />
-                        Settings
-                    </Button>
+            {/* Footer */}
+            <div className="px-3 py-3">
+                <Link
+                    href="/settings"
+                    title={collapsed ? "Settings" : undefined}
+                    className={cn(
+                        "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-white",
+                        pathname === "/settings" && "bg-white/[0.06] text-white",
+                    )}
+                >
+                    <Settings className="h-[18px] w-[18px]" />
+                    {!collapsed && <span className="font-medium">Settings</span>}
                 </Link>
             </div>
-        </div>
+        </aside>
     );
 }
