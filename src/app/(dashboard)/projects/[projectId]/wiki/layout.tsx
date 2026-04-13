@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { WikiSidebar } from "@/components/wiki/wiki-sidebar";
 import { WikiNamespace } from "@prisma/client";
+
+export const metadata: Metadata = {
+    title: "Project Wiki",
+    description: "Project knowledge base and documentation",
+};
 
 export default async function ProjectWikiLayout({
     children,

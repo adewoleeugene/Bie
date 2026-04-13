@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -7,6 +8,11 @@ import { Calendar } from "lucide-react";
 
 interface PageProps {
     params: Promise<{ date: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+    const { date } = await params;
+    return { title: `Date: ${date}` };
 }
 
 export default async function DatePage({ params }: PageProps) {

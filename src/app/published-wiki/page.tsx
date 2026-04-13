@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { WikiNamespace } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+    title: "Knowledge Base",
+    description: "Published knowledge base and documentation",
+};
 
 export default async function PublishedWikiPage() {
     // Find organization by slug

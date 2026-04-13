@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ActionResult } from "@/types";
-import { startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, addDays, format } from "date-fns";
 
 export type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -524,5 +524,232 @@ export async function getProjectProgress(): Promise<ActionResult<Array<{
     } catch (error) {
         console.error("Error fetching project progress:", error);
         return { success: false, error: "Failed to fetch project progress" };
+    }
+}
+
+// ─── Sprint Burndown Chart ───────────────────────────────
+
+export async function getSprintBurndown(sprintId: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+
+        const sprint = await db.sprint.findUnique({
+            where: { id: sprintId },
+            include: {
+                tasks: {
+                    select: { id: true, status: true, createdAt: true, updatedAt: true },
+                },
+            },
+        });
+
+        if (!sprint) return { success: false, error: "Sprint not found" };
+
+        const totalDays = differenceInDays(sprint.endDate, sprint.startDate) + 1;
+        const totalTasks = sprint.tasks.length;
+
+        // Build daily burndown data
+        const data: { date: string; remaining: number; ideal: number }[] = [];
+
+        for (let i = 0; i < totalDays; i++) {
+            const date = addDays(sprint.startDate, i);
+            const dateEnd = endOfDay(date);
+
+            // Count tasks completed by this date
+            const completedByDate = sprint.tasks.filter(
+                (t) => t.status === "DONE" && t.updatedAt <= dateEnd
+            ).length;
+
+            const remaining = totalTasks - completedByDate;
+            const ideal = Math.max(0, totalTasks - (totalTasks / (totalDays - 1)) * i);
+
+            data.push({
+                date: format(date, "MMM d"),
+                remaining: date <= new Date() ? remaining : -1, // -1 = future
+                ideal: Math.round(ideal * 10) / 10,
+            });
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("Error fetching sprint burndown:", error);
+        return { success: false, error: "Failed to fetch burndown data" };
+    }
+}
+
+// ─── Sprint Health ───────────────────────────────────────
+
+export type SprintHealth = "on_track" | "at_risk" | "behind";
+
+export async function getSprintHealth(sprintId: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+
+        const sprint = await db.sprint.findUnique({
+            where: { id: sprintId },
+            include: {
+                tasks: { select: { status: true } },
+            },
+        });
+
+        if (!sprint) return { success: false, error: "Sprint not found" };
+
+        const now = new Date();
+        const totalDays = differenceInDays(sprint.endDate, sprint.startDate) + 1;
+        const elapsed = Math.min(differenceInDays(now, sprint.startDate) + 1, totalDays);
+        const timeProgress = elapsed / totalDays; // 0-1
+
+        const total = sprint.tasks.length;
+        const completed = sprint.tasks.filter((t) => t.status === "DONE").length;
+        const taskProgress = total > 0 ? completed / total : 1; // 0-1
+
+        let health: SprintHealth;
+        const ratio = total > 0 ? taskProgress / timeProgress : 1;
+
+        if (ratio >= 0.8) {
+            health = "on_track";
+        } else if (ratio >= 0.5) {
+            health = "at_risk";
+        } else {
+            health = "behind";
+        }
+
+        return {
+            success: true,
+            data: {
+                health,
+                totalTasks: total,
+                completedTasks: completed,
+                timeProgressPercent: Math.round(timeProgress * 100),
+                taskProgressPercent: total > 0 ? Math.round(taskProgress * 100) : 100,
+                daysRemaining: Math.max(0, differenceInDays(sprint.endDate, now)),
+            },
+        };
+    } catch (error) {
+        console.error("Error fetching sprint health:", error);
+        return { success: false, error: "Failed to fetch sprint health" };
+    }
+}
+
+// ─── Peak Productivity Hours ─────────────────────────────
+
+export async function getPeakProductivityHours(params: DateRangeParams) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+
+        const user = await db.user.findUnique({
+            where: { email: session.user.email },
+            include: { memberships: true },
+        });
+        if (!user || user.memberships.length === 0) return { success: false, error: "No org" };
+
+        const { start, end } = getDateRange(params);
+
+        // Get task completion times (updatedAt when status changed to DONE)
+        const completedTasks = await db.task.findMany({
+            where: {
+                organizationId: user.memberships[0].organizationId,
+                status: "DONE",
+                updatedAt: { gte: start, lte: end },
+            },
+            select: { updatedAt: true },
+        });
+
+        // Also get focus session start times
+        const focusSessions = await db.focusSession.findMany({
+            where: {
+                userId: user.id,
+                startedAt: { gte: start, lte: end },
+            },
+            select: { startedAt: true },
+        });
+
+        // Aggregate by hour
+        const hourCounts = new Array(24).fill(0);
+
+        for (const task of completedTasks) {
+            hourCounts[task.updatedAt.getHours()]++;
+        }
+        for (const session of focusSessions) {
+            hourCounts[session.startedAt.getHours()]++;
+        }
+
+        const data = hourCounts.map((count, hour) => ({
+            hour: `${hour.toString().padStart(2, "0")}:00`,
+            activity: count,
+        }));
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("Error fetching peak hours:", error);
+        return { success: false, error: "Failed to fetch peak hours" };
+    }
+}
+
+// ─── Forecasting / Predictive Completion ─────────────────
+
+export async function getCompletionForecast(projectId: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+
+        const user = await db.user.findUnique({
+            where: { email: session.user.email },
+            include: { memberships: true },
+        });
+        if (!user || user.memberships.length === 0) return { success: false, error: "No org" };
+
+        const orgId = user.memberships[0].organizationId;
+
+        const tasks = await db.task.findMany({
+            where: { projectId, organizationId: orgId },
+            select: { status: true, createdAt: true, updatedAt: true },
+            orderBy: { updatedAt: "asc" },
+        });
+
+        const total = tasks.length;
+        const completed = tasks.filter((t) => t.status === "DONE").length;
+        const remaining = total - completed;
+
+        if (total === 0) {
+            return { success: true, data: { forecastDate: null, confidence: "low" as const, remaining: 0, velocity: 0 } };
+        }
+
+        if (remaining === 0) {
+            return { success: true, data: { forecastDate: new Date().toISOString(), confidence: "high" as const, remaining: 0, velocity: 0 } };
+        }
+
+        // Calculate velocity (tasks completed per day over the last 30 days)
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        const recentlyCompleted = tasks.filter(
+            (t) => t.status === "DONE" && t.updatedAt >= thirtyDaysAgo
+        ).length;
+
+        const velocity = recentlyCompleted / 30; // tasks per day
+
+        if (velocity <= 0) {
+            return { success: true, data: { forecastDate: null, confidence: "low" as const, remaining, velocity: 0 } };
+        }
+
+        const daysToComplete = Math.ceil(remaining / velocity);
+        const forecastDate = addDays(new Date(), daysToComplete);
+
+        const confidence = velocity >= 1 ? "high" as const : velocity >= 0.3 ? "medium" as const : "low" as const;
+
+        return {
+            success: true,
+            data: {
+                forecastDate: forecastDate.toISOString(),
+                confidence,
+                remaining,
+                velocity: Math.round(velocity * 100) / 100,
+                daysToComplete,
+            },
+        };
+    } catch (error) {
+        console.error("Error fetching forecast:", error);
+        return { success: false, error: "Failed to fetch forecast" };
     }
 }

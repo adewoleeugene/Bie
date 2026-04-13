@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Settings, User, Users, Calendar, Activity } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ProjectDialog } from "@/components/projects/project-dialog";
+import { MilestoneList } from "@/components/milestones/milestone-list";
 import { useState } from "react";
 import Link from "next/link";
 import { TaskStatus } from "@prisma/client";
@@ -220,6 +221,13 @@ export default function ProjectDashboardPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Milestones */}
+            <Card>
+                <CardContent className="pt-6">
+                    <MilestoneList projectId={projectId} />
+                </CardContent>
+            </Card>
         </div>
     );
 }

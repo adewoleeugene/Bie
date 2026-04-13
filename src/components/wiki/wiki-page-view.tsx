@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { WikiPage, User, WikiPageVersion } from "@prisma/client";
 import {
     MoreVertical,
@@ -40,6 +40,7 @@ import { WikiBacklinks } from "@/components/wiki/wiki-backlinks";
 import { WikiBlockComments } from "@/components/wiki/wiki-block-comments";
 import { WikiHistoryDialog } from "@/components/wiki/wiki-history-dialog";
 import { deleteWikiPage, updateWikiPage, duplicateWikiPage, trackWikiPageView, getWikiPageAnalytics } from "@/actions/wiki";
+import { createWikiTemplate } from "@/actions/wiki-template";
 import { useFavorites, useToggleFavorite, useTrackRecent } from "@/hooks/use-favorites";
 import { Star, Download, FileText, Eye } from "lucide-react";
 import { blocknoteToMarkdown } from "@/lib/blocknote-to-markdown";
@@ -125,8 +126,21 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
         URL.revokeObjectURL(url);
     };
 
-    const exportPdf = () => {
-        window.print();
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    const exportPdf = async () => {
+        if (!contentRef.current) return;
+        const html2pdf = (await import("html2pdf.js")).default;
+        html2pdf()
+            .from(contentRef.current)
+            .set({
+                margin: [10, 10],
+                filename: `${title.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`,
+                image: { type: "jpeg", quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+            })
+            .save();
     };
 
     const saveIcon = async (newIcon: string) => {
@@ -350,6 +364,23 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
 
                             {!readOnly && (
                                 <>
+                                    <DropdownMenuItem onClick={async () => {
+                                        const result = await createWikiTemplate({
+                                            name: title,
+                                            description: `Template from "${title}"`,
+                                            content,
+                                            organizationId: page.organizationId,
+                                        });
+                                        if (result.success) {
+                                            toast.success("Saved as template");
+                                        } else {
+                                            toast.error(result.error || "Failed to save template");
+                                        }
+                                    }}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        Save as Template
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={exportMarkdown}>
                                         <Download className="mr-2 h-4 w-4" />
                                         Export as Markdown
@@ -524,7 +555,9 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         </div>
                     </div>
 
-                    <div className={cn(
+                    <div
+                        ref={contentRef}
+                        className={cn(
                         "prose prose-neutral dark:prose-invert max-w-none min-h-[500px]",
                         !isEditing && "leading-relaxed"
                     )}>

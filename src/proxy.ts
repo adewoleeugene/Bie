@@ -1,18 +1,55 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { auth } from "@/lib/auth";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const hostname = request.headers.get("host") || "";
+    const { pathname } = request.nextUrl;
 
-    // Extract subdomain
-    // This logic assumes standard domain structure (e.g., subdomain.domain.com or subdomain.localhost:port)
+    // Extract subdomain for wiki rewrite
     const subdomain = hostname.split(".")[0];
-
-    // If accessing via wiki subdomain, rewrite to /published-wiki using the existing path
     if (subdomain === "wiki") {
         const url = request.nextUrl.clone();
-        url.pathname = `/published-wiki${url.pathname}`;
+        url.pathname = `/published-wiki${pathname}`;
         return NextResponse.rewrite(url);
+    }
+
+    // Public paths that don't require authentication
+    const isPublicPath =
+        pathname === "/" ||
+        pathname.startsWith("/published-wiki") ||
+        pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/uploads") ||
+        pathname === "/favicon.ico" ||
+        pathname === "/sitemap.xml" ||
+        pathname === "/robots.txt";
+
+    const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup");
+
+    if (isPublicPath) {
+        return NextResponse.next();
+    }
+
+    // Check auth session
+    const session = await auth();
+    const isAuthenticated = !!session?.user;
+
+    // Redirect authenticated users away from auth pages
+    if (isAuthPage && isAuthenticated) {
+        return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
+    }
+
+    // Allow auth pages for unauthenticated users
+    if (isAuthPage) {
+        return NextResponse.next();
+    }
+
+    // Redirect unauthenticated users to login
+    if (!isAuthenticated) {
+        const loginUrl = new URL("/login", request.nextUrl);
+        loginUrl.searchParams.set("callbackUrl", pathname);
+        return NextResponse.redirect(loginUrl);
     }
 
     return NextResponse.next();
@@ -21,12 +58,11 @@ export function proxy(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes)
+         * Match all request paths except:
          * - _next/static (static files)
          * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
+         * - favicon.ico, sitemap.xml, robots.txt
          */
-        "/((?!api|_next/static|_next/image|favicon.ico).*)",
+        "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
     ],
 };

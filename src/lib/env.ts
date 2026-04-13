@@ -1,0 +1,71 @@
+import { z } from "zod";
+
+/**
+ * Environment variable validation using Zod.
+ * Fails fast at startup if required variables are missing.
+ */
+
+const serverSchema = z.object({
+    // Database
+    DATABASE_URL: z.string().url("DATABASE_URL must be a valid connection string"),
+
+    // Auth
+    NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
+    NEXTAUTH_URL: z.string().url().optional(),
+
+    // Google OAuth (optional — credentials auth works without these)
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+    // SMTP for email notifications (optional — skips email if not set)
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z.enum(["true", "false"]).optional(),
+    EMAIL_FROM: z.string().optional(),
+
+    // AI / Cloudflare (optional — AI features degrade gracefully)
+    CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+    CLOUDFLARE_API_TOKEN: z.string().optional(),
+
+    // Google Gemini (optional)
+    GEMINI_API_KEY: z.string().optional(),
+
+    // Node environment
+    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+});
+
+const clientSchema = z.object({
+    NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+});
+
+export type ServerEnv = z.infer<typeof serverSchema>;
+export type ClientEnv = z.infer<typeof clientSchema>;
+
+function validateEnv() {
+    const serverResult = serverSchema.safeParse(process.env);
+    if (!serverResult.success) {
+        const formatted = serverResult.error.issues
+            .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+            .join("\n");
+        console.error(`\n❌ Invalid environment variables:\n${formatted}\n`);
+        throw new Error("Invalid environment variables. See above for details.");
+    }
+
+    const clientResult = clientSchema.safeParse(process.env);
+    if (!clientResult.success) {
+        const formatted = clientResult.error.issues
+            .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+            .join("\n");
+        console.error(`\n❌ Invalid client environment variables:\n${formatted}\n`);
+        throw new Error("Invalid client environment variables. See above for details.");
+    }
+
+    return {
+        server: serverResult.data,
+        client: clientResult.data,
+    };
+}
+
+export const env = validateEnv();

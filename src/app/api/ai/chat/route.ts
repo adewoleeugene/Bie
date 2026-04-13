@@ -44,10 +44,22 @@ async function runCfModel(
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-        const msg =
+        // Cloudflare content filtering returns a 400 with a specific message.
+        // Surface a user-friendly message instead of a raw API error.
+        const rawMsg =
             data?.errors?.[0]?.message ||
-            `Cloudflare AI request failed (${res.status})`;
-        throw new Error(msg);
+            (typeof data?.error === "object" && data.error?.message) ||
+            "";
+        if (
+            res.status === 400 &&
+            typeof rawMsg === "string" &&
+            rawMsg.toLowerCase().includes("content filtering")
+        ) {
+            throw new Error(
+                "The AI response was blocked by Cloudflare's content filter. Try rephrasing your message.",
+            );
+        }
+        throw new Error(rawMsg || `Cloudflare AI request failed (${res.status})`);
     }
     return data.result;
 }
