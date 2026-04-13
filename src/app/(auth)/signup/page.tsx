@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { SignupForm } from "@/components/auth/signup-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+    title: "Create Account",
+    description: "Create a new Bie account",
+};
 
 export default function SignupPage() {
     return (

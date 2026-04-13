@@ -11,6 +11,7 @@ import { SprintVelocityChart } from "@/components/analytics/sprint-velocity-char
 import { TeamProductivity } from "@/components/analytics/team-productivity";
 import { ProjectProgressList } from "@/components/analytics/project-progress-list";
 import { ExportButton } from "@/components/analytics/export-button";
+import { ReportBuilder } from "@/components/analytics/report-builder";
 import {
     useOverviewMetrics,
     useTaskCompletionTrend,
@@ -61,6 +62,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                     <DateRangePicker date={dateRange} setDate={setDateRange} />
+                    <ReportBuilder />
                     <ExportButton data={{ overview, taskTrend, statusDist, sprintVel, teamProd, projectProg }} />
                 </div>
             </div>

@@ -9,6 +9,10 @@ import {
     getTeamProductivity,
     getSprintVelocity,
     getProjectProgress,
+    getSprintBurndown,
+    getSprintHealth,
+    getPeakProductivityHours,
+    getCompletionForecast,
     type DateRange,
 } from "@/actions/analytics";
 
@@ -92,5 +96,52 @@ export function useProjectProgress() {
             if (!result.success) throw new Error(result.error);
             return result.data;
         },
+    });
+}
+
+export function useSprintBurndown(sprintId: string) {
+    return useQuery({
+        queryKey: ["analytics", "sprint-burndown", sprintId],
+        queryFn: async () => {
+            const result = await getSprintBurndown(sprintId);
+            if (!result.success) throw new Error(result.error);
+            return result.data;
+        },
+        enabled: !!sprintId,
+    });
+}
+
+export function useSprintHealthData(sprintId: string) {
+    return useQuery({
+        queryKey: ["analytics", "sprint-health", sprintId],
+        queryFn: async () => {
+            const result = await getSprintHealth(sprintId);
+            if (!result.success) throw new Error(result.error);
+            return result.data;
+        },
+        enabled: !!sprintId,
+    });
+}
+
+export function usePeakProductivityHours(params: DateRangeParams = { range: "month" }) {
+    return useQuery({
+        queryKey: ["analytics", "peak-hours", params],
+        queryFn: async () => {
+            const result = await getPeakProductivityHours(params);
+            if (!result.success) throw new Error(result.error);
+            return result.data;
+        },
+    });
+}
+
+export function useCompletionForecast(projectId: string) {
+    return useQuery({
+        queryKey: ["analytics", "forecast", projectId],
+        queryFn: async () => {
+            const result = await getCompletionForecast(projectId);
+            if (!result.success) throw new Error(result.error);
+            return result.data;
+        },
+        enabled: !!projectId,
     });
 }

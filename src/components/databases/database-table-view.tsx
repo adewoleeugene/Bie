@@ -18,7 +18,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Settings, Maximize2 } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Settings, Maximize2, Download } from "lucide-react";
+import { exportDatabaseToCSV } from "@/lib/export";
 import {
     useAddProperty,
     useAddRow,
@@ -330,6 +331,15 @@ export function DatabaseTableView({
                                     onClick={() => addRow.mutate()}
                                 >
                                     <Plus className="mr-1 h-3 w-3" /> New row
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-neutral-500 ml-2"
+                                    onClick={() => exportDatabaseToCSV(properties, rows)}
+                                >
+                                    <Download className="mr-1 h-3 w-3" /> Export CSV
                                 </Button>
                             </td>
                         </tr>}

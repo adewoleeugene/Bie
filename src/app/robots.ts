@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
             allow: '/',
             disallow: ['/api/', '/(dashboard)/'],
         },
-        // sitemap: 'https://christbase.christex.org/sitemap.xml',
+        sitemap: 'https://christbase.christex.org/sitemap.xml',
     }
 }
