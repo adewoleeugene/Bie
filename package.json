@@ -1,12 +1,15 @@
 {
   "name": "christbase",
   "version": "0.1.0",
-  "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Christex Foundation <opensource@christex.foundation>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/christex-foundation/ChristBase.git"
+    "url": "https://github.com/adewoleeugene/Bie.git"
+  },
+  "homepage": "https://github.com/adewoleeugene/Bie",
+  "bugs": {
+    "url": "https://github.com/adewoleeugene/Bie/issues"
   },
   "main": "electron/main.js",
   "scripts": {

@@ -1,6 +1,8 @@
 # ChristBase
 
-All-in-one project management and productivity platform for Christex Foundation. Built with Next.js and deployable as both a web app (Vercel) and a desktop app (Electron).
+Open-source project management and productivity platform for Christex Foundation.
+Built with Next.js and deployable as both a web app (Vercel) and a desktop app
+(Electron).
 
 ## Features
 

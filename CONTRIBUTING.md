@@ -24,8 +24,8 @@ Thank you for your interest in contributing to ChristBase. This guide explains h
 1. **Fork and clone the repository**
 
    ```bash
-   git clone https://github.com/<your-username>/ChristBase.git
-   cd ChristBase
+   git clone https://github.com/<your-username>/Bie.git
+   cd Bie
    ```
 
 2. **Install dependencies**
@@ -127,7 +127,7 @@ Keep branch names lowercase and use hyphens to separate words.
 
 ## Reporting Bugs
 
-If you find a bug, please [open an issue](https://github.com/ChristexFoundation/ChristBase/issues/new) and include:
+If you find a bug, please [open an issue](https://github.com/adewoleeugene/Bie/issues/new) and include:
 
 1. A clear, descriptive title.
 2. Steps to reproduce the problem.
@@ -137,7 +137,7 @@ If you find a bug, please [open an issue](https://github.com/ChristexFoundation/
 
 ## Requesting Features
 
-Feature requests are welcome. [Open an issue](https://github.com/ChristexFoundation/ChristBase/issues/new) and include:
+Feature requests are welcome. [Open an issue](https://github.com/adewoleeugene/Bie/issues/new) and include:
 
 1. A concise description of the feature.
 2. The problem it solves or the use case it addresses.
