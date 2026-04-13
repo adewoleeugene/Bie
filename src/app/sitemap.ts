@@ -19,24 +19,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
     ];
 
-    // Published wiki pages are publicly accessible
-    const publishedPages = await db.wikiPage.findMany({
-        where: {
-            published: true,
-            deletedAt: null,
-        },
-        select: {
-            id: true,
-            updatedAt: true,
-        },
-    });
+    try {
+        // Published wiki pages are publicly accessible.
+        const publishedPages = await db.wikiPage.findMany({
+            where: {
+                published: true,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                updatedAt: true,
+            },
+        });
 
-    const wikiRoutes: MetadataRoute.Sitemap = publishedPages.map((page) => ({
-        url: `${baseUrl}/published-wiki/${page.id}`,
-        lastModified: page.updatedAt,
-        changeFrequency: "weekly" as const,
-        priority: 0.7,
-    }));
+        const wikiRoutes: MetadataRoute.Sitemap = publishedPages.map((page) => ({
+            url: `${baseUrl}/published-wiki/${page.id}`,
+            lastModified: page.updatedAt,
+            changeFrequency: "weekly" as const,
+            priority: 0.7,
+        }));
 
-    return [...staticRoutes, ...wikiRoutes];
+        return [...staticRoutes, ...wikiRoutes];
+    } catch (error) {
+        console.warn("Falling back to static sitemap routes because wiki pages could not be loaded.", error);
+        return staticRoutes;
+    }
 }
