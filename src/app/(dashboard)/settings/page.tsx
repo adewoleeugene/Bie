@@ -5,19 +5,31 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import { OrgRole } from "@prisma/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { useNotificationPreferences, useUpdateNotificationPreference } from "@/hooks/use-notification-preferences";
+import { useMembers } from "@/hooks/use-members";
+import { updateUserAvatar, updateUserProfile } from "@/actions/user";
+import { MemberManagement } from "@/components/settings/member-management";
+import { PrivacyAdminPanel } from "@/components/settings/privacy-admin-panel";
+import { PrivacyControls } from "@/components/settings/privacy-controls";
 
 export default function SettingsPage() {
     const { data: session, update } = useSession();
+    const { theme, setTheme } = useTheme();
     const [name, setName] = useState(session?.user?.name || "");
     const [loading, setLoading] = useState(false);
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { data: notifPrefs } = useNotificationPreferences();
+    const { data: members = [] } = useMembers();
     const updatePref = useUpdateNotificationPreference();
+    const currentMembership = members.find((member) => member.email === session?.user?.email);
+    const currentRole = (currentMembership?.role as OrgRole | undefined) ?? undefined;
 
     const NOTIF_TYPE_LABELS: Record<string, string> = {
         MENTION: "Mentions",
@@ -29,12 +41,36 @@ export default function SettingsPage() {
 
     const handleSaveProfile = async () => {
         setLoading(true);
-        // In a real app, this would call a server action
-        // For now, we'll just simulate it
-        setTimeout(() => {
-            setLoading(false);
+        const result = await updateUserProfile({ name });
+        setLoading(false);
+        if (result.success) {
+            await update({ name });
             toast.success("Profile updated successfully");
-        }, 1000);
+        } else {
+            toast.error(result.error || "Failed to update profile");
+        }
+    };
+
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setAvatarUploading(true);
+        const formData = new FormData();
+        formData.append("avatar", file);
+
+        const result = await updateUserAvatar(formData);
+        setAvatarUploading(false);
+
+        if (result.success && result.url) {
+            await update({ image: result.url });
+            toast.success("Avatar updated");
+        } else {
+            toast.error(result.error || "Failed to upload avatar");
+        }
+
+        // Reset input so the same file can be re-selected
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     return (
@@ -54,7 +90,22 @@ export default function SettingsPage() {
                                 {session?.user?.name?.charAt(0).toUpperCase()}
                             </AvatarFallback>
                         </Avatar>
-                        <Button variant="outline">Change Avatar</Button>
+                        <div>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                className="hidden"
+                                onChange={handleAvatarChange}
+                            />
+                            <Button
+                                variant="outline"
+                                disabled={avatarUploading}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                {avatarUploading ? "Uploading..." : "Change Avatar"}
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="grid gap-4 max-w-md">
@@ -109,14 +160,12 @@ export default function SettingsPage() {
                                     />
                                 </div>
                                 <div className="flex justify-center">
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div>
-                                                <Switch checked={false} disabled />
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Coming soon</TooltipContent>
-                                    </Tooltip>
+                                    <Switch
+                                        checked={pref.email}
+                                        onCheckedChange={(checked) =>
+                                            updatePref.mutate({ type: pref.type, field: "email", value: checked })
+                                        }
+                                    />
                                 </div>
                             </div>
                         ))}
@@ -136,13 +185,35 @@ export default function SettingsPage() {
                             <p className="text-sm text-muted-foreground">Select your preferred interface theme.</p>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm">Light</Button>
-                            <Button variant="outline" size="sm">Dark</Button>
-                            <Button variant="secondary" size="sm">System</Button>
+                            <Button
+                                variant={theme === "light" ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => setTheme("light")}
+                            >
+                                Light
+                            </Button>
+                            <Button
+                                variant={theme === "dark" ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => setTheme("dark")}
+                            >
+                                Dark
+                            </Button>
+                            <Button
+                                variant={theme === "system" ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => setTheme("system")}
+                            >
+                                System
+                            </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
+
+            <MemberManagement />
+            <PrivacyControls />
+            <PrivacyAdminPanel role={currentRole} />
         </div>
     );
 }

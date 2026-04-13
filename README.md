@@ -215,6 +215,21 @@ prisma/
 
 **Build errors** - Run `npx prisma generate`, then clear `.next` (`rm -rf .next`) and retry.
 
+## DPG Alignment Documents
+
+The following repository documents are maintained to support evaluation against
+the Digital Public Goods Standard:
+
+- [SDG_ALIGNMENT.md](./SDG_ALIGNMENT.md) - SDG relevance and feature mapping
+- [AUTHORS.md](./AUTHORS.md) - ownership and maintainership
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - contribution process
+- [SECURITY.md](./SECURITY.md) - vulnerability disclosure process
+- [PRIVACY.md](./PRIVACY.md) - privacy and data handling commitments
+- [DATA_EXTRACTION.md](./DATA_EXTRACTION.md) - non-proprietary data export mechanisms
+- [STANDARDS.md](./STANDARDS.md) - standards and best-practices alignment
+- [DO_NO_HARM.md](./DO_NO_HARM.md) - harm mitigation and safety assessment
+
 ## License
 
-Internal use only - Christex Foundation
+ChristBase is licensed under the GNU Affero General Public License v3.0 or
+later. See [LICENSE](./LICENSE).

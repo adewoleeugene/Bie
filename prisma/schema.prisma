@@ -156,6 +156,8 @@ model Organization {
   attachments   Attachment[]
   databases     WikiDatabase[]
   reflections   DailyReflection[]
+  milestones    Milestone[]
+  privacyRequests PrivacyRequest[]
 }
 
 model User {
@@ -195,6 +197,8 @@ model User {
   reflections    DailyReflection[]  @relation("DailyReflectionAuthor")
   databaseMemberships WikiDatabaseMember[] @relation("WikiDatabaseMemberUser")
   wikiPageMemberships WikiPageMember[] @relation("WikiPageMemberUser")
+  assistantMessages AssistantMessage[] @relation("AssistantMessageUser")
+  privacyRequests PrivacyRequest[]
 }
 
 model Account {
@@ -289,6 +293,7 @@ model Project {
   tasks        Task[]
   wikiPages    WikiPage[]
   automationRules AutomationRule[]
+  milestones   Milestone[]
 
   @@index([organizationId])
 }
@@ -857,4 +862,64 @@ model AutomationRule {
 
   @@index([projectId])
   @@index([creatorId])
+}
+
+// ─── AI Chat History ─────────────────────────────────────
+
+model AssistantMessage {
+  id        String   @id @default(cuid())
+  role      String   // "user" | "assistant"
+  content   String   @db.Text
+  metadata  Json?    // references to tasks/projects mentioned
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation("AssistantMessageUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Project Milestones ──────────────────────────────────
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+}
+
+model Milestone {
+  id             String          @id @default(cuid())
+  title          String
+  description    String?
+  dueDate        DateTime
+  status         MilestoneStatus @default(PENDING)
+  projectId      String
+  organizationId String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([organizationId])
+}
+
+model PrivacyRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  kind           String
+  status         String   @default("PENDING")
+  details        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  completedAt    DateTime?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
 }
