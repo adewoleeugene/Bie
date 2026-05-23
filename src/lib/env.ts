@@ -9,9 +9,12 @@ const serverSchema = z.object({
     // Database
     DATABASE_URL: z.string().url("DATABASE_URL must be a valid connection string"),
 
-    // Auth
-    NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
+    // Auth — NextAuth v5 uses AUTH_SECRET; NEXTAUTH_SECRET accepted for legacy support
+    AUTH_SECRET: z.string().min(1).optional(),
+    NEXTAUTH_SECRET: z.string().min(1).optional(),
+    AUTH_URL: z.string().url().optional(),
     NEXTAUTH_URL: z.string().url().optional(),
+    AUTH_TRUST_HOST: z.string().optional(),
 
     // Google OAuth (optional — credentials auth works without these)
     GOOGLE_CLIENT_ID: z.string().optional(),
