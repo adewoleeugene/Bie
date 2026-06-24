@@ -91,8 +91,8 @@ const schema = BlockNoteSchema.create({
     blockSpecs: {
         ...defaultBlockSpecs,
         databaseEmbed: DatabaseEmbedBlock(),
-        toggle: ToggleBlock as any,
-        callout: CalloutBlock as any,
+        toggle: ToggleBlock(),
+        callout: CalloutBlock(),
     },
     inlineContentSpecs: {
         ...defaultInlineContentSpecs,
