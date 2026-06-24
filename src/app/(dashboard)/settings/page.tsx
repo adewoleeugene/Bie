@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { useRef, useState } from "react";
-import { useTheme } from "next-themes";
 import { OrgRole } from "@prisma/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -20,7 +19,6 @@ import { PrivacyControls } from "@/components/settings/privacy-controls";
 
 export default function SettingsPage() {
     const { data: session, update } = useSession();
-    const { theme, setTheme } = useTheme();
     const [name, setName] = useState(session?.user?.name || "");
     const [loading, setLoading] = useState(false);
     const [avatarUploading, setAvatarUploading] = useState(false);
@@ -169,44 +167,6 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                         ))}
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Preferences</CardTitle>
-                    <CardDescription>Customize your workspace experience.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label>Theme</Label>
-                            <p className="text-sm text-muted-foreground">Select your preferred interface theme.</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant={theme === "light" ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setTheme("light")}
-                            >
-                                Light
-                            </Button>
-                            <Button
-                                variant={theme === "dark" ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setTheme("dark")}
-                            >
-                                Dark
-                            </Button>
-                            <Button
-                                variant={theme === "system" ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setTheme("system")}
-                            >
-                                System
-                            </Button>
-                        </div>
                     </div>
                 </CardContent>
             </Card>

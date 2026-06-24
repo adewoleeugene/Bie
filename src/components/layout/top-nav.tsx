@@ -12,9 +12,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Menu, Sun, Moon } from "lucide-react";
+import { LogOut, User, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
-import { useTheme } from "next-themes";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/layout/sidebar";
 
@@ -29,7 +28,6 @@ interface TopNavProps {
 }
 
 export function TopNav({ user, organizationName, projects }: TopNavProps) {
-    const { theme, setTheme } = useTheme();
     const initials = user.name
         ?.split(" ")
         .map((n) => n[0])
@@ -61,13 +59,6 @@ export function TopNav({ user, organizationName, projects }: TopNavProps) {
 
             <div className="flex items-center gap-1.5">
                 <PomodoroTimer />
-                <button
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    className="rounded-md p-1.5 text-neutral-400 hover:bg-white/[0.05] hover:text-white transition-colors"
-                    title="Toggle theme"
-                >
-                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
                 <NotificationBell />
 
                 <DropdownMenu>
