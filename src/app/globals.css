@@ -243,3 +243,10 @@
 .bn-editor a:not(:has([data-mention-type])):hover {
   opacity: 0.85;
 }
+
+/* Slash / mention menu: cap height so it's compact and scrolls instead of
+   running off-screen. */
+.bn-suggestion-menu {
+  max-height: 280px;
+  overflow-y: auto;
+}
