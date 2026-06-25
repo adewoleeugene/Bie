@@ -260,6 +260,12 @@ export function BlockEditor({
                 editor={editor}
                 theme="dark"
                 editable={editable}
+                // We render our own "/" SuggestionMenuController below (with the
+                // extra Wiki blocks). Disable BlockNote's built-in slash menu so
+                // it doesn't render a second, overlapping menu — the duplicate
+                // intercepted mouse clicks (keyboard still worked) because the
+                // click landed on the default menu instead of ours.
+                slashMenu={false}
                 onChange={() => {
                     if (onChange) {
                         onChange(editor.document);
