@@ -6,7 +6,6 @@ import {
     MoreVertical,
     History,
     Trash2,
-    ExternalLink,
     Globe,
     Lock,
     Copy,
@@ -279,13 +278,13 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         <span className="text-[10px] text-muted-foreground animate-pulse mr-2">Saving...</span>
                     )}
 
-                    {analytics && analytics.totalViews > 0 && (
+                    {analytics && analytics.uniqueViewers > 0 && (
                         <span
                             className="flex items-center gap-1 text-[10px] text-muted-foreground"
-                            title={`${analytics.uniqueViewers} unique viewers${analytics.lastViewedBy ? `, last viewed by ${analytics.lastViewedBy.name}` : ""}`}
+                            title={`${analytics.uniqueViewers} unique viewer${analytics.uniqueViewers === 1 ? "" : "s"} · ${analytics.totalViews} total views${analytics.lastViewedBy ? `, last viewed by ${analytics.lastViewedBy.name}` : ""}`}
                         >
                             <Eye className="h-3 w-3" />
-                            {analytics.totalViews}
+                            {analytics.uniqueViewers}
                         </span>
                     )}
 
@@ -376,14 +375,6 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                                 </DropdownMenuItem>
                             )}
 
-                            {isPublished && (
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/published-wiki/${page.id}`} target="_blank">
-                                        <ExternalLink className="mr-2 h-4 w-4" />
-                                        View Public Page
-                                    </Link>
-                                </DropdownMenuItem>
-                            )}
 
                             {!readOnly && (
                                 <>
@@ -666,6 +657,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     if (!isPublished) await togglePublished();
                     copyPublicLink();
                 }}
+                previewUrl={`/published-wiki/${page.id}`}
                 onSetVisibility={async (v) => {
                     await setWikiPageVisibility({ pageId: page.id, visibility: v });
                     await refetchSharing();

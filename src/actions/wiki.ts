@@ -334,6 +334,12 @@ export async function trackWikiPageView(pageId: string) {
         if (!session?.user?.email) return;
         const user = await db.user.findUnique({ where: { email: session.user.email } });
         if (!user) return;
+        // Don't count the page's own author viewing their page.
+        const page = await db.wikiPage.findUnique({
+            where: { id: pageId },
+            select: { authorId: true },
+        });
+        if (page?.authorId === user.id) return;
         await db.wikiPageAnalytics.create({
             data: { pageId, userId: user.id },
         });
@@ -344,20 +350,28 @@ export async function trackWikiPageView(pageId: string) {
 
 export async function getWikiPageAnalytics(pageId: string) {
     try {
+        // Exclude the page author so the count reflects other viewers only.
+        const page = await db.wikiPage.findUnique({
+            where: { id: pageId },
+            select: { authorId: true },
+        });
+        const where = page?.authorId
+            ? { pageId, userId: { not: page.authorId } }
+            : { pageId };
         const totalViews = await db.wikiPageAnalytics.count({
-            where: { pageId },
+            where,
         });
         const uniqueViewers = await db.wikiPageAnalytics.groupBy({
             by: ["userId"],
-            where: { pageId },
+            where,
         });
         const lastView = await db.wikiPageAnalytics.findFirst({
-            where: { pageId },
+            where,
             orderBy: { viewedAt: "desc" },
             include: { user: { select: { name: true, image: true } } },
         });
         const recentViewers = await db.wikiPageAnalytics.findMany({
-            where: { pageId },
+            where,
             orderBy: { viewedAt: "desc" },
             distinct: ["userId"],
             take: 5,

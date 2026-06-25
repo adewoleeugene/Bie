@@ -18,7 +18,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Globe, Lock, Trash2, Copy } from "lucide-react";
+import { Globe, Lock, Trash2, Copy, ExternalLink } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -53,6 +53,8 @@ interface ShareDialogProps {
     onTransferOwnership?: (newOwnerId: string) => Promise<void> | void;
     /** When provided, shows a "Copy link" button (publishes + copies a public link). */
     onCopyLink?: () => Promise<void> | void;
+    /** When provided, shows a "Preview" link opening the public page in a new tab. */
+    previewUrl?: string;
 }
 
 export function ShareDialog({
@@ -68,6 +70,7 @@ export function ShareDialog({
     onRemoveMember,
     onTransferOwnership,
     onCopyLink,
+    previewUrl,
 }: ShareDialogProps) {
     const isOwner =
         !!ownerId && !!viewerUserId && ownerId === viewerUserId;
@@ -102,7 +105,7 @@ export function ShareDialog({
 
                 <div className="space-y-4">
                     {/* Public link */}
-                    {onCopyLink && (
+                    {(onCopyLink || previewUrl) && (
                         <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Link to page</p>
@@ -110,14 +113,30 @@ export function ShareDialog({
                                     Publishes the page and copies a public link.
                                 </p>
                             </div>
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => onCopyLink()}
-                            >
-                                <Copy className="mr-2 h-3.5 w-3.5" />
-                                Copy link
-                            </Button>
+                            <div className="flex shrink-0 items-center gap-2">
+                                {previewUrl && (
+                                    <Button asChild size="sm" variant="ghost">
+                                        <a
+                                            href={previewUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                                            Preview
+                                        </a>
+                                    </Button>
+                                )}
+                                {onCopyLink && (
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => onCopyLink()}
+                                    >
+                                        <Copy className="mr-2 h-3.5 w-3.5" />
+                                        Copy link
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     )}
 
