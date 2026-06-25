@@ -239,24 +239,30 @@ export function ShareDialog({
                                                     {m.user.email}
                                                 </div>
                                             </div>
-                                            <Select
-                                                value={m.role}
-                                                onValueChange={async (v) => {
-                                                    await onAddMember(
-                                                        m.userId,
-                                                        v as ResourceMemberRole,
-                                                    );
-                                                    toast.success("Role updated");
-                                                }}
-                                            >
-                                                <SelectTrigger className="h-7 w-24">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="VIEWER">Viewer</SelectItem>
-                                                    <SelectItem value="EDITOR">Editor</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                            {vis === "ORG_VIEW" ? (
+                                                <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                                                    Editor
+                                                </span>
+                                            ) : (
+                                                <Select
+                                                    value={m.role}
+                                                    onValueChange={async (v) => {
+                                                        await onAddMember(
+                                                            m.userId,
+                                                            v as ResourceMemberRole,
+                                                        );
+                                                        toast.success("Role updated");
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="h-7 w-24">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="VIEWER">Viewer</SelectItem>
+                                                        <SelectItem value="EDITOR">Editor</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                             <button
                                                 type="button"
                                                 onClick={() => onRemoveMember(m.userId)}
@@ -279,20 +285,22 @@ export function ShareDialog({
                                         placeholder="Search org members…"
                                         className="h-8"
                                     />
-                                    <Select
-                                        value={pendingRole}
-                                        onValueChange={(v) =>
-                                            setPendingRole(v as ResourceMemberRole)
-                                        }
-                                    >
-                                        <SelectTrigger className="h-8 w-24">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="VIEWER">Viewer</SelectItem>
-                                            <SelectItem value="EDITOR">Editor</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    {vis !== "ORG_VIEW" && (
+                                        <Select
+                                            value={pendingRole}
+                                            onValueChange={(v) =>
+                                                setPendingRole(v as ResourceMemberRole)
+                                            }
+                                        >
+                                            <SelectTrigger className="h-8 w-24">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="VIEWER">Viewer</SelectItem>
+                                                <SelectItem value="EDITOR">Editor</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </div>
                                 {candidates.length === 0 ? (
                                     <p className="text-xs italic text-neutral-500">
@@ -305,7 +313,10 @@ export function ShareDialog({
                                                 <button
                                                     type="button"
                                                     onClick={async () => {
-                                                        await onAddMember(m.id, pendingRole);
+                                                        await onAddMember(
+                                                            m.id,
+                                                            vis === "ORG_VIEW" ? "EDITOR" : pendingRole,
+                                                        );
                                                         toast.success("Member added");
                                                     }}
                                                     className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-900"
