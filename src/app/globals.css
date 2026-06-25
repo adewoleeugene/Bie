@@ -228,3 +228,18 @@
 .bn-editor {
   background-color: transparent !important;
 }
+
+/* Links in the wiki editor: blue + underlined. */
+.bn-editor a {
+  color: var(--bz-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bn-editor a:hover {
+  opacity: 0.85;
+}
+/* Keep @-mention chips looking like chips, not underlined links. */
+.bn-editor a:has([data-mention-type]) {
+  color: inherit;
+  text-decoration: none;
+}
