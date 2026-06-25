@@ -29,7 +29,6 @@ import {
     SuggestionMenuController,
     DefaultReactSuggestionItem,
     getDefaultReactSlashMenuItems,
-    type SuggestionMenuProps,
 } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 import { searchMentionTargets } from "@/actions/wiki";
@@ -107,71 +106,6 @@ interface BlockEditorProps {
     onChange?: (content: any) => void;
     editable?: boolean;
     onActiveBlockChange?: (blockId: string | null) => void;
-}
-
-/**
- * Custom slash-menu renderer. Two reasons we don't use the default:
- *  1. onMouseDown + preventDefault keeps the editor focused so a *mouse click*
- *     reliably fires the command (the default lost focus → only keyboard
- *     selection worked).
- *  2. Stable per-index keys avoid React duplicate-key issues.
- * Renders grouped items with icons, subtext, and shortcut badges to match the
- * default look.
- */
-function EditorSuggestionMenu(
-    props: SuggestionMenuProps<DefaultReactSuggestionItem>,
-) {
-    const { items, selectedIndex, onItemClick } = props;
-    let lastGroup: string | undefined;
-    return (
-        <div className="z-50 max-h-[360px] w-72 overflow-y-auto rounded-lg border border-neutral-200 bg-[color:var(--card)] p-1 shadow-xl dark:border-neutral-800">
-            {items.length === 0 && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No matches
-                </div>
-            )}
-            {items.map((item, i) => {
-                const showHeader = !!item.group && item.group !== lastGroup;
-                lastGroup = item.group;
-                return (
-                    <div key={`${item.group ?? ""}-${item.title}-${i}`}>
-                        {showHeader && (
-                            <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                                {item.group}
-                            </div>
-                        )}
-                        <button
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => onItemClick?.(item)}
-                            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
-                                i === selectedIndex ? "bg-muted" : "hover:bg-muted"
-                            }`}
-                        >
-                            {item.icon && (
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                                    {item.icon}
-                                </span>
-                            )}
-                            <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate font-medium">{item.title}</span>
-                                {item.subtext && (
-                                    <span className="truncate text-[11px] text-muted-foreground">
-                                        {item.subtext}
-                                    </span>
-                                )}
-                            </span>
-                            {item.badge && (
-                                <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                    {item.badge}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                );
-            })}
-        </div>
-    );
 }
 
 export function BlockEditor({
@@ -344,7 +278,6 @@ export function BlockEditor({
             >
                 <SuggestionMenuController
                     triggerCharacter={"/"}
-                    suggestionMenuComponent={EditorSuggestionMenu}
                     getItems={async (query) =>
                         filterItems(
                             [
