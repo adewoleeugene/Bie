@@ -229,17 +229,16 @@
   background-color: transparent !important;
 }
 
-/* Links in the wiki editor: blue + underlined. */
-.bn-editor a {
+/* Links in the wiki editor: blue + underlined (excluding @-mention chips).
+   Also colors the inner text span BlockNote wraps the link content in. */
+.bn-editor a:not(:has([data-mention-type])),
+.bn-editor a:not(:has([data-mention-type])) * {
   color: var(--bz-blue);
+}
+.bn-editor a:not(:has([data-mention-type])) {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.bn-editor a:hover {
+.bn-editor a:not(:has([data-mention-type])):hover {
   opacity: 0.85;
-}
-/* Keep @-mention chips looking like chips, not underlined links. */
-.bn-editor a:has([data-mention-type]) {
-  color: inherit;
-  text-decoration: none;
 }
