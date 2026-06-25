@@ -18,7 +18,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Globe, Lock, Trash2 } from "lucide-react";
+import { Globe, Lock, Trash2, Copy } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -51,6 +51,8 @@ interface ShareDialogProps {
     onAddMember: (userId: string, role: ResourceMemberRole) => Promise<void> | void;
     onRemoveMember: (userId: string) => Promise<void> | void;
     onTransferOwnership?: (newOwnerId: string) => Promise<void> | void;
+    /** When provided, shows a "Copy link" button (publishes + copies a public link). */
+    onCopyLink?: () => Promise<void> | void;
 }
 
 export function ShareDialog({
@@ -65,6 +67,7 @@ export function ShareDialog({
     onAddMember,
     onRemoveMember,
     onTransferOwnership,
+    onCopyLink,
 }: ShareDialogProps) {
     const isOwner =
         !!ownerId && !!viewerUserId && ownerId === viewerUserId;
@@ -98,6 +101,26 @@ export function ShareDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
+                    {/* Public link */}
+                    {onCopyLink && (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Link to page</p>
+                                <p className="text-[10px] text-neutral-500">
+                                    Publishes the page and copies a public link.
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => onCopyLink()}
+                            >
+                                <Copy className="mr-2 h-3.5 w-3.5" />
+                                Copy link
+                            </Button>
+                        </div>
+                    )}
+
                     {/* Visibility */}
                     <div>
                         <h4 className="mb-2 text-[10px] font-semibold uppercase text-neutral-500">

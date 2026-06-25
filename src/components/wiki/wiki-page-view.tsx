@@ -662,6 +662,10 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                 members={(sharing?.members ?? []) as ShareMember[]}
                 ownerId={sharing?.authorId}
                 viewerUserId={viewerUserId}
+                onCopyLink={async () => {
+                    if (!isPublished) await togglePublished();
+                    copyPublicLink();
+                }}
                 onSetVisibility={async (v) => {
                     await setWikiPageVisibility({ pageId: page.id, visibility: v });
                     await refetchSharing();
