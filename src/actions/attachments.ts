@@ -111,6 +111,23 @@ export async function uploadAttachment(formData: FormData) {
     }
 }
 
+/**
+ * Lightweight upload for the wiki editor's media blocks (image/video/audio/
+ * file). Saves the file and returns a public URL string — the shape
+ * BlockNote's `uploadFile` expects. Throws on error so the editor surfaces it.
+ */
+export async function uploadEditorFile(formData: FormData): Promise<string> {
+    const { organizationId } = await getUserOrganization();
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new Error("No file provided");
+    if (file.size > MAX_BYTES) throw new Error("File exceeds 25 MB limit");
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const id = crypto.randomUUID();
+    const saved = await saveFile(organizationId, id, file.name, buffer);
+    return saved.publicUrl;
+}
+
 export async function listAttachments(parentType: AttachmentParent, parentId: string) {
     try {
         const { organizationId } = await getUserOrganization();

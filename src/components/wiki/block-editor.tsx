@@ -32,6 +32,7 @@ import {
 } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 import { searchMentionTargets } from "@/actions/wiki";
+import { uploadEditorFile } from "@/actions/attachments";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FileText, Calendar, Users, Database, ChevronRight, MessageSquare, Link2 } from "lucide-react";
@@ -118,6 +119,12 @@ export function BlockEditor({
         initialContent: initialContent
             ? (initialContent as PartialBlock[])
             : undefined,
+        // Enables the Image/Video/Audio/File blocks to actually upload.
+        uploadFile: async (file: File) => {
+            const fd = new FormData();
+            fd.append("file", file);
+            return await uploadEditorFile(fd);
+        },
     });
 
     useEffect(() => {
