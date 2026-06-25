@@ -25,7 +25,11 @@ async function getMe() {
     if (!user || user.memberships.length === 0) {
         throw new Error("No organization");
     }
-    return { userId: user.id, organizationId: user.memberships[0].organizationId };
+    return {
+        userId: user.id,
+        organizationId: user.memberships[0].organizationId,
+        orgRole: user.memberships[0].role,
+    };
 }
 
 async function assertDatabaseAccess(
@@ -33,7 +37,7 @@ async function assertDatabaseAccess(
     require: "view" | "edit" = "edit",
     opts?: { allowTrashed?: boolean },
 ) {
-    const { organizationId, userId } = await getMe();
+    const { organizationId, userId, orgRole } = await getMe();
     const database = await db.wikiDatabase.findUnique({
         where: { id: databaseId },
         select: {
@@ -56,7 +60,7 @@ async function assertDatabaseAccess(
             creatorId: database.createdById,
             members: database.members,
         },
-        { userId, organizationId },
+        { userId, organizationId, orgRole },
     );
     if (require === "edit" ? !canEdit(access) : !canView(access)) {
         throw new Error("Access denied");

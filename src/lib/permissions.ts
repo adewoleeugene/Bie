@@ -11,7 +11,7 @@
  * WikiPage and WikiDatabase without coupling to a Prisma type.
  */
 
-import { ResourceMemberRole, ResourceVisibility } from "@prisma/client";
+import { OrgRole, ResourceMemberRole, ResourceVisibility } from "@prisma/client";
 
 interface ResourceShape {
     visibility: ResourceVisibility;
@@ -23,6 +23,8 @@ interface ResourceShape {
 interface ViewerShape {
     userId: string;
     organizationId: string;
+    /** Viewer's org-level role. Admins/owners manage all resources in their org. */
+    orgRole?: OrgRole;
 }
 
 export type AccessLevel = "none" | "view" | "edit";
@@ -32,6 +34,10 @@ export function resolveAccess(
     viewer: ViewerShape,
 ): AccessLevel {
     if (resource.organizationId !== viewer.organizationId) return "none";
+    // Org admins/owners can manage any resource in their organization.
+    if (viewer.orgRole === OrgRole.ADMIN || viewer.orgRole === OrgRole.OWNER) {
+        return "edit";
+    }
     if (resource.visibility === ResourceVisibility.ORG) return "edit";
 
     // PRIVATE

@@ -546,7 +546,11 @@ export async function getWikiPage(id: string) {
                 creatorId: page.authorId,
                 members: page.members,
             },
-            { userId: me.id, organizationId: me.memberships[0].organizationId },
+            {
+                userId: me.id,
+                organizationId: me.memberships[0].organizationId,
+                orgRole: me.memberships[0].role,
+            },
         );
         if (!canView(access)) {
             return { success: false, error: "Access denied" };
@@ -888,6 +892,7 @@ async function assertPageEditAccess(pageId: string) {
         {
             userId: me.id,
             organizationId: me.memberships[0].organizationId,
+            orgRole: me.memberships[0].role,
         },
     );
     if (access !== "edit") throw new Error("Access denied");
@@ -935,6 +940,7 @@ export async function getWikiPageSharing(pageId: string) {
             {
                 userId: me.id,
                 organizationId: me.memberships[0].organizationId,
+                orgRole: me.memberships[0].role,
             },
         );
         if (!canView(access)) return null;
