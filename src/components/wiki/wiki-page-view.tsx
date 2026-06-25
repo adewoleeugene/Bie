@@ -61,7 +61,9 @@ interface WikiPageViewProps {
 
 export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
     const router = useRouter();
-    const [isEditing, setIsEditing] = useState(false);
+    // Wiki pages are inline-editable by default (Notion-style); the published
+    // read-only view passes readOnly to keep it locked.
+    const [isEditing, setIsEditing] = useState(true);
     const [title, setTitle] = useState(page.title);
     const [content, setContent] = useState(page.content);
     const [shareOpen, setShareOpen] = useState(false);
@@ -180,13 +182,39 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
         setIsSaving(false);
 
         if (result.success) {
-            toast.success("Page saved");
             if (newContent) setContent(newContent);
-            router.refresh();
         } else {
             toast.error(result.error || "Failed to save page");
         }
     };
+
+    // Debounced autosave for content edits — avoids a save (and previously a
+    // toast + full router.refresh) on every keystroke.
+    const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scheduleSave = (newContent: string) => {
+        if (readOnly) return;
+        setContent(newContent);
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(async () => {
+            setIsSaving(true);
+            const result = await updateWikiPage({
+                id: page.id,
+                title,
+                content: newContent,
+                published: isPublished,
+            });
+            setIsSaving(false);
+            if (!result.success) {
+                toast.error(result.error || "Failed to save page");
+            }
+        }, 800);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (saveTimer.current) clearTimeout(saveTimer.current);
+        };
+    }, []);
 
     const handleDelete = async () => {
         if (readOnly) return;
@@ -298,14 +326,9 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     )}
 
                     {!readOnly && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-2 text-xs font-medium"
-                            onClick={() => setIsEditing(!isEditing)}
-                        >
-                            {isEditing ? "View mode" : "Edit mode"}
-                        </Button>
+                        <span className="px-2 text-xs text-muted-foreground">
+                            {isSaving ? "Saving…" : "Saved"}
+                        </span>
                     )}
 
                     {!readOnly && (
@@ -563,7 +586,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     )}>
                         <BlockEditor
                             initialContent={content}
-                            onChange={(newContent) => handleSave(newContent)}
+                            onChange={(newContent) => scheduleSave(newContent)}
                             editable={isEditing && !readOnly}
                             onActiveBlockChange={setActiveBlockId}
                         />
