@@ -93,7 +93,7 @@ export function WikiHistoryDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-6xl h-[85vh] flex flex-col p-0">
+            <DialogContent className="w-[95vw] sm:max-w-6xl h-[85vh] flex flex-col p-0">
                 <DialogHeader className="border-b px-6 py-4">
                     <DialogTitle>Page history</DialogTitle>
                 </DialogHeader>

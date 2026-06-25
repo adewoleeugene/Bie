@@ -684,20 +684,44 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                             <History className="h-3.5 w-3.5" />
                             <span>Version History ({page.versions.length})</span>
                         </button>
-                        <div className="flex -space-x-1.5">
-                            {Array.from(new Set(page.versions.map(v => v.editedBy.id))).slice(0, 5).map(userId => {
-                                const user = page.versions.find(v => v.editedBy.id === userId)?.editedBy;
-                                return (
-                                    <div
-                                        key={userId}
-                                        className="h-6 w-6 rounded-full border-2 border-background bg-slate-200 flex items-center justify-center text-[8px] font-bold"
-                                        title={user?.name || "Editor"}
-                                    >
-                                        {user?.name?.charAt(0)}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        {(() => {
+                            const editorIds = Array.from(
+                                new Set(page.versions.map((v) => v.editedBy.id)),
+                            );
+                            const shown = editorIds.slice(0, 5);
+                            const overflow = editorIds.length - shown.length;
+                            return (
+                                <div className="flex -space-x-1.5">
+                                    {shown.map((userId) => {
+                                        const user = page.versions.find(
+                                            (v) => v.editedBy.id === userId,
+                                        )?.editedBy;
+                                        return (
+                                            <Avatar
+                                                key={userId}
+                                                className="h-6 w-6 border-2 border-background"
+                                                title={user?.name || "Editor"}
+                                            >
+                                                <AvatarImage src={user?.image || undefined} />
+                                                <AvatarFallback className="text-[10px]">
+                                                    {(user?.name || "?")
+                                                        .substring(0, 2)
+                                                        .toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        );
+                                    })}
+                                    {overflow > 0 && (
+                                        <div
+                                            className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium text-muted-foreground"
+                                            title={`${overflow} more editor${overflow > 1 ? "s" : ""}`}
+                                        >
+                                            +{overflow}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </footer>
             )}

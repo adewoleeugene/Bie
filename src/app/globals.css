@@ -245,8 +245,21 @@
 }
 
 /* Slash / mention menu: cap height so it's compact and scrolls instead of
-   running off-screen. */
-.bn-suggestion-menu {
-  max-height: 280px;
-  overflow-y: auto;
+   running off-screen. BlockNote's own `.bn-mantine .bn-suggestion-menu` rule sets
+   `max-height: inherit` (which resolves to the full viewport height floating-ui
+   gives the popover), and it has equal specificity to ours — whichever stylesheet
+   loads last wins, and BlockNote's is imported by the editor component, so it can
+   beat globals.css. `!important` makes the cap deterministic; `50vh` guarantees the
+   menu always fits the window with a reachable internal scrollbar. */
+.bn-mantine .bn-suggestion-menu {
+  max-height: min(320px, 50vh) !important;
+  overflow-y: auto !important;
+  /* Solid panel so page content never bleeds through the menu itself. */
+  background-color: #161616 !important;
+  /* The huge spread acts as a full-viewport scrim: everything outside the menu
+     is dimmed, so the page behind recedes like a modal backdrop. The second
+     shadow keeps a normal drop shadow for depth. */
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.6),
+    0 8px 28px rgba(0, 0, 0, 0.5) !important;
 }
