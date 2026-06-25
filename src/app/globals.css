@@ -238,6 +238,7 @@
 .bn-editor a:not(:has([data-mention-type])) {
   text-decoration: underline;
   text-underline-offset: 2px;
+  font-style: italic;
 }
 .bn-editor a:not(:has([data-mention-type])):hover {
   opacity: 0.85;
