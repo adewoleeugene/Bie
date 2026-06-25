@@ -75,15 +75,42 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
         // (not just when the Share dialog is open).
         enabled: !readOnly,
     });
-    // People with access (owner + invited members) for the header avatar stack.
+    // Header avatar stack. On the editor it shows people with access (owner +
+    // invited members). On the public page it shows contributors (author +
+    // people who edited) — never the internal access list.
     const accessPeople: { id: string; name: string | null; image: string | null }[] = [
         { id: page.author.id, name: page.author.name, image: page.author.image },
     ];
-    for (const m of sharing?.members ?? []) {
-        if (!accessPeople.some((p) => p.id === m.user.id)) {
-            accessPeople.push({ id: m.user.id, name: m.user.name, image: m.user.image });
+    const pushPerson = (u: { id: string; name: string | null; image: string | null }) => {
+        if (!accessPeople.some((p) => p.id === u.id)) accessPeople.push(u);
+    };
+    if (readOnly) {
+        for (const v of page.versions ?? []) {
+            if (v.editedBy) pushPerson(v.editedBy);
         }
+    } else {
+        for (const m of sharing?.members ?? []) pushPerson(m.user);
     }
+    const avatarEls = (
+        <>
+            {accessPeople.slice(0, 4).map((p) => (
+                <Avatar
+                    key={p.id}
+                    className="h-6 w-6 ring-2 ring-[color:var(--background)]"
+                >
+                    <AvatarImage src={p.image || undefined} />
+                    <AvatarFallback className="text-[10px]">
+                        {(p.name || "?").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                </Avatar>
+            ))}
+            {accessPeople.length > 4 && (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-[color:var(--background)]">
+                    +{accessPeople.length - 4}
+                </span>
+            )}
+        </>
+    );
     const [isPublished, setIsPublished] = useState(page.published);
     const [icon, setIcon] = useState(page.icon || "");
     const [coverImage, setCoverImage] = useState(page.coverImage || "");
@@ -344,31 +371,24 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         </span>
                     )}
 
-                    {!readOnly && accessPeople.length > 1 && (
-                        <button
-                            type="button"
-                            onClick={() => setShareOpen(true)}
-                            title="People with access — click to manage"
-                            className="flex items-center -space-x-2 pr-1"
-                        >
-                            {accessPeople.slice(0, 4).map((p) => (
-                                <Avatar
-                                    key={p.id}
-                                    className="h-6 w-6 ring-2 ring-[color:var(--background)]"
-                                >
-                                    <AvatarImage src={p.image || undefined} />
-                                    <AvatarFallback className="text-[10px]">
-                                        {(p.name || "?").charAt(0).toUpperCase()}
-                                    </AvatarFallback>
-                                </Avatar>
-                            ))}
-                            {accessPeople.length > 4 && (
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-[color:var(--background)]">
-                                    +{accessPeople.length - 4}
-                                </span>
-                            )}
-                        </button>
-                    )}
+                    {(readOnly ? accessPeople.length >= 1 : accessPeople.length > 1) &&
+                        (readOnly ? (
+                            <div
+                                className="flex items-center -space-x-2 pr-1"
+                                title="Contributors"
+                            >
+                                {avatarEls}
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setShareOpen(true)}
+                                title="People with access — click to manage"
+                                className="flex items-center -space-x-2 pr-1"
+                            >
+                                {avatarEls}
+                            </button>
+                        ))}
 
                     {!readOnly && (
                         <Button
