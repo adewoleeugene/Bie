@@ -663,8 +663,13 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                 }}
                 previewUrl={`/published-wiki/${page.id}`}
                 onSetVisibility={async (v) => {
-                    await setWikiPageVisibility({ pageId: page.id, visibility: v });
+                    const result = await setWikiPageVisibility({ pageId: page.id, visibility: v });
+                    if (result && result.success === false) {
+                        toast.error(result.error || "Couldn't change visibility");
+                        return;
+                    }
                     await refetchSharing();
+                    toast.success(v === "PRIVATE" ? "Set to private" : "Shared with the whole org");
                 }}
                 onAddMember={async (userId, role) => {
                     await addWikiPageMember({ pageId: page.id, userId, role });
