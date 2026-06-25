@@ -34,7 +34,7 @@ import "@blocknote/mantine/style.css";
 import { searchMentionTargets } from "@/actions/wiki";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { FileText, Calendar, Users, Database, ChevronRight, MessageSquare } from "lucide-react";
+import { FileText, Calendar, Users, Database, ChevronRight, MessageSquare, Link2 } from "lucide-react";
 import { DatabaseEmbedBlock } from "@/components/wiki/database-embed-block";
 import { ToggleBlock } from "@/components/wiki/toggle-block";
 import { CalloutBlock } from "@/components/wiki/callout-block";
@@ -234,6 +234,23 @@ export function BlockEditor({
                         filterItems(
                             [
                                 ...getDefaultReactSlashMenuItems(editor as any),
+                                {
+                                    title: "Link",
+                                    subtext: "Insert a hyperlink",
+                                    aliases: ["link", "url", "hyperlink", "href", "anchor"],
+                                    group: "Inline",
+                                    icon: <Link2 className="h-4 w-4 text-neutral-500" />,
+                                    onItemClick: () => {
+                                        const url = window.prompt("Link URL (https://…)");
+                                        if (!url) return;
+                                        const text =
+                                            window.prompt("Text to display", url) || url;
+                                        editor.insertInlineContent([
+                                            { type: "link", href: url, content: text },
+                                            " ",
+                                        ]);
+                                    },
+                                },
                                 {
                                     title: "Database",
                                     subtext: "Embed a database",
