@@ -29,6 +29,7 @@ import {
     SuggestionMenuController,
     DefaultReactSuggestionItem,
     getDefaultReactSlashMenuItems,
+    type SuggestionMenuProps,
 } from "@blocknote/react";
 import "@blocknote/mantine/style.css";
 import { searchMentionTargets } from "@/actions/wiki";
@@ -106,6 +107,53 @@ interface BlockEditorProps {
     onChange?: (content: any) => void;
     editable?: boolean;
     onActiveBlockChange?: (blockId: string | null) => void;
+}
+
+/**
+ * Custom suggestion-menu renderer. The default menu's click handling can fail
+ * (the click blurs the editor before the action fires, so only keyboard
+ * selection worked). Using onMouseDown + preventDefault keeps the editor
+ * focused so a mouse click reliably triggers the command.
+ */
+function EditorSuggestionMenu(
+    props: SuggestionMenuProps<DefaultReactSuggestionItem>,
+) {
+    const { items, selectedIndex, onItemClick } = props;
+    return (
+        <div className="z-50 max-h-[340px] w-72 overflow-y-auto rounded-lg border border-neutral-200 bg-[color:var(--card)] p-1 shadow-xl dark:border-neutral-800">
+            {items.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No matches
+                </div>
+            ) : (
+                items.map((item, i) => (
+                    <button
+                        key={`${item.title}-${i}`}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => onItemClick?.(item)}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
+                            i === selectedIndex ? "bg-muted" : "hover:bg-muted"
+                        }`}
+                    >
+                        {item.icon && (
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                                {item.icon}
+                            </span>
+                        )}
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium">{item.title}</span>
+                            {item.subtext && (
+                                <span className="truncate text-[11px] text-muted-foreground">
+                                    {item.subtext}
+                                </span>
+                            )}
+                        </span>
+                    </button>
+                ))
+            )}
+        </div>
+    );
 }
 
 export function BlockEditor({
@@ -278,6 +326,7 @@ export function BlockEditor({
             >
                 <SuggestionMenuController
                     triggerCharacter={"/"}
+                    suggestionMenuComponent={EditorSuggestionMenu}
                     getItems={async (query) =>
                         filterItems(
                             [
