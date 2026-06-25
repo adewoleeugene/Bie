@@ -122,6 +122,7 @@ enum DatabaseViewType {
 
 enum ResourceVisibility {
   ORG
+  ORG_VIEW
   PRIVATE
 }
 
@@ -450,7 +451,7 @@ model WikiPage {
   slug           String?       @unique
   allowDuplicate Boolean       @default(false)
   disallowIndexing Boolean     @default(false)
-  visibility     ResourceVisibility @default(ORG)
+  visibility     ResourceVisibility @default(ORG_VIEW)
   /// Soft-delete marker.
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())

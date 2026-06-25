@@ -669,7 +669,13 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         return;
                     }
                     await refetchSharing();
-                    toast.success(v === "PRIVATE" ? "Set to private" : "Shared with the whole org");
+                    toast.success(
+                        v === "PRIVATE"
+                            ? "Set to private"
+                            : v === "ORG_VIEW"
+                              ? "Org can now view (read-only)"
+                              : "Org can now view & edit"
+                    );
                 }}
                 onAddMember={async (userId, role) => {
                     await addWikiPageMember({ pageId: page.id, userId, role });

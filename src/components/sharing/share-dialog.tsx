@@ -18,7 +18,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Globe, Lock, Trash2, Copy, ExternalLink } from "lucide-react";
+import { Globe, Lock, Trash2, Copy, ExternalLink, Eye } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -145,7 +145,7 @@ export function ShareDialog({
                         <h4 className="mb-2 text-[10px] font-semibold uppercase text-neutral-500">
                             Who can access
                         </h4>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             <button
                                 type="button"
                                 onClick={() => onSetVisibility("ORG")}
@@ -156,9 +156,24 @@ export function ShareDialog({
                                 }`}
                             >
                                 <Globe className="h-4 w-4 text-primary" />
-                                <span className="text-sm font-medium">Whole org</span>
+                                <span className="text-sm font-medium">Org can edit</span>
                                 <span className="text-[10px] text-neutral-500">
-                                    Anyone in the organization can view and edit.
+                                    Anyone in the org can view and edit.
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onSetVisibility("ORG_VIEW")}
+                                className={`flex flex-col items-start gap-1 rounded-md border p-3 text-left ${
+                                    visibility === "ORG_VIEW"
+                                        ? "border-primary bg-primary/5"
+                                        : "border-neutral-200 dark:border-neutral-800"
+                                }`}
+                            >
+                                <Eye className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Org can view</span>
+                                <span className="text-[10px] text-neutral-500">
+                                    Anyone in the org can read; only invited people edit.
                                 </span>
                             </button>
                             <button
@@ -173,7 +188,7 @@ export function ShareDialog({
                                 <Lock className="h-4 w-4 text-primary" />
                                 <span className="text-sm font-medium">Private</span>
                                 <span className="text-[10px] text-neutral-500">
-                                    Only the creator + people you add can access.
+                                    Only the creator + people you add.
                                 </span>
                             </button>
                         </div>

@@ -2,10 +2,12 @@
  * Permission helper for resources that can be ORG-visible or PRIVATE.
  *
  * Rules:
- *   - ORG visibility: any member of the resource's organization can view +
- *     edit (current default; matches the pre-permissions behavior).
+ *   - ORG visibility: any member of the org can view + edit.
+ *   - ORG_VIEW visibility: any member of the org can view (read-only); only
+ *     the creator + explicitly invited editors (and org admins) can edit.
  *   - PRIVATE visibility: only the creator/author plus explicit members can
  *     access. Members may have role VIEWER (read-only) or EDITOR (read+write).
+ *   - Org ADMIN/OWNER can manage any resource in their org.
  *
  * The helper takes a small "shape" object so the same logic works for both
  * WikiPage and WikiDatabase without coupling to a Prisma type.
@@ -38,13 +40,29 @@ export function resolveAccess(
     if (viewer.orgRole === OrgRole.ADMIN || viewer.orgRole === OrgRole.OWNER) {
         return "edit";
     }
-    if (resource.visibility === ResourceVisibility.ORG) return "edit";
-
-    // PRIVATE
+    // The creator always has full access.
     if (resource.creatorId === viewer.userId) return "edit";
+
     const member = resource.members.find((m) => m.userId === viewer.userId);
-    if (!member) return "none";
-    return member.role === ResourceMemberRole.VIEWER ? "view" : "edit";
+    const memberAccess: AccessLevel | null = member
+        ? member.role === ResourceMemberRole.VIEWER
+            ? "view"
+            : "edit"
+        : null;
+
+    switch (resource.visibility) {
+        case ResourceVisibility.ORG:
+            // Whole org can view and edit.
+            return "edit";
+        case ResourceVisibility.ORG_VIEW:
+            // Whole org can view; only invited editors (or above) can edit.
+            return memberAccess === "edit" ? "edit" : "view";
+        case ResourceVisibility.PRIVATE:
+            // Only the creator + explicitly invited members.
+            return memberAccess ?? "none";
+        default:
+            return "none";
+    }
 }
 
 export function canView(level: AccessLevel): boolean {
