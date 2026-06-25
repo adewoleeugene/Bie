@@ -288,28 +288,30 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         </span>
                     )}
 
-                    <button
-                        type="button"
-                        onClick={() =>
-                            toggleFavorite.mutate({
-                                itemType: "wiki_page",
-                                itemId: page.id,
-                                itemTitle: page.title,
-                                itemUrl: `/wiki/${page.id}`,
-                            })
-                        }
-                        className="rounded p-1.5 hover:bg-muted transition-colors"
-                        title={isFavorited ? "Remove from favorites" : "Add to favorites"}
-                    >
-                        <Star
-                            className={cn(
-                                "h-4 w-4",
-                                isFavorited
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-muted-foreground"
-                            )}
-                        />
-                    </button>
+                    {!readOnly && (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                toggleFavorite.mutate({
+                                    itemType: "wiki_page",
+                                    itemId: page.id,
+                                    itemTitle: page.title,
+                                    itemUrl: `/wiki/${page.id}`,
+                                })
+                            }
+                            className="rounded p-1.5 hover:bg-muted transition-colors"
+                            title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Star
+                                className={cn(
+                                    "h-4 w-4",
+                                    isFavorited
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-muted-foreground"
+                                )}
+                            />
+                        </button>
+                    )}
 
                     {!readOnly && (
                         <Badge
@@ -342,6 +344,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         </Button>
                     )}
 
+                    {!readOnly && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -425,6 +428,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                             )}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                 </div>
             </header>
 
