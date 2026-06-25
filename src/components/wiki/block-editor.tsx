@@ -286,7 +286,7 @@ export function BlockEditor({
                                     title: "Link",
                                     subtext: "Insert a hyperlink",
                                     aliases: ["link", "url", "hyperlink", "href", "anchor"],
-                                    group: "Inline",
+                                    group: "Wiki blocks",
                                     icon: <Link2 className="h-4 w-4 text-neutral-500" />,
                                     onItemClick: () => openLinkInput(),
                                 },
@@ -294,7 +294,7 @@ export function BlockEditor({
                                     title: "Database",
                                     subtext: "Embed a database",
                                     aliases: ["db", "database", "table"],
-                                    group: "Other",
+                                    group: "Wiki blocks",
                                     icon: <Database className="h-4 w-4 text-neutral-500" />,
                                     onItemClick: () => {
                                         editor.insertBlocks(
@@ -313,7 +313,7 @@ export function BlockEditor({
                                     title: "Toggle",
                                     subtext: "Collapsible section",
                                     aliases: ["toggle", "collapse", "accordion", "expand"],
-                                    group: "Basic blocks",
+                                    group: "Wiki blocks",
                                     icon: <ChevronRight className="h-4 w-4 text-neutral-500" />,
                                     onItemClick: () => {
                                         editor.insertBlocks(
@@ -327,7 +327,7 @@ export function BlockEditor({
                                     title: "Callout",
                                     subtext: "Highlighted note with icon",
                                     aliases: ["callout", "note", "info", "warning", "tip"],
-                                    group: "Basic blocks",
+                                    group: "Wiki blocks",
                                     icon: <MessageSquare className="h-4 w-4 text-neutral-500" />,
                                     onItemClick: () => {
                                         editor.insertBlocks(
