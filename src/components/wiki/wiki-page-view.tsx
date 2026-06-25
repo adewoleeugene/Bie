@@ -492,7 +492,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     </div>
                 )}
 
-                <div className="max-w-4xl mx-auto py-12 lg:py-20 px-8 lg:px-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="max-w-3xl mx-auto py-12 lg:py-16 px-8 lg:px-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {/* Hover actions: add icon / add cover */}
                     {!readOnly && (!icon || !coverImage) && (
                         <div className="mb-3 flex items-center gap-2 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
@@ -556,11 +556,11 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 onBlur={() => handleSave()}
-                                className="w-full text-4xl lg:text-5xl font-black bg-transparent border-none outline-none focus:ring-0 placeholder:opacity-20"
+                                className="w-full text-4xl font-bold tracking-tight bg-transparent border-none outline-none focus:ring-0 placeholder:opacity-20"
                                 placeholder="Untitled"
                             />
                         ) : (
-                            <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight">
+                            <h1 className="text-4xl font-bold tracking-tight leading-tight">
                                 {icon && <span className="mr-3">{icon}</span>}
                                 {page.title}
                             </h1>
@@ -581,7 +581,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     <div
                         ref={contentRef}
                         className={cn(
-                        "prose prose-neutral dark:prose-invert max-w-none min-h-[500px]",
+                        "max-w-none min-h-[500px]",
                         !isEditing && "leading-relaxed"
                     )}>
                         <BlockEditor
