@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
     BlockNoteSchema,
     defaultBlockSpecs,
@@ -124,6 +124,47 @@ export function BlockEditor({
         editor.isEditable = editable;
     }, [editable, editor]);
 
+    // Inline link popover (used by the "/" → Link command) instead of a
+    // browser prompt. Anchored to the caret position.
+    const [linkPos, setLinkPos] = useState<{ left: number; top: number } | null>(
+        null,
+    );
+    const [linkUrl, setLinkUrl] = useState("");
+    const [linkText, setLinkText] = useState("");
+    const linkUrlRef = useRef<HTMLInputElement>(null);
+
+    const openLinkInput = () => {
+        let left = 240;
+        let top = 240;
+        const sel = typeof window !== "undefined" ? window.getSelection() : null;
+        if (sel && sel.rangeCount > 0) {
+            const rect = sel.getRangeAt(0).getBoundingClientRect();
+            if (rect && (rect.left || rect.bottom)) {
+                left = rect.left;
+                top = rect.bottom + 6;
+            }
+        }
+        setLinkUrl("");
+        setLinkText("");
+        setLinkPos({ left, top });
+        setTimeout(() => linkUrlRef.current?.focus(), 0);
+    };
+
+    const submitLink = () => {
+        const raw = linkUrl.trim();
+        if (!raw) {
+            setLinkPos(null);
+            return;
+        }
+        const href = /^(https?:\/\/|mailto:|\/)/i.test(raw) ? raw : `https://${raw}`;
+        editor.insertInlineContent([
+            { type: "link", href, content: linkText.trim() || raw },
+            " ",
+        ]);
+        setLinkPos(null);
+        editor.focus();
+    };
+
     /**
      * Builds suggestion items for the @-menu.
      * Queries users + wiki pages for the current org, plus a "today" date entry.
@@ -240,16 +281,7 @@ export function BlockEditor({
                                     aliases: ["link", "url", "hyperlink", "href", "anchor"],
                                     group: "Inline",
                                     icon: <Link2 className="h-4 w-4 text-neutral-500" />,
-                                    onItemClick: () => {
-                                        const url = window.prompt("Link URL (https://…)");
-                                        if (!url) return;
-                                        const text =
-                                            window.prompt("Text to display", url) || url;
-                                        editor.insertInlineContent([
-                                            { type: "link", href: url, content: text },
-                                            " ",
-                                        ]);
-                                    },
+                                    onItemClick: () => openLinkInput(),
                                 },
                                 {
                                     title: "Database",
@@ -331,6 +363,69 @@ export function BlockEditor({
                     ]}
                 />
             </BlockNoteView>
+
+            {linkPos && (
+                <>
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setLinkPos(null)}
+                    />
+                    <div
+                        style={{
+                            position: "fixed",
+                            left: linkPos.left,
+                            top: linkPos.top,
+                            zIndex: 50,
+                        }}
+                        className="w-72 rounded-lg border border-neutral-200 bg-[color:var(--card)] p-2 shadow-xl dark:border-neutral-800"
+                        onKeyDown={(e) => {
+                            if (e.key === "Escape") setLinkPos(null);
+                        }}
+                    >
+                        <input
+                            ref={linkUrlRef}
+                            value={linkUrl}
+                            onChange={(e) => setLinkUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    submitLink();
+                                }
+                            }}
+                            placeholder="Paste or type a link"
+                            className="mb-1.5 h-8 w-full rounded border border-neutral-200 bg-[color:var(--background)] px-2 text-sm outline-none focus:ring-1 focus:ring-primary dark:border-neutral-800"
+                        />
+                        <input
+                            value={linkText}
+                            onChange={(e) => setLinkText(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    submitLink();
+                                }
+                            }}
+                            placeholder="Display text (optional)"
+                            className="mb-2 h-8 w-full rounded border border-neutral-200 bg-[color:var(--background)] px-2 text-sm outline-none focus:ring-1 focus:ring-primary dark:border-neutral-800"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setLinkPos(null)}
+                                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={submitLink}
+                                className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                            >
+                                Add link
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
