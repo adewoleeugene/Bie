@@ -218,3 +218,13 @@
     box-shadow: 0 0 0 1px rgba(0, 153, 255, 0.4), 0 8px 32px -8px rgba(0, 153, 255, 0.35);
   }
 }
+
+/* BlockNote (wiki editor): blend with the app's dark canvas instead of
+   painting its own distinct block background. */
+.bn-container {
+  --bn-colors-editor-background: transparent;
+  background-color: transparent !important;
+}
+.bn-editor {
+  background-color: transparent !important;
+}
