@@ -15,6 +15,20 @@ import { extractMentions, newlyAddedTargets } from "@/lib/wiki-mentions";
 import { sendNotifications } from "@/lib/notifications";
 import { canView, resolveAccess } from "@/lib/permissions";
 
+/**
+ * Strips `undefined` from editor content before it reaches Prisma.
+ *
+ * BlockNote's table block emits `columnWidths: [undefined, ...]` for unsized
+ * columns, and Prisma rejects `undefined` inside JSON arrays ("Can not use
+ * `undefined` value within array"). A JSON round-trip turns those slots into
+ * `null` and drops `undefined` object props — the shape BlockNote re-hydrates
+ * cleanly — so any block type is safe to persist.
+ */
+function sanitizeContent<T>(content: T): T {
+    if (content === undefined || content === null) return content;
+    return JSON.parse(JSON.stringify(content));
+}
+
 const createWikiPageSchema = z.object({
     title: z.string().min(1, "Title is required"),
     content: z.any().optional(),
@@ -54,6 +68,7 @@ export async function createWikiPage(data: z.infer<typeof createWikiPageSchema>)
         }
 
         const validated = createWikiPageSchema.parse(data);
+        validated.content = sanitizeContent(validated.content);
 
         // Get the highest sort order for pages at this level
         const lastPage = await db.wikiPage.findFirst({
@@ -120,6 +135,7 @@ export async function updateWikiPage(data: z.infer<typeof updateWikiPageSchema>)
         }
 
         const validated = updateWikiPageSchema.parse(data);
+        validated.content = sanitizeContent(validated.content);
 
         const existingPage = await db.wikiPage.findUnique({
             where: { id: validated.id },
