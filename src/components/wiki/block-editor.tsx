@@ -210,7 +210,7 @@ export function BlockEditor({
         <div className="min-h-[500px]">
             <BlockNoteView
                 editor={editor}
-                theme="light"
+                theme="dark"
                 editable={editable}
                 onChange={() => {
                     if (onChange) {
