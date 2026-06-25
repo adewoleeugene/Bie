@@ -80,6 +80,16 @@ export function ShareDialog({
     const [search, setSearch] = useState("");
     const [pendingRole, setPendingRole] = useState<ResourceMemberRole>("EDITOR");
 
+    // Optimistic visibility: highlight the chosen tier immediately, persist in
+    // the background, and reconcile when the refetched prop comes back.
+    const [vis, setVis] = useState<ResourceVisibility>(visibility);
+    useEffect(() => setVis(visibility), [visibility]);
+    const changeVisibility = (v: ResourceVisibility) => {
+        if (v === vis) return;
+        setVis(v);
+        void onSetVisibility(v);
+    };
+
     useEffect(() => {
         if (!open) setSearch("");
     }, [open]);
@@ -148,9 +158,9 @@ export function ShareDialog({
                         <div className="grid grid-cols-3 gap-2">
                             <button
                                 type="button"
-                                onClick={() => onSetVisibility("ORG")}
+                                onClick={() => changeVisibility("ORG")}
                                 className={`flex flex-col items-start gap-1 rounded-md border p-3 text-left ${
-                                    visibility === "ORG"
+                                    vis === "ORG"
                                         ? "border-primary bg-primary/5"
                                         : "border-neutral-200 dark:border-neutral-800"
                                 }`}
@@ -163,9 +173,9 @@ export function ShareDialog({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => onSetVisibility("ORG_VIEW")}
+                                onClick={() => changeVisibility("ORG_VIEW")}
                                 className={`flex flex-col items-start gap-1 rounded-md border p-3 text-left ${
-                                    visibility === "ORG_VIEW"
+                                    vis === "ORG_VIEW"
                                         ? "border-primary bg-primary/5"
                                         : "border-neutral-200 dark:border-neutral-800"
                                 }`}
@@ -178,9 +188,9 @@ export function ShareDialog({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => onSetVisibility("PRIVATE")}
+                                onClick={() => changeVisibility("PRIVATE")}
                                 className={`flex flex-col items-start gap-1 rounded-md border p-3 text-left ${
-                                    visibility === "PRIVATE"
+                                    vis === "PRIVATE"
                                         ? "border-primary bg-primary/5"
                                         : "border-neutral-200 dark:border-neutral-800"
                                 }`}
@@ -194,15 +204,17 @@ export function ShareDialog({
                         </div>
                     </div>
 
-                    {/* Members list */}
-                    {visibility === "PRIVATE" && (
+                    {/* Members list — used by Private (access) and Org-can-view (editors) */}
+                    {(vis === "PRIVATE" || vis === "ORG_VIEW") && (
                         <div>
                             <h4 className="mb-2 text-[10px] font-semibold uppercase text-neutral-500">
-                                People with access
+                                {vis === "ORG_VIEW" ? "People who can edit" : "People with access"}
                             </h4>
                             {members.length === 0 ? (
                                 <p className="text-xs italic text-neutral-500">
-                                    Only the creator currently.
+                                    {vis === "ORG_VIEW"
+                                        ? "Only the creator can edit so far. Add people below to let them edit."
+                                        : "Only the creator currently."}
                                 </p>
                             ) : (
                                 <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200 dark:divide-neutral-900 dark:border-neutral-800">
