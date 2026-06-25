@@ -55,6 +55,8 @@ interface WikiPageViewProps {
     page: WikiPage & {
         author: User;
         versions: (WikiPageVersion & { editedBy: User })[];
+        /** Optional: passed by the public page so invited people can be shown. */
+        members?: { user: { id: string; name: string | null; image: string | null } }[];
     };
     readOnly?: boolean;
 }
@@ -88,6 +90,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
         for (const v of page.versions ?? []) {
             if (v.editedBy) pushPerson(v.editedBy);
         }
+        for (const m of page.members ?? []) pushPerson(m.user);
     } else {
         for (const m of sharing?.members ?? []) pushPerson(m.user);
     }

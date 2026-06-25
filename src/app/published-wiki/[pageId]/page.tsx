@@ -41,6 +41,13 @@ export default async function PublishedWikiPageDetail({ params }: PageProps) {
                 },
                 take: 20,
             },
+            members: {
+                include: {
+                    user: {
+                        select: { id: true, name: true, email: true, image: true },
+                    },
+                },
+            },
         },
     });
 
