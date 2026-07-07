@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { acceptInvite, declineInvite } from "@/actions/invites";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,34 +19,38 @@ export function InviteConfirm({
     roleLabel: string;
     inviterName?: string | null;
 }) {
-    const router = useRouter();
-    const [isPending, startTransition] = useTransition();
     const [action, setAction] = useState<"accept" | "decline" | null>(null);
+    const isPending = action !== null;
 
     const target = projectName ?? workspaceName;
 
-    const handleAccept = () => {
+    const handleAccept = async () => {
+        if (isPending) return;
         setAction("accept");
-        startTransition(async () => {
+        try {
             const result = await acceptInvite(token);
             if (result.success) {
-                toast.success(`You've joined ${target}`);
-                router.push("/dashboard");
-                router.refresh();
+                // Hard navigation so we always leave this page once joined.
+                window.location.assign("/dashboard");
             } else {
                 toast.error(result.error || "Couldn't accept this invite");
                 setAction(null);
             }
-        });
+        } catch {
+            toast.error("Couldn't accept this invite. Please try again.");
+            setAction(null);
+        }
     };
 
-    const handleDecline = () => {
+    const handleDecline = async () => {
+        if (isPending) return;
         setAction("decline");
-        startTransition(async () => {
+        try {
             await declineInvite(token);
-            toast.success("Invite declined");
-            router.push("/dashboard");
-        });
+        } catch {
+            // Declining is best-effort; leave regardless.
+        }
+        window.location.assign("/dashboard");
     };
 
     return (
