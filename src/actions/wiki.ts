@@ -15,7 +15,8 @@ import {
 } from "@prisma/client";
 import { extractMentions, newlyAddedTargets } from "@/lib/wiki-mentions";
 import { sendNotifications } from "@/lib/notifications";
-import { canView, resolveAccess } from "@/lib/permissions";
+import { canView, resolveAccess, resolveInheritedAccess } from "@/lib/permissions";
+import { loadPageAccessChain } from "@/lib/wiki-access";
 
 const createWikiPageSchema = z.object({
     title: z.string().min(1, "Title is required"),
@@ -25,6 +26,7 @@ const createWikiPageSchema = z.object({
     projectId: z.string().optional(),
     parentPageId: z.string().optional(),
     template: z.boolean().optional(),
+    isFolder: z.boolean().optional(),
 });
 
 const updateWikiPageSchema = z.object({
@@ -76,6 +78,7 @@ export async function createWikiPage(data: z.infer<typeof createWikiPageSchema>)
                 parentPageId: validated.parentPageId || null,
                 authorId: user.id,
                 template: validated.template || false,
+                isFolder: validated.isFolder || false,
                 sortOrder: (lastPage?.sortOrder || 0) + 1,
             },
             include: {
@@ -884,19 +887,14 @@ async function assertPageEditAccess(pageId: string) {
         },
     });
     if (!page) throw new Error("Page not found");
-    const access = resolveAccess(
-        {
-            visibility: page.visibility,
-            organizationId: page.organizationId,
-            creatorId: page.authorId,
-            members: page.members,
-        },
-        {
-            userId: me.id,
-            organizationId: me.memberships[0].organizationId,
-            orgRole: me.memberships[0].role,
-        },
-    );
+    // Edit access inherits from ancestor folders too, so a folder shared with
+    // edit rights lets you edit the docs inside it.
+    const chain = await loadPageAccessChain(page.id);
+    const access = resolveInheritedAccess(chain, {
+        userId: me.id,
+        organizationId: me.memberships[0].organizationId,
+        orgRole: me.memberships[0].role,
+    });
     if (access !== "edit") throw new Error("Access denied");
     return { userId: me.id, page };
 }
@@ -1110,19 +1108,12 @@ export async function requestWikiPageEditAccess(args: {
             return { success: false, error: "Page not found" };
         }
 
-        const access = resolveAccess(
-            {
-                visibility: page.visibility,
-                organizationId: page.organizationId,
-                creatorId: page.authorId,
-                members: page.members,
-            },
-            {
-                userId: me.id,
-                organizationId: me.memberships[0].organizationId,
-                orgRole: me.memberships[0].role,
-            },
-        );
+        const chain = await loadPageAccessChain(page.id);
+        const access = resolveInheritedAccess(chain, {
+            userId: me.id,
+            organizationId: me.memberships[0].organizationId,
+            orgRole: me.memberships[0].role,
+        });
         if (access === "edit") {
             return { success: false, error: "You already have edit access" };
         }

@@ -72,3 +72,34 @@ export function canView(level: AccessLevel): boolean {
 export function canEdit(level: AccessLevel): boolean {
     return level === "edit";
 }
+
+const RANK: Record<AccessLevel, number> = { none: 0, view: 1, edit: 2 };
+
+function maxAccess(a: AccessLevel, b: AccessLevel): AccessLevel {
+    return RANK[a] >= RANK[b] ? a : b;
+}
+
+/**
+ * Resolve access with folder inheritance.
+ *
+ * `chain` is the page followed by its ancestor folders, nearest first
+ * (i.e. `[page, parent, grandparent, …]`). A page's effective access is its
+ * own access maxed with the access granted by any ancestor — so sharing a
+ * folder cascades to everything inside it (including private docs and pages
+ * added later), which is the "share a set of docs" behaviour.
+ *
+ * Note: cascade is additive only — a doc can be granted to more people via a
+ * folder, but cannot currently be made *more* private than a folder it lives
+ * in. An explicit "stop inheriting" toggle would be a future addition.
+ */
+export function resolveInheritedAccess(
+    chain: ResourceShape[],
+    viewer: ViewerShape,
+): AccessLevel {
+    let best: AccessLevel = "none";
+    for (const resource of chain) {
+        if (best === "edit") break;
+        best = maxAccess(best, resolveAccess(resource, viewer));
+    }
+    return best;
+}
