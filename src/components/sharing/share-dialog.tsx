@@ -18,7 +18,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Globe, Lock, Trash2, Copy, ExternalLink, Eye } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Globe, Lock, Trash2, Copy, ExternalLink, Eye, ShieldOff } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -68,6 +69,11 @@ interface ShareDialogProps {
     previewUrl?: string;
     /** When true, shows a note that sharing cascades to everything inside. */
     isFolder?: boolean;
+    /** Show the "protect from folder sharing" toggle (page is nested in a folder). */
+    showProtect?: boolean;
+    /** Whether the page currently inherits shares from its folder. */
+    inheritAccess?: boolean;
+    onSetInheritAccess?: (inherit: boolean) => Promise<void> | void;
     /** Pending "request edit access" requests, shown to people who can grant. */
     accessRequests?: AccessRequestItem[];
     onApproveRequest?: (
@@ -92,6 +98,9 @@ export function ShareDialog({
     onCopyLink,
     previewUrl,
     isFolder,
+    showProtect,
+    inheritAccess,
+    onSetInheritAccess,
     accessRequests,
     onApproveRequest,
     onDenyRequest,
@@ -117,6 +126,14 @@ export function ShareDialog({
         if (v === vis) return;
         setVis(v);
         void onSetVisibility(v);
+    };
+
+    // Optimistic "inherit from folder" toggle (true = shares cascade in).
+    const [inherit, setInherit] = useState(inheritAccess ?? true);
+    useEffect(() => setInherit(inheritAccess ?? true), [inheritAccess]);
+    const toggleInherit = (next: boolean) => {
+        setInherit(next);
+        void onSetInheritAccess?.(next);
     };
 
     useEffect(() => {
@@ -332,6 +349,27 @@ export function ShareDialog({
                             </button>
                         </div>
                     </div>
+
+                    {/* Protect from folder sharing (only when nested in a folder) */}
+                    {showProtect && (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+                            <div className="flex items-start gap-2">
+                                <ShieldOff className="mt-0.5 h-4 w-4 text-primary/70" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium">Protect this page</p>
+                                    <p className="text-[10px] text-neutral-500">
+                                        Keep it private even when its folder is shared —
+                                        it stops inheriting the folder&apos;s access.
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                checked={!inherit}
+                                onCheckedChange={(checked) => toggleInherit(!checked)}
+                                aria-label="Protect this page from folder sharing"
+                            />
+                        </div>
+                    )}
 
                     {/* Members list — used by Private (access) and Org-can-view (editors) */}
                     {(vis === "PRIVATE" || vis === "ORG_VIEW") && (

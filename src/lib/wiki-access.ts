@@ -7,6 +7,8 @@ export interface PageAccessShape {
     organizationId: string;
     creatorId: string;
     members: { userId: string; role: ResourceMemberRole }[];
+    /** false = protected: stops inheriting shares from ancestor folders. */
+    inheritAccess: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ export async function loadPageAccessChain(
             visibility: ResourceVisibility;
             organizationId: string;
             authorId: string;
+            inheritAccess: boolean;
             members: { userId: string; role: ResourceMemberRole }[];
         } | null = await db.wikiPage.findUnique({
             where: { id: currentId },
@@ -39,6 +42,7 @@ export async function loadPageAccessChain(
                 visibility: true,
                 organizationId: true,
                 authorId: true,
+                inheritAccess: true,
                 members: { select: { userId: true, role: true } },
             },
         });
@@ -48,6 +52,7 @@ export async function loadPageAccessChain(
             organizationId: page.organizationId,
             creatorId: page.authorId,
             members: page.members,
+            inheritAccess: page.inheritAccess,
         });
         currentId = page.parentPageId;
         depth++;

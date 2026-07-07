@@ -84,22 +84,25 @@ function maxAccess(a: AccessLevel, b: AccessLevel): AccessLevel {
  *
  * `chain` is the page followed by its ancestor folders, nearest first
  * (i.e. `[page, parent, grandparent, …]`). A page's effective access is its
- * own access maxed with the access granted by any ancestor — so sharing a
+ * own access maxed with the access granted by each ancestor — so sharing a
  * folder cascades to everything inside it (including private docs and pages
  * added later), which is the "share a set of docs" behaviour.
  *
- * Note: cascade is additive only — a doc can be granted to more people via a
- * folder, but cannot currently be made *more* private than a folder it lives
- * in. An explicit "stop inheriting" toggle would be a future addition.
+ * A node with `inheritAccess === false` is "protected": its own access still
+ * counts, but the walk stops there, so it (and anything below it) no longer
+ * inherits shares from folders above it. That's how a doc — or a whole
+ * sub-folder — can be kept more private than the folder it lives in.
  */
 export function resolveInheritedAccess(
-    chain: ResourceShape[],
+    chain: (ResourceShape & { inheritAccess?: boolean })[],
     viewer: ViewerShape,
 ): AccessLevel {
     let best: AccessLevel = "none";
-    for (const resource of chain) {
+    for (const node of chain) {
+        best = maxAccess(best, resolveAccess(node, viewer));
+        // Protected node blocks inheritance from anything above it.
+        if (node.inheritAccess === false) break;
         if (best === "edit") break;
-        best = maxAccess(best, resolveAccess(resource, viewer));
     }
     return best;
 }

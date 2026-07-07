@@ -533,6 +533,10 @@ model WikiPage {
   /// A folder is a page that acts as a container for other pages. Sharing a
   /// folder cascades access to everything nested under it.
   isFolder       Boolean       @default(false)
+  /// When false, this page is "protected": it stops inheriting shares from its
+  /// ancestor folders and stays as private as its own visibility says, even if
+  /// the folder around it is shared.
+  inheritAccess  Boolean       @default(true)
   published      Boolean       @default(false)
   slug           String?       @unique
   allowDuplicate Boolean       @default(false)
