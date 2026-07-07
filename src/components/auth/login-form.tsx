@@ -16,6 +16,8 @@ export function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const error = searchParams.get("error");
+    const callbackUrl = searchParams.get("callbackUrl");
+    const nextUrl = callbackUrl?.startsWith("/") ? callbackUrl : "/dashboard";
 
     const form = useForm<LoginInput>({
         resolver: zodResolver(loginSchema),
@@ -49,7 +51,7 @@ export function LoginForm() {
                 }
             } else {
                 toast.success("Logged in successfully!");
-                router.push("/dashboard");
+                router.push(nextUrl);
                 router.refresh();
             }
         } catch (error) {

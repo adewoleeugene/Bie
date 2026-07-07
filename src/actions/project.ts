@@ -13,6 +13,7 @@ import {
 } from "@/lib/validators/project";
 import { Project } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { ensurePersonalWorkspace, selectCurrentMembership } from "@/lib/workspaces";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -31,14 +32,26 @@ async function getUserOrganization() {
         },
     });
 
-    if (!user || user.memberships.length === 0) {
+    if (!user) {
+        throw new Error("No organization found");
+    }
+
+    await ensurePersonalWorkspace(db, user);
+
+    const memberships = await db.organizationMember.findMany({
+        where: { userId: user.id },
+        include: { organization: true },
+    });
+    const currentMembership = selectCurrentMembership(memberships);
+
+    if (!currentMembership) {
         throw new Error("No organization found");
     }
 
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
-        role: user.memberships[0].role,
+        organizationId: currentMembership.organizationId,
+        role: currentMembership.role,
     };
 }
 

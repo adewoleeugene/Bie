@@ -6,7 +6,17 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { Suspense } from "react";
 
-export default function LoginPage() {
+export default async function LoginPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+    const { callbackUrl } = await searchParams;
+    const safeCallbackUrl = callbackUrl?.startsWith("/") ? callbackUrl : "/";
+    const signupHref = safeCallbackUrl === "/"
+        ? "/signup"
+        : `/signup?callbackUrl=${encodeURIComponent(safeCallbackUrl)}`;
+
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-neutral-950 dark:to-neutral-900">
             <Card className="w-full max-w-md">
@@ -35,7 +45,7 @@ export default function LoginPage() {
                     <form
                         action={async () => {
                             "use server";
-                            await signIn("google", { redirectTo: "/" });
+                            await signIn("google", { redirectTo: safeCallbackUrl });
                         }}
                     >
                         <Button type="submit" variant="outline" className="w-full" size="lg">
@@ -63,7 +73,7 @@ export default function LoginPage() {
 
                     <div className="text-center text-sm">
                         {"Don't have an account? "}
-                        <Link href="/signup" className="font-semibold text-primary hover:underline">
+                        <Link href={signupHref} className="font-semibold text-primary hover:underline">
                             Sign up here
                         </Link>
                     </div>

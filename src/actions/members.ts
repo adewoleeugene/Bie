@@ -24,7 +24,7 @@ function inviteToken() {
 }
 
 function inviteLink(token: string) {
-    return `/signup?invite=${token}`;
+    return `/invite/${token}`;
 }
 
 async function getUserOrganization() {

@@ -6,6 +6,7 @@ import { TopNav } from "@/components/layout/top-nav";
 import { getProjects } from "@/actions/project";
 import { DashboardClientProviders } from "@/components/layout/dashboard-client-providers";
 import { AssistantChat } from "@/components/ai/assistant-chat";
+import { ensurePersonalWorkspace, selectCurrentMembership } from "@/lib/workspaces";
 
 export default async function DashboardLayout({
     children,
@@ -18,9 +19,25 @@ export default async function DashboardLayout({
         redirect("/login");
     }
 
-    // Get user and organization
-    const user = await db.user.findUnique({
+    let user = await db.user.findUnique({
         where: { email: session.user.email },
+        include: {
+            memberships: {
+                include: {
+                    organization: true,
+                },
+            },
+        },
+    });
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    await ensurePersonalWorkspace(db, user);
+
+    user = await db.user.findUnique({
+        where: { id: user.id },
         include: {
             memberships: {
                 include: {
@@ -34,7 +51,8 @@ export default async function DashboardLayout({
         redirect("/login");
     }
 
-    const organization = user.memberships[0].organization;
+    const currentMembership = selectCurrentMembership(user.memberships);
+    const organization = currentMembership.organization;
     const projects = await getProjects();
 
     return (

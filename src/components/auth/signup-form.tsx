@@ -8,12 +8,15 @@ import { signUp } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export function SignupForm() {
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get("callbackUrl");
+    const nextUrl = callbackUrl?.startsWith("/") ? callbackUrl : "/dashboard";
 
     const form = useForm<SignUpInput>({
         resolver: zodResolver(signUpSchema),
@@ -31,7 +34,7 @@ export function SignupForm() {
             const result = await signUp(data);
             if (result.success) {
                 toast.success("Account created successfully!");
-                router.push("/dashboard");
+                router.push(nextUrl);
                 router.refresh();
             } else {
                 toast.error(result.error);

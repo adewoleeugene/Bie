@@ -1,6 +1,16 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
+type MembershipWithOrganization = {
+    organizationId: string;
+    role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
+    organization: {
+        id: string;
+        type: "PERSONAL" | "ORGANIZATION";
+        createdAt?: Date;
+    };
+    joinedAt?: Date;
+};
 
 function slugify(value: string) {
     return value
@@ -114,4 +124,94 @@ export async function acceptPendingInvitesForUser(
             data: { acceptedAt: now },
         });
     }
+}
+
+export async function acceptInviteByTokenForUser(
+    db: DbClient,
+    token: string,
+    user: { id: string; email?: string | null; name?: string | null }
+) {
+    if (!user.email) {
+        return { success: false, error: "Your account needs an email address to accept this invite." };
+    }
+
+    const invitation = await db.organizationInvitation.findUnique({
+        where: { token },
+        include: {
+            organization: { select: { name: true } },
+            project: { select: { name: true } },
+        },
+    });
+
+    if (!invitation) {
+        return { success: false, error: "This invite link is invalid." };
+    }
+
+    const email = user.email.toLowerCase().trim();
+    if (invitation.email !== email) {
+        return { success: false, error: `This invite was sent to ${invitation.email}. Sign in with that email to accept it.` };
+    }
+
+    if (invitation.expiresAt <= new Date()) {
+        return { success: false, error: "This invite link has expired." };
+    }
+
+    await ensurePersonalWorkspace(db, user);
+
+    const orgRole = invitation.scope === "PROJECT" ? "GUEST" : invitation.role;
+
+    await db.organizationMember.upsert({
+        where: {
+            organizationId_userId: {
+                organizationId: invitation.organizationId,
+                userId: user.id,
+            },
+        },
+        update: {},
+        create: {
+            organizationId: invitation.organizationId,
+            userId: user.id,
+            role: orgRole,
+        },
+    });
+
+    if (invitation.scope === "PROJECT" && invitation.projectId) {
+        await db.projectMember.upsert({
+            where: {
+                projectId_userId: {
+                    projectId: invitation.projectId,
+                    userId: user.id,
+                },
+            },
+            update: {
+                role: invitation.projectRole ?? "EDITOR",
+            },
+            create: {
+                projectId: invitation.projectId,
+                userId: user.id,
+                role: invitation.projectRole ?? "EDITOR",
+            },
+        });
+    }
+
+    if (!invitation.acceptedAt) {
+        await db.organizationInvitation.update({
+            where: { id: invitation.id },
+            data: { acceptedAt: new Date() },
+        });
+    }
+
+    return {
+        success: true,
+        workspaceName: invitation.organization.name,
+        projectName: invitation.project?.name,
+    };
+}
+
+export function selectCurrentMembership<T extends MembershipWithOrganization>(memberships: T[]) {
+    return (
+        memberships.find((membership) => membership.organization.type === "ORGANIZATION") ??
+        memberships.find((membership) => membership.organization.type === "PERSONAL") ??
+        memberships[0]
+    );
 }
