@@ -11,8 +11,9 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { FileText, Trash2, Plus, Layout } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getWikiTemplates, deleteWikiTemplate } from "@/actions/wiki-template";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteWikiTemplate } from "@/actions/wiki-template";
+import { useWikiTemplates } from "@/hooks/use-wiki";
 import { formatDistanceToNow } from "date-fns";
 
 interface WikiTemplatesDialogProps {
@@ -24,11 +25,9 @@ export function WikiTemplatesDialog({ organizationId, onUseTemplate }: WikiTempl
     const [open, setOpen] = useState(false);
     const queryClient = useQueryClient();
 
-    const { data: templatesResult, isLoading } = useQuery({
-        queryKey: ["wiki-templates", organizationId],
-        queryFn: () => getWikiTemplates(organizationId),
-        enabled: open,
-    });
+    // Shares the same hook (and cache) as the New Page dialog so the shape is
+    // consistent and the list is already warm by the time this opens.
+    const { data: templates = [], isLoading } = useWikiTemplates(organizationId);
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteWikiTemplate(id),
@@ -36,8 +35,6 @@ export function WikiTemplatesDialog({ organizationId, onUseTemplate }: WikiTempl
             queryClient.invalidateQueries({ queryKey: ["wiki-templates"] });
         },
     });
-
-    const templates = templatesResult?.data || [];
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
