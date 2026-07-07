@@ -1,8 +1,16 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createInviteLink, getOrganizationMembers, inviteMember, removeMember, updateMemberRole } from "@/actions/members";
-import { OrgRole } from "@prisma/client";
+import {
+    createInviteLink,
+    createProjectInviteLink,
+    getOrganizationMembers,
+    inviteMember,
+    inviteProjectMember,
+    removeMember,
+    updateMemberRole,
+} from "@/actions/members";
+import { OrgRole, ProjectRole } from "@prisma/client";
 
 export function useMembers() {
     return useQuery({
@@ -26,6 +34,19 @@ export function useInviteMember() {
 export function useCreateInviteLink() {
     return useMutation({
         mutationFn: (role?: OrgRole) => createInviteLink(role),
+    });
+}
+
+export function useInviteProjectMember(projectId: string) {
+    return useMutation({
+        mutationFn: ({ email, role }: { email: string; role?: ProjectRole }) =>
+            inviteProjectMember(projectId, email, role),
+    });
+}
+
+export function useCreateProjectInviteLink(projectId: string) {
+    return useMutation({
+        mutationFn: (role?: ProjectRole) => createProjectInviteLink(projectId, role),
     });
 }
 
