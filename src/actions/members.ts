@@ -79,6 +79,26 @@ export async function getOrganizationMembers() {
             },
         });
 
+        // Which projects (in this workspace) each member belongs to.
+        const projectMembers = await db.projectMember.findMany({
+            where: {
+                project: { organizationId },
+                userId: { in: members.map((m) => m.user.id) },
+            },
+            select: {
+                userId: true,
+                role: true,
+                project: { select: { id: true, name: true } },
+            },
+        });
+
+        const projectsByUser = new Map<string, { id: string; name: string; role: ProjectRole }[]>();
+        for (const pm of projectMembers) {
+            const list = projectsByUser.get(pm.userId) ?? [];
+            list.push({ id: pm.project.id, name: pm.project.name, role: pm.role });
+            projectsByUser.set(pm.userId, list);
+        }
+
         // Map to simpler user objects
         return members.map((member) => ({
             id: member.user.id,
@@ -86,10 +106,100 @@ export async function getOrganizationMembers() {
             email: member.user.email,
             image: member.user.image,
             role: member.role,
+            projects: projectsByUser.get(member.user.id) ?? [],
         }));
     } catch (error) {
         console.error("Get members error:", error);
         return [];
+    }
+}
+
+// ─── Pending invites & shareable links ──────────────────
+
+function inviteRoleLabel(invitation: {
+    scope: "ORGANIZATION" | "PROJECT";
+    role: OrgRole;
+    projectRole: ProjectRole | null;
+}) {
+    return invitation.scope === "PROJECT"
+        ? invitation.projectRole ?? ProjectRole.EDITOR
+        : invitation.role;
+}
+
+export async function getWorkspaceInvites() {
+    try {
+        const { organizationId, role } = await getUserOrganization();
+
+        if (role !== OrgRole.OWNER && role !== OrgRole.ADMIN) {
+            return { pending: [], links: [] };
+        }
+
+        const invitations = await db.organizationInvitation.findMany({
+            where: {
+                organizationId,
+                acceptedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+            include: {
+                project: { select: { name: true } },
+                invitedBy: { select: { name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        const pending = invitations
+            .filter((i) => i.email)
+            .map((i) => ({
+                id: i.id,
+                email: i.email as string,
+                scope: i.scope,
+                projectName: i.project?.name ?? null,
+                role: inviteRoleLabel(i),
+                invitedByName: i.invitedBy?.name ?? null,
+                createdAt: i.createdAt,
+            }));
+
+        const links = invitations
+            .filter((i) => !i.email)
+            .map((i) => ({
+                id: i.id,
+                token: i.token,
+                scope: i.scope,
+                projectName: i.project?.name ?? null,
+                role: inviteRoleLabel(i),
+            }));
+
+        return { pending, links };
+    } catch (error) {
+        console.error("Get workspace invites error:", error);
+        return { pending: [], links: [] };
+    }
+}
+
+export async function revokeInvitation(invitationId: string) {
+    try {
+        const { organizationId, role } = await getUserOrganization();
+
+        if (role !== OrgRole.OWNER && role !== OrgRole.ADMIN) {
+            return { success: false, error: "Only owners and admins can revoke invites" };
+        }
+
+        const invitation = await db.organizationInvitation.findFirst({
+            where: { id: invitationId, organizationId },
+            select: { id: true },
+        });
+
+        if (!invitation) {
+            return { success: false, error: "Invite not found" };
+        }
+
+        await db.organizationInvitation.delete({ where: { id: invitation.id } });
+
+        revalidatePath("/settings");
+        return { success: true };
+    } catch (error) {
+        console.error("Revoke invitation error:", error);
+        return { success: false, error: "Failed to revoke invite" };
     }
 }
 
