@@ -46,6 +46,9 @@ export function useWikiTemplates(organizationId: string) {
             if (!result.success) throw new Error(result.error);
             return result.data;
         },
+        // Templates change rarely; keep the list warm so the dialog opens
+        // instantly instead of refetching each time.
+        staleTime: 60_000,
     });
 }
 
