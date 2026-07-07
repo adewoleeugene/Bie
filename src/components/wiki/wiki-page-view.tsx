@@ -17,6 +17,7 @@ import {
     getWikiPageSharing,
     removeWikiPageMember,
     setWikiPageVisibility,
+    setWikiPageInheritAccess,
     transferWikiPageOwnership,
 } from "@/actions/wiki";
 import { ShareDialog, ShareMember } from "@/components/sharing/share-dialog";
@@ -820,6 +821,24 @@ export function WikiPageView({
                 ownerId={sharing?.authorId}
                 viewerUserId={viewerUserId}
                 isFolder={page.isFolder}
+                showProtect={!!page.parentPageId}
+                inheritAccess={page.inheritAccess}
+                onSetInheritAccess={async (inherit) => {
+                    const result = await setWikiPageInheritAccess({
+                        pageId: page.id,
+                        inheritAccess: inherit,
+                    });
+                    if (result && result.success === false) {
+                        toast.error(result.error || "Couldn't update protection");
+                        return;
+                    }
+                    toast.success(
+                        inherit
+                            ? "Now inherits access from its folder"
+                            : "Protected — folder sharing won't apply",
+                    );
+                    router.refresh();
+                }}
                 onCopyLink={async () => {
                     if (!isPublished) await togglePublished();
                     copyPublicLink();

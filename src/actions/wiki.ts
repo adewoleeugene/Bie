@@ -977,6 +977,29 @@ export async function setWikiPageVisibility(args: {
     }
 }
 
+/**
+ * Toggle whether a page inherits shares from its ancestor folders. Setting
+ * `inheritAccess = false` "protects" the page — it stays as private as its own
+ * visibility even when the folder around it is shared.
+ */
+export async function setWikiPageInheritAccess(args: {
+    pageId: string;
+    inheritAccess: boolean;
+}) {
+    try {
+        await assertPageEditAccess(args.pageId);
+        await db.wikiPage.update({
+            where: { id: args.pageId },
+            data: { inheritAccess: args.inheritAccess },
+        });
+        revalidatePath(`/wiki/${args.pageId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("setWikiPageInheritAccess error:", error);
+        return { success: false, error: "Failed to update protection" };
+    }
+}
+
 export async function addWikiPageMember(args: {
     pageId: string;
     userId: string;
