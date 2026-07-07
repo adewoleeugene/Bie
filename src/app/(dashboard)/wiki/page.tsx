@@ -32,6 +32,7 @@ export default async function WikiPage() {
             organizationId,
             namespace: WikiNamespace.COMPANY,
             parentPageId: null,
+            deletedAt: null,
         },
         orderBy: {
             sortOrder: "asc",

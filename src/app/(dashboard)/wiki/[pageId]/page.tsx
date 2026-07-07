@@ -58,7 +58,7 @@ export default async function WikiPageDetail({
         },
     });
 
-    if (!page) {
+    if (!page || page.deletedAt) {
         redirect("/wiki");
     }
 

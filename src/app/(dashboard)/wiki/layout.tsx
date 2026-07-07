@@ -41,6 +41,7 @@ export default async function WikiLayout({
         where: {
             organizationId,
             namespace: WikiNamespace.COMPANY,
+            deletedAt: null,
         },
         include: {
             author: true,
