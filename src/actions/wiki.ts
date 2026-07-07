@@ -978,6 +978,24 @@ export async function setWikiPageVisibility(args: {
 }
 
 /**
+ * List the pages directly inside a folder, with their protection state, so the
+ * folder's Share dialog can offer a per-page "shared / protected" checklist.
+ */
+export async function getWikiFolderContents(folderId: string) {
+    try {
+        await assertPageEditAccess(folderId);
+        return await db.wikiPage.findMany({
+            where: { parentPageId: folderId, deletedAt: null },
+            select: { id: true, title: true, isFolder: true, inheritAccess: true },
+            orderBy: { sortOrder: "asc" },
+        });
+    } catch (error) {
+        console.error("getWikiFolderContents error:", error);
+        return [];
+    }
+}
+
+/**
  * Toggle whether a page inherits shares from its ancestor folders. Setting
  * `inheritAccess = false` "protects" the page — it stays as private as its own
  * visibility even when the folder around it is shared.
