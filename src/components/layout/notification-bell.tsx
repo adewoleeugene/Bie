@@ -9,7 +9,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, MessageSquare, AlertTriangle, Clock, UserPlus, AtSign } from "lucide-react";
+import { Bell, Check, CheckCheck, MessageSquare, AlertTriangle, Clock, UserPlus, AtSign, KeyRound, ShieldCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 
@@ -19,6 +19,8 @@ const NOTIFICATION_ICONS: Record<string, React.ReactNode> = {
     ASSIGNED: <UserPlus className="h-4 w-4 text-purple-500" />,
     DUE_SOON: <Clock className="h-4 w-4 text-amber-500" />,
     OVERDUE: <AlertTriangle className="h-4 w-4 text-red-500" />,
+    ACCESS_REQUEST: <KeyRound className="h-4 w-4 text-amber-500" />,
+    ACCESS_GRANTED: <ShieldCheck className="h-4 w-4 text-green-500" />,
 };
 
 export function NotificationBell() {

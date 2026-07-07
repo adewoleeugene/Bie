@@ -21,7 +21,7 @@ import {
 } from "@/actions/wiki";
 import { ShareDialog, ShareMember } from "@/components/sharing/share-dialog";
 import { useQuery } from "@tanstack/react-query";
-import { ResourceVisibility } from "@prisma/client";
+import { ResourceVisibility, ResourceMemberRole } from "@prisma/client";
 import { useViewerUserId } from "@/hooks/use-viewer";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +39,7 @@ import { AttachmentParent } from "@prisma/client";
 import { WikiBacklinks } from "@/components/wiki/wiki-backlinks";
 import { WikiBlockComments } from "@/components/wiki/wiki-block-comments";
 import { WikiHistoryDialog } from "@/components/wiki/wiki-history-dialog";
-import { deleteWikiPage, updateWikiPage, duplicateWikiPage, trackWikiPageView, getWikiPageAnalytics } from "@/actions/wiki";
+import { deleteWikiPage, updateWikiPage, duplicateWikiPage, trackWikiPageView, getWikiPageAnalytics, requestWikiPageEditAccess, getWikiPageAccessRequests, approveWikiPageAccessRequest, denyWikiPageAccessRequest } from "@/actions/wiki";
 import { createWikiTemplate } from "@/actions/wiki-template";
 import { useFavorites, useToggleFavorite, useTrackRecent } from "@/hooks/use-favorites";
 import { Star, Download, FileText, Eye } from "lucide-react";
@@ -59,10 +59,28 @@ interface WikiPageViewProps {
         members?: { user: { id: string; name: string | null; image: string | null } }[];
     };
     readOnly?: boolean;
+    /**
+     * Whether the current (internal) viewer may edit. Defaults to true so the
+     * normal editor path is unaffected; the internal page passes `false` for
+     * view-only users, which locks the editor and surfaces "Request edit access".
+     */
+    canEdit?: boolean;
+    /** True when the view-only viewer already has a PENDING access request. */
+    hasPendingRequest?: boolean;
 }
 
-export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
+export function WikiPageView({
+    page,
+    readOnly = false,
+    canEdit = true,
+    hasPendingRequest = false,
+}: WikiPageViewProps) {
     const router = useRouter();
+    // Internal viewers who lack edit access get a locked editor. `canMutate`
+    // guards every write control; `readOnly` remains the published-view flag.
+    const canMutate = !readOnly && canEdit;
+    const [requested, setRequested] = useState(hasPendingRequest);
+    const [requesting, setRequesting] = useState(false);
     // Wiki pages are inline-editable by default (Notion-style); the published
     // read-only view passes readOnly to keep it locked.
     const [isEditing, setIsEditing] = useState(true);
@@ -294,6 +312,52 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
         }
     };
 
+    // View-only viewer asks the owner for access (Google-Docs style).
+    const handleRequestAccess = async () => {
+        if (requesting || requested) return;
+        setRequesting(true);
+        const result = await requestWikiPageEditAccess({ pageId: page.id });
+        setRequesting(false);
+        if (result.success) {
+            setRequested(true);
+            toast.success("Access requested — the owner has been notified");
+        } else {
+            toast.error(result.error || "Failed to request access");
+        }
+    };
+
+    // Owner/editor side: pending access requests to approve or deny. Only
+    // fetched for people who can actually grant (the action returns [] otherwise).
+    const { data: accessRequests, refetch: refetchAccessRequests } = useQuery({
+        queryKey: ["wiki-access-requests", page.id],
+        queryFn: () => getWikiPageAccessRequests(page.id),
+        enabled: canMutate,
+    });
+
+    const handleApproveRequest = async (
+        requestId: string,
+        role: ResourceMemberRole,
+    ) => {
+        const result = await approveWikiPageAccessRequest({ requestId, role });
+        if (result.success) {
+            toast.success("Access granted");
+            await Promise.all([refetchAccessRequests(), refetchSharing()]);
+            router.refresh();
+        } else {
+            toast.error(result.error || "Failed to approve");
+        }
+    };
+
+    const handleDenyRequest = async (requestId: string) => {
+        const result = await denyWikiPageAccessRequest({ requestId });
+        if (result.success) {
+            toast.success("Request denied");
+            await refetchAccessRequests();
+        } else {
+            toast.error(result.error || "Failed to deny");
+        }
+    };
+
     return (
         <div className="flex flex-col min-h-full bg-background selection:bg-primary/10">
             {/* Contextual Header / Breadcrumbs */}
@@ -393,7 +457,20 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                             </button>
                         ))}
 
-                    {!readOnly && (
+                    {!readOnly && !canEdit && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-2 text-xs font-medium"
+                            disabled={requesting || requested}
+                            onClick={handleRequestAccess}
+                        >
+                            <Lock className="h-3.5 w-3.5" />
+                            {requested ? "Request pending" : "Request edit access"}
+                        </Button>
+                    )}
+
+                    {canMutate && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -607,7 +684,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     )}
 
                     <div className="mb-10 space-y-4">
-                        {isEditing && !readOnly ? (
+                        {isEditing && canMutate ? (
                             <input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
@@ -643,7 +720,7 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                         <BlockEditor
                             initialContent={content}
                             onChange={(newContent) => scheduleSave(newContent)}
-                            editable={isEditing && !readOnly}
+                            editable={isEditing && canMutate}
                             onActiveBlockChange={setActiveBlockId}
                         />
                     </div>
@@ -774,6 +851,13 @@ export function WikiPageView({ page, readOnly = false }: WikiPageViewProps) {
                     await transferWikiPageOwnership({ pageId: page.id, newOwnerId });
                     await refetchSharing();
                 }}
+                accessRequests={(accessRequests ?? []).map((r) => ({
+                    id: r.id,
+                    message: r.message,
+                    user: r.user,
+                }))}
+                onApproveRequest={handleApproveRequest}
+                onDenyRequest={handleDenyRequest}
             />
         </div>
     );

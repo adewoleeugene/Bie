@@ -38,6 +38,17 @@ export interface ShareMember {
     };
 }
 
+export interface AccessRequestItem {
+    id: string;
+    message?: string | null;
+    user: {
+        id: string;
+        name: string | null;
+        email: string | null;
+        image: string | null;
+    };
+}
+
 interface ShareDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -55,6 +66,13 @@ interface ShareDialogProps {
     onCopyLink?: () => Promise<void> | void;
     /** When provided, shows a "Preview" link opening the public page in a new tab. */
     previewUrl?: string;
+    /** Pending "request edit access" requests, shown to people who can grant. */
+    accessRequests?: AccessRequestItem[];
+    onApproveRequest?: (
+        requestId: string,
+        role: ResourceMemberRole,
+    ) => Promise<void> | void;
+    onDenyRequest?: (requestId: string) => Promise<void> | void;
 }
 
 export function ShareDialog({
@@ -71,6 +89,9 @@ export function ShareDialog({
     onTransferOwnership,
     onCopyLink,
     previewUrl,
+    accessRequests,
+    onApproveRequest,
+    onDenyRequest,
 }: ShareDialogProps) {
     const isOwner =
         !!ownerId && !!viewerUserId && ownerId === viewerUserId;
@@ -79,6 +100,11 @@ export function ShareDialog({
     const { data: orgMembers } = useMembers();
     const [search, setSearch] = useState("");
     const [pendingRole, setPendingRole] = useState<ResourceMemberRole>("EDITOR");
+    // Per-request grant role, defaulting to Editor.
+    const [requestRoles, setRequestRoles] = useState<
+        Record<string, ResourceMemberRole>
+    >({});
+    const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
 
     // Optimistic visibility: highlight the chosen tier immediately, persist in
     // the background, and reconcile when the refetched prop comes back.
@@ -114,6 +140,100 @@ export function ShareDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
+                    {/* Pending access requests (Google-Docs style) */}
+                    {accessRequests && accessRequests.length > 0 && (
+                        <div className="rounded-md border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                            <h4 className="mb-2 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-400">
+                                Access requests ({accessRequests.length})
+                            </h4>
+                            <ul className="space-y-2">
+                                {accessRequests.map((r) => {
+                                    const role = requestRoles[r.id] ?? "EDITOR";
+                                    const busy = busyRequestId === r.id;
+                                    return (
+                                        <li
+                                            key={r.id}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarImage
+                                                    src={r.user.image || undefined}
+                                                />
+                                                <AvatarFallback className="text-[10px]">
+                                                    {(r.user.name || r.user.email || "?")
+                                                        .substring(0, 2)
+                                                        .toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="truncate text-sm">
+                                                    {r.user.name || r.user.email}
+                                                </div>
+                                                {r.message ? (
+                                                    <div className="truncate text-[10px] text-neutral-500">
+                                                        “{r.message}”
+                                                    </div>
+                                                ) : (
+                                                    <div className="truncate text-[10px] text-neutral-500">
+                                                        {r.user.email}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Select
+                                                value={role}
+                                                onValueChange={(v) =>
+                                                    setRequestRoles((prev) => ({
+                                                        ...prev,
+                                                        [r.id]: v as ResourceMemberRole,
+                                                    }))
+                                                }
+                                            >
+                                                <SelectTrigger className="h-7 w-[84px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="VIEWER">
+                                                        Viewer
+                                                    </SelectItem>
+                                                    <SelectItem value="EDITOR">
+                                                        Editor
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                size="sm"
+                                                className="h-7"
+                                                disabled={busy || !onApproveRequest}
+                                                onClick={async () => {
+                                                    if (!onApproveRequest) return;
+                                                    setBusyRequestId(r.id);
+                                                    await onApproveRequest(r.id, role);
+                                                    setBusyRequestId(null);
+                                                }}
+                                            >
+                                                Approve
+                                            </Button>
+                                            <button
+                                                type="button"
+                                                aria-label="Deny"
+                                                disabled={busy || !onDenyRequest}
+                                                onClick={async () => {
+                                                    if (!onDenyRequest) return;
+                                                    setBusyRequestId(r.id);
+                                                    await onDenyRequest(r.id);
+                                                    setBusyRequestId(null);
+                                                }}
+                                                className="text-neutral-400 hover:text-red-500 disabled:opacity-50"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Public link */}
                     {(onCopyLink || previewUrl) && (
                         <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">

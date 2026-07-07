@@ -78,6 +78,14 @@ enum NotificationType {
   OVERDUE
   ASSIGNED
   COMMENT
+  ACCESS_REQUEST
+  ACCESS_GRANTED
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
 }
 
 enum AttachmentParent {
@@ -198,6 +206,7 @@ model User {
   reflections    DailyReflection[]  @relation("DailyReflectionAuthor")
   databaseMemberships WikiDatabaseMember[] @relation("WikiDatabaseMemberUser")
   wikiPageMemberships WikiPageMember[] @relation("WikiPageMemberUser")
+  wikiAccessRequests WikiPageAccessRequest[] @relation("WikiPageAccessRequester")
   assistantMessages AssistantMessage[] @relation("AssistantMessageUser")
   privacyRequests PrivacyRequest[]
 }
@@ -467,10 +476,31 @@ model WikiPage {
   blockComments BlockComment[] @relation("WikiPageBlockComments")
   members      WikiPageMember[]
   analytics    WikiPageAnalytics[]
+  accessRequests WikiPageAccessRequest[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([parentPageId])
+}
+
+/// Google-Docs-style "request edit access". A view-only user asks for access to
+/// a page; the owner (or an org admin) approves — granting a WikiPageMember role
+/// of their choosing — or denies.
+model WikiPageAccessRequest {
+  id        String              @id @default(cuid())
+  pageId    String
+  userId    String
+  status    AccessRequestStatus @default(PENDING)
+  message   String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  page WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User     @relation("WikiPageAccessRequester", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, userId])
+  @@index([pageId, status])
+  @@index([userId])
 }
 
 model DailyReflection {
