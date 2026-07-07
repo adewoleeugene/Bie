@@ -35,6 +35,7 @@ import { searchMentionTargets } from "@/actions/wiki";
 import { uploadEditorFile } from "@/actions/attachments";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { FileText, Calendar, Users, Database, ChevronRight, MessageSquare, Link2 } from "lucide-react";
 import { DatabaseEmbedBlock } from "@/components/wiki/database-embed-block";
 import { ToggleBlock } from "@/components/wiki/toggle-block";
@@ -108,7 +109,7 @@ interface BlockEditorProps {
     onActiveBlockChange?: (blockId: string | null) => void;
 }
 
-export function BlockEditor({
+function BlockEditorInner({
     initialContent,
     onChange,
     editable = true,
@@ -116,9 +117,15 @@ export function BlockEditor({
 }: BlockEditorProps) {
     const editor = useCreateBlockNote({
         schema,
-        initialContent: initialContent
-            ? (initialContent as PartialBlock[])
-            : undefined,
+        // BlockNote throws synchronously during render if `initialContent` is an
+        // empty array or otherwise not a non-empty block array. A page saved with
+        // `[]` (or NULL, which arrives here as null) must fall through to
+        // `undefined` so the editor starts with a valid empty document instead of
+        // crashing the whole client tree.
+        initialContent:
+            Array.isArray(initialContent) && initialContent.length > 0
+                ? (initialContent as PartialBlock[])
+                : undefined,
         // Enables the Image/Video/Audio/File blocks to actually upload.
         uploadFile: async (file: File) => {
             const fd = new FormData();
@@ -440,5 +447,25 @@ export function BlockEditor({
                 </>
             )}
         </div>
+    );
+}
+
+/**
+ * Public editor. Wraps the real editor in an error boundary so a single page
+ * with malformed BlockNote content degrades to a small notice instead of
+ * throwing during render and white-screening the entire app.
+ */
+export function BlockEditor(props: BlockEditorProps) {
+    return (
+        <ErrorBoundary
+            fallback={
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-muted-foreground">
+                    This content couldn&apos;t be displayed. It may be in an older
+                    or unsupported format.
+                </div>
+            }
+        >
+            <BlockEditorInner {...props} />
+        </ErrorBoundary>
     );
 }
