@@ -428,8 +428,16 @@ export function MemberManagement() {
                                                 <p className="text-xs text-muted-foreground">
                                                     {member.email}
                                                 </p>
-                                                {member.projects.length > 0 && (
+                                                {(member.role !== "GUEST" || member.projects.length > 0) && (
                                                     <div className="mt-1 flex flex-wrap gap-1">
+                                                        {member.role !== "GUEST" && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] font-normal text-muted-foreground"
+                                                            >
+                                                                Whole workspace · {ROLE_CONFIG[member.role as OrgRole].label}
+                                                            </Badge>
+                                                        )}
                                                         {member.projects.map((project) => (
                                                             <Badge
                                                                 key={project.id}
