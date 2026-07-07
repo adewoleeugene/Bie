@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { WikiPage, User, WikiNamespace } from "@prisma/client";
-import { ChevronRight, ChevronDown, FileText, Plus, Hash, Folder, Trash2, GripVertical } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Plus, Hash, Folder, FolderPlus, Trash2, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,7 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { reorderWikiPages } from "@/actions/wiki";
+import { reorderWikiPages, createWikiPage } from "@/actions/wiki";
 import { toast } from "sonner";
 
 type WikiPageWithChildren = WikiPage & {
@@ -134,7 +134,7 @@ function WikiTreeItem({
 
                     {page.icon ? (
                         <span className="h-4 w-4 shrink-0 text-center text-sm leading-4">{page.icon}</span>
-                    ) : level === 0 ? (
+                    ) : page.isFolder || hasChildren ? (
                         <Folder className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/50")} />
                     ) : (
                         <FileText className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/50")} />
@@ -313,6 +313,22 @@ export function WikiSidebar({
         sessionStorage.setItem("wiki-template-title", title);
     };
 
+    const handleNewFolder = useCallback(async () => {
+        const result = await createWikiPage({
+            title: "New Folder",
+            organizationId,
+            projectId,
+            namespace: projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY,
+            isFolder: true,
+        });
+        if (result.success && result.data) {
+            router.push(`${basePath}/${result.data.id}`);
+            router.refresh();
+        } else {
+            toast.error(result.error || "Failed to create folder");
+        }
+    }, [organizationId, projectId, basePath, router]);
+
     const rootIds = useMemo(() => tree.map((p) => p.id), [tree]);
 
     return (
@@ -326,16 +342,27 @@ export function WikiSidebar({
                         </h2>
                     </div>
                     {!readOnly && (
-                        <WikiPageDialog
-                            organizationId={organizationId}
-                            projectId={projectId}
-                            namespace={projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY}
-                            trigger={
-                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md">
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            }
-                        />
+                        <div className="flex items-center gap-0.5">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 rounded-md"
+                                title="New folder"
+                                onClick={handleNewFolder}
+                            >
+                                <FolderPlus className="h-4 w-4" />
+                            </Button>
+                            <WikiPageDialog
+                                organizationId={organizationId}
+                                projectId={projectId}
+                                namespace={projectId ? WikiNamespace.PROJECT : WikiNamespace.COMPANY}
+                                trigger={
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" title="New page">
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                }
+                            />
+                        </div>
                     )}
                 </div>
 

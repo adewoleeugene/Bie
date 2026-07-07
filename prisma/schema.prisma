@@ -456,6 +456,9 @@ model WikiPage {
   authorId       String
   sortOrder      Int           @default(0)
   template       Boolean       @default(false)
+  /// A folder is a page that acts as a container for other pages. Sharing a
+  /// folder cascades access to everything nested under it.
+  isFolder       Boolean       @default(false)
   published      Boolean       @default(false)
   slug           String?       @unique
   allowDuplicate Boolean       @default(false)

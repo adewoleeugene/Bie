@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { WikiPageView } from "@/components/wiki/wiki-page-view";
-import { resolveAccess } from "@/lib/permissions";
+import { resolveInheritedAccess } from "@/lib/permissions";
+import { loadPageAccessChain } from "@/lib/wiki-access";
 import { AccessRequestStatus } from "@prisma/client";
 
 export async function generateMetadata({
@@ -61,19 +62,13 @@ export default async function WikiPageDetail({
         redirect("/wiki");
     }
 
-    const access = resolveAccess(
-        {
-            visibility: page.visibility,
-            organizationId: page.organizationId,
-            creatorId: page.authorId,
-            members: page.members,
-        },
-        {
-            userId: me.id,
-            organizationId: me.memberships[0].organizationId,
-            orgRole: me.memberships[0].role,
-        },
-    );
+    // Access inherits down the tree: a folder share cascades to its contents.
+    const chain = await loadPageAccessChain(page.id);
+    const access = resolveInheritedAccess(chain, {
+        userId: me.id,
+        organizationId: me.memberships[0].organizationId,
+        orgRole: me.memberships[0].role,
+    });
 
     // No access at all — bounce to the wiki home rather than leaking the page.
     if (access === "none") {

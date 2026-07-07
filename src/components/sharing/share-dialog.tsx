@@ -66,6 +66,8 @@ interface ShareDialogProps {
     onCopyLink?: () => Promise<void> | void;
     /** When provided, shows a "Preview" link opening the public page in a new tab. */
     previewUrl?: string;
+    /** When true, shows a note that sharing cascades to everything inside. */
+    isFolder?: boolean;
     /** Pending "request edit access" requests, shown to people who can grant. */
     accessRequests?: AccessRequestItem[];
     onApproveRequest?: (
@@ -89,6 +91,7 @@ export function ShareDialog({
     onTransferOwnership,
     onCopyLink,
     previewUrl,
+    isFolder,
     accessRequests,
     onApproveRequest,
     onDenyRequest,
@@ -275,6 +278,12 @@ export function ShareDialog({
                         <h4 className="mb-2 text-[10px] font-semibold uppercase text-neutral-500">
                             Who can access
                         </h4>
+                        {isFolder && (
+                            <p className="mb-2 rounded-md bg-primary/5 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                                This is a folder — sharing it gives access to every
+                                page inside, including ones added later.
+                            </p>
+                        )}
                         <div className="grid grid-cols-3 gap-2">
                             <button
                                 type="button"

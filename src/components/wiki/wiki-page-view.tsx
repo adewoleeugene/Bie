@@ -819,6 +819,7 @@ export function WikiPageView({
                 members={(sharing?.members ?? []) as ShareMember[]}
                 ownerId={sharing?.authorId}
                 viewerUserId={viewerUserId}
+                isFolder={page.isFolder}
                 onCopyLink={async () => {
                     if (!isPublished) await togglePublished();
                     copyPublicLink();
