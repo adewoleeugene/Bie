@@ -21,7 +21,10 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { createWikiPage } from "@/actions/wiki";
+import { createWikiTemplate } from "@/actions/wiki-template";
 import { useWikiTemplates } from "@/hooks/use-wiki";
+import { useProjects } from "@/hooks/use-projects";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plus, FileText, Layout, Info, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -50,13 +53,30 @@ export function WikiPageDialog({
     const [selectedNamespace, setSelectedNamespace] = useState<WikiNamespace>(namespace);
     const [isTemplate, setIsTemplate] = useState(false);
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
+    const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
     const { data: templates } = useWikiTemplates(organizationId);
+    const { data: projects } = useProjects();
+    const queryClient = useQueryClient();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
 
+        // Resolve which project (if any) the page belongs to. In a project
+        // context the projectId prop is fixed; from the company wiki the user
+        // picks one when they choose "Specific Project Wiki".
+        const effectiveProjectId = projectId
+            ? projectId
+            : selectedNamespace === WikiNamespace.PROJECT
+              ? selectedProjectId || undefined
+              : undefined;
+
+        if (selectedNamespace === WikiNamespace.PROJECT && !effectiveProjectId) {
+            toast.error("Choose a project for this page");
+            return;
+        }
+
+        setLoading(true);
         const loadingToast = toast.loading("Creating page...");
 
         let content = null;
@@ -72,26 +92,46 @@ export function WikiPageDialog({
                 title,
                 content,
                 organizationId,
-                projectId: selectedNamespace === WikiNamespace.PROJECT ? projectId : undefined,
+                projectId: effectiveProjectId,
                 parentPageId,
                 namespace: selectedNamespace,
                 template: isTemplate,
             });
 
             if (result.success) {
-                toast.success("Page created successfully", { id: loadingToast });
+                // "Save as template" also registers a reusable WikiTemplate so it
+                // shows up in the sidebar Templates list + the template dropdown
+                // (which read the WikiTemplate model, not the page flag).
+                if (isTemplate && result.data) {
+                    const tpl = await createWikiTemplate({
+                        name: title,
+                        content: result.data.content ?? [],
+                        organizationId,
+                    });
+                    if (tpl.success) {
+                        queryClient.invalidateQueries({ queryKey: ["wiki-templates"] });
+                    }
+                }
+
+                toast.success(
+                    isTemplate
+                        ? "Page created and saved as a template"
+                        : "Page created successfully",
+                    { id: loadingToast },
+                );
                 setOpen(false);
                 setTitle("");
                 setIsTemplate(false);
                 setSelectedTemplateId("none");
+                setSelectedProjectId("");
                 if (onSuccess) {
                     onSuccess();
                 }
                 router.refresh();
                 // Navigate to the new page
                 if (result.data) {
-                    const basePath = selectedNamespace === WikiNamespace.PROJECT && projectId
-                        ? `/projects/${projectId}/wiki`
+                    const basePath = effectiveProjectId
+                        ? `/projects/${effectiveProjectId}/wiki`
                         : "/wiki";
                     router.push(`${basePath}/${result.data.id}`);
                 }
@@ -162,6 +202,33 @@ export function WikiPageDialog({
                             </div>
                         )}
 
+                        {!projectId && selectedNamespace === WikiNamespace.PROJECT && (
+                            <div className="space-y-2">
+                                <Label htmlFor="project" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Project</Label>
+                                <Select
+                                    value={selectedProjectId}
+                                    onValueChange={setSelectedProjectId}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select a project" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {(projects ?? []).length === 0 ? (
+                                            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                                No projects yet
+                                            </div>
+                                        ) : (
+                                            (projects ?? []).map((p: { id: string; name: string }) => (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    {p.name}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {templates && templates.length > 0 && (
                             <div className="space-y-2">
                                 <Label htmlFor="template" className="text-sm font-semibold">Template</Label>
@@ -180,7 +247,7 @@ export function WikiPageDialog({
                                         </SelectItem>
                                         {templates.map((template: any) => (
                                             <SelectItem key={template.id} value={template.id}>
-                                                {template.title}
+                                                {template.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
