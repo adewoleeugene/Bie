@@ -19,6 +19,29 @@ enum OrgRole {
   OWNER
   ADMIN
   MEMBER
+  GUEST
+}
+
+enum WorkspaceType {
+  PERSONAL
+  ORGANIZATION
+}
+
+enum InviteScope {
+  ORGANIZATION
+  PROJECT
+}
+
+enum ProjectVisibility {
+  ORG_VISIBLE
+  PRIVATE
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
 }
 
 enum ProjectStatus {
@@ -147,10 +170,14 @@ model Organization {
   slug      String   @unique
   logoUrl   String?
   plan      OrgPlan  @default(FREE)
+  type      WorkspaceType @default(ORGANIZATION)
+  ownerId   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  owner         User? @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   members       OrganizationMember[]
+  invitations   OrganizationInvitation[]
   projects      Project[]
   squads        Squad[]
   tasks         Task[]
@@ -167,6 +194,9 @@ model Organization {
   reflections   DailyReflection[]
   milestones    Milestone[]
   privacyRequests PrivacyRequest[]
+
+  @@index([ownerId])
+  @@index([type])
 }
 
 model User {
@@ -209,6 +239,9 @@ model User {
   wikiAccessRequests WikiPageAccessRequest[] @relation("WikiPageAccessRequester")
   assistantMessages AssistantMessage[] @relation("AssistantMessageUser")
   privacyRequests PrivacyRequest[]
+  ownedWorkspaces Organization[] @relation("WorkspaceOwner")
+  sentInvitations OrganizationInvitation[] @relation("InvitationSender")
+  projectMemberships ProjectMember[]
 }
 
 model Account {
@@ -259,6 +292,31 @@ model OrganizationMember {
   @@index([userId])
 }
 
+model OrganizationInvitation {
+  id             String      @id @default(cuid())
+  email          String
+  scope          InviteScope
+  token          String      @unique
+  role           OrgRole     @default(MEMBER)
+  projectRole    ProjectRole?
+  organizationId String
+  projectId      String?
+  invitedById    String
+  acceptedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([token])
+}
+
 model Squad {
   id             String   @id @default(cuid())
   name           String
@@ -291,6 +349,7 @@ model Project {
   name           String
   description    String?
   status         ProjectStatus @default(ACTIVE)
+  visibility     ProjectVisibility @default(ORG_VISIBLE)
   organizationId String
   leadId         String?
   createdAt      DateTime      @default(now())
@@ -304,8 +363,23 @@ model Project {
   wikiPages    WikiPage[]
   automationRules AutomationRule[]
   milestones   Milestone[]
+  members      ProjectMember[]
+  invitations  OrganizationInvitation[]
 
   @@index([organizationId])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      ProjectRole @default(EDITOR)
+  joinedAt  DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
 }
 
 model Sprint {

@@ -38,6 +38,7 @@ async function getUserOrganization() {
     return {
         userId: user.id,
         organizationId: user.memberships[0].organizationId,
+        role: user.memberships[0].role,
     };
 }
 
@@ -46,13 +47,18 @@ export async function createProject(
 ): Promise<ActionResult<Project>> {
     try {
         const validated = createProjectSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const { organizationId, role } = await getUserOrganization();
+
+        if (role === "GUEST") {
+            return { success: false, error: "Guests cannot create projects" };
+        }
 
         const project = await db.project.create({
             data: {
                 name: validated.name,
                 description: validated.description,
                 status: validated.status,
+                visibility: validated.visibility,
                 organizationId,
                 leadId: validated.leadId || null,
                 squads: {
@@ -84,7 +90,11 @@ export async function updateProject(
 ): Promise<ActionResult<Project>> {
     try {
         const validated = updateProjectSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const { organizationId, role } = await getUserOrganization();
+
+        if (role === "GUEST") {
+            return { success: false, error: "Guests cannot update projects" };
+        }
 
         const existingProject = await db.project.findFirst({
             where: {
@@ -103,6 +113,7 @@ export async function updateProject(
                 name: validated.name,
                 description: validated.description,
                 status: validated.status,
+                visibility: validated.visibility,
                 leadId: validated.leadId,
                 squads: {
                     set: validated.squadIds?.map((id) => ({ id })) || [],
@@ -134,7 +145,11 @@ export async function deleteProject(
 ): Promise<ActionResult> {
     try {
         const validated = deleteProjectSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const { organizationId, role } = await getUserOrganization();
+
+        if (role === "GUEST") {
+            return { success: false, error: "Guests cannot delete projects" };
+        }
 
         const existingProject = await db.project.findFirst({
             where: {
@@ -164,11 +179,18 @@ export async function deleteProject(
 
 export async function getProjects() {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const projects = await db.project.findMany({
             where: {
                 organizationId,
+                ...(role === "GUEST"
+                    ? {
+                          members: {
+                              some: { userId },
+                          },
+                      }
+                    : {}),
             },
             include: {
                 lead: {
@@ -200,12 +222,19 @@ export async function getProjects() {
 
 export async function getProject(id: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const project = await db.project.findFirst({
             where: {
                 id,
                 organizationId,
+                ...(role === "GUEST"
+                    ? {
+                          members: {
+                              some: { userId },
+                          },
+                      }
+                    : {}),
             },
             include: {
                 lead: {

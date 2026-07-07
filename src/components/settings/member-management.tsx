@@ -52,6 +52,7 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
     OWNER: { label: "Owner", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: ShieldCheck },
     ADMIN: { label: "Admin", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Shield },
     MEMBER: { label: "Member", color: "bg-neutral-500/10 text-neutral-400 border-neutral-500/20", icon: User },
+    GUEST: { label: "Guest", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20", icon: User },
 };
 
 export function MemberManagement() {
@@ -118,7 +119,7 @@ export function MemberManagement() {
                                 <DialogHeader>
                                     <DialogTitle>Invite Member</DialogTitle>
                                     <DialogDescription>
-                                        Invite a user to your workspace by email. They must already have an account.
+                                        Invite a user to your workspace by email.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-2">
@@ -144,6 +145,7 @@ export function MemberManagement() {
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="MEMBER">Member</SelectItem>
+                                                <SelectItem value="GUEST">Guest</SelectItem>
                                                 <SelectItem value="ADMIN">Admin</SelectItem>
                                                 <SelectItem value="OWNER">Owner</SelectItem>
                                             </SelectContent>
@@ -216,7 +218,7 @@ export function MemberManagement() {
                                                             Change role
                                                         </DropdownMenuSubTrigger>
                                                         <DropdownMenuSubContent>
-                                                            {(["OWNER", "ADMIN", "MEMBER"] as OrgRole[]).map((role) => (
+                                                            {(["OWNER", "ADMIN", "MEMBER", "GUEST"] as OrgRole[]).map((role) => (
                                                                 <DropdownMenuItem
                                                                     key={role}
                                                                     disabled={member.role === role}

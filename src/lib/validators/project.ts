@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { ProjectStatus } from "@prisma/client";
+import { ProjectStatus, ProjectVisibility } from "@prisma/client";
 
 export const createProjectSchema = z.object({
     name: z.string().min(1, "Name is required").max(100),
     description: z.string().optional(),
     status: z.nativeEnum(ProjectStatus).default("ACTIVE"),
+    visibility: z.nativeEnum(ProjectVisibility).default("ORG_VISIBLE"),
     leadId: z.string().optional(),
     squadIds: z.array(z.string()).optional().default([]),
 });
@@ -14,6 +15,7 @@ export const updateProjectSchema = z.object({
     name: z.string().min(1, "Name is required").max(100).optional(),
     description: z.string().optional(),
     status: z.nativeEnum(ProjectStatus).optional(),
+    visibility: z.nativeEnum(ProjectVisibility).optional(),
     leadId: z.string().nullable().optional(),
     squadIds: z.array(z.string()).optional(),
 });
