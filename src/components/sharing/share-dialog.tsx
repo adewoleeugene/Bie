@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Globe, Lock, Trash2, Copy, ExternalLink, Eye, ShieldOff } from "lucide-react";
+import { Globe, Lock, Trash2, Copy, ExternalLink, Eye, ShieldOff, Folder, FileText } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -74,6 +74,14 @@ interface ShareDialogProps {
     /** Whether the page currently inherits shares from its folder. */
     inheritAccess?: boolean;
     onSetInheritAccess?: (inherit: boolean) => Promise<void> | void;
+    /** When sharing a folder: its contents, for a per-page shared/protected list. */
+    folderContents?: {
+        id: string;
+        title: string;
+        isFolder: boolean;
+        inheritAccess: boolean;
+    }[];
+    onSetChildInherit?: (childId: string, inherit: boolean) => Promise<void> | void;
     /** Pending "request edit access" requests, shown to people who can grant. */
     accessRequests?: AccessRequestItem[];
     onApproveRequest?: (
@@ -101,6 +109,8 @@ export function ShareDialog({
     showProtect,
     inheritAccess,
     onSetInheritAccess,
+    folderContents,
+    onSetChildInherit,
     accessRequests,
     onApproveRequest,
     onDenyRequest,
@@ -368,6 +378,46 @@ export function ShareDialog({
                                 onCheckedChange={(checked) => toggleInherit(!checked)}
                                 aria-label="Protect this page from folder sharing"
                             />
+                        </div>
+                    )}
+
+                    {/* Folder contents — per-page shared/protected checklist */}
+                    {folderContents && folderContents.length > 0 && (
+                        <div>
+                            <h4 className="mb-2 text-[10px] font-semibold uppercase text-neutral-500">
+                                Pages in this folder
+                            </h4>
+                            <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200 dark:divide-neutral-900 dark:border-neutral-800">
+                                {folderContents.map((c) => (
+                                    <li
+                                        key={c.id}
+                                        className="flex items-center gap-2 px-3 py-2"
+                                    >
+                                        {c.isFolder ? (
+                                            <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        )}
+                                        <span className="flex-1 truncate text-sm">
+                                            {c.title || "Untitled"}
+                                        </span>
+                                        <span className="text-[10px] text-neutral-500">
+                                            {c.inheritAccess ? "Shared" : "Protected"}
+                                        </span>
+                                        <Switch
+                                            checked={c.inheritAccess}
+                                            onCheckedChange={(checked) =>
+                                                onSetChildInherit?.(c.id, checked)
+                                            }
+                                            aria-label={`Share "${c.title}" with the folder`}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="mt-1 text-[10px] text-neutral-500">
+                                Turn a page off to protect it — it won&apos;t be shared
+                                with the folder.
+                            </p>
                         </div>
                     )}
 

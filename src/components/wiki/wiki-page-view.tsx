@@ -18,6 +18,7 @@ import {
     removeWikiPageMember,
     setWikiPageVisibility,
     setWikiPageInheritAccess,
+    getWikiFolderContents,
     transferWikiPageOwnership,
 } from "@/actions/wiki";
 import { ShareDialog, ShareMember } from "@/components/sharing/share-dialog";
@@ -334,6 +335,26 @@ export function WikiPageView({
         queryFn: () => getWikiPageAccessRequests(page.id),
         enabled: canMutate,
     });
+
+    // Folder contents for the per-page shared/protected checklist in Share.
+    const { data: folderContents, refetch: refetchFolderContents } = useQuery({
+        queryKey: ["wiki-folder-contents", page.id],
+        queryFn: () => getWikiFolderContents(page.id),
+        enabled: canMutate && shareOpen,
+    });
+
+    const handleSetChildInherit = async (childId: string, inherit: boolean) => {
+        const result = await setWikiPageInheritAccess({
+            pageId: childId,
+            inheritAccess: inherit,
+        });
+        if (result && result.success === false) {
+            toast.error(result.error || "Couldn't update");
+            return;
+        }
+        await refetchFolderContents();
+        router.refresh();
+    };
 
     const handleApproveRequest = async (
         requestId: string,
@@ -823,6 +844,8 @@ export function WikiPageView({
                 isFolder={page.isFolder}
                 showProtect={!!page.parentPageId}
                 inheritAccess={page.inheritAccess}
+                folderContents={folderContents ?? undefined}
+                onSetChildInherit={handleSetChildInherit}
                 onSetInheritAccess={async (inherit) => {
                     const result = await setWikiPageInheritAccess({
                         pageId: page.id,
