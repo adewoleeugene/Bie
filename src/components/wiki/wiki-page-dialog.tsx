@@ -95,13 +95,14 @@ export function WikiPageDialog({
                 projectId: effectiveProjectId,
                 parentPageId,
                 namespace: selectedNamespace,
-                template: isTemplate,
+                // Templates are separate reusable items (WikiTemplate), not flagged
+                // pages — so we never set the page's `template` flag here.
+                template: false,
             });
 
             if (result.success) {
-                // "Save as template" also registers a reusable WikiTemplate so it
-                // shows up in the sidebar Templates list + the template dropdown
-                // (which read the WikiTemplate model, not the page flag).
+                // "Save as template" registers a reusable WikiTemplate so it shows
+                // up in the sidebar Templates list + the template dropdown.
                 if (isTemplate && result.data) {
                     const tpl = await createWikiTemplate({
                         name: title,
