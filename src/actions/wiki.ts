@@ -254,9 +254,15 @@ export async function updateWikiPage(data: z.infer<typeof updateWikiPageSchema>)
 
 export async function deleteWikiPage(id: string) {
     try {
-        const session = await auth();
-        if (!session?.user?.email) {
-            return { success: false, error: "Unauthorized" };
+        // Only people who can edit the page (incl. via folder inheritance) may
+        // delete it.
+        try {
+            await assertPageEditAccess(id);
+        } catch {
+            return {
+                success: false,
+                error: "You don't have permission to delete this page",
+            };
         }
 
         const page = await db.wikiPage.findUnique({
@@ -273,7 +279,9 @@ export async function deleteWikiPage(id: string) {
         });
 
         revalidatePath("/wiki");
-        revalidatePath(`/projects/${page.projectId}/wiki`);
+        if (page.projectId) {
+            revalidatePath(`/projects/${page.projectId}/wiki`);
+        }
 
         return { success: true };
     } catch (error) {

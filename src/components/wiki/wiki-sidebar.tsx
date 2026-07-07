@@ -26,7 +26,7 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { reorderWikiPages, createWikiPage } from "@/actions/wiki";
+import { reorderWikiPages, createWikiPage, deleteWikiPage } from "@/actions/wiki";
 import { toast } from "sonner";
 
 type WikiPageWithChildren = WikiPage & {
@@ -88,8 +88,27 @@ function WikiTreeItem({
     dragHandleProps,
 }: WikiTreeItemProps & { dragHandleProps?: Record<string, any> }) {
     const [isExpanded, setIsExpanded] = useState(true);
+    const router = useRouter();
     const hasChildren = page.childPages && page.childPages.length > 0;
     const isActive = currentPageId === page.id;
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const childCount = page.childPages?.length ?? 0;
+        const msg = childCount
+            ? `Delete "${page.title}" and move its ${childCount} sub-page${childCount > 1 ? "s" : ""} up a level? It goes to Trash and can be restored.`
+            : `Delete "${page.title}"? It goes to Trash and can be restored.`;
+        if (!window.confirm(msg)) return;
+        const res = await deleteWikiPage(page.id);
+        if (res.success) {
+            toast.success("Moved to Trash");
+            if (isActive) router.push(basePath);
+            router.refresh();
+        } else {
+            toast.error(res.error || "Failed to delete");
+        }
+    };
 
     return (
         <div className="flex flex-col">
@@ -149,21 +168,32 @@ function WikiTreeItem({
                 </div>
 
                 {!readOnly && (
-                    <WikiPageDialog
-                        organizationId={organizationId}
-                        projectId={projectId}
-                        parentPageId={page.id}
-                        namespace={page.namespace}
-                        trigger={
-                            <button
-                                aria-label="Add subpage"
-                                onClick={(e) => e.stopPropagation()}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-background rounded-md border shadow-sm transition-all"
-                            >
-                                <Plus className="h-3 w-3 text-muted-foreground" />
-                            </button>
-                        }
-                    />
+                    <div className="flex items-center gap-0.5">
+                        <WikiPageDialog
+                            organizationId={organizationId}
+                            projectId={projectId}
+                            parentPageId={page.id}
+                            namespace={page.namespace}
+                            trigger={
+                                <button
+                                    aria-label="Add subpage"
+                                    title="Add page inside"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-background rounded-md border shadow-sm transition-all"
+                                >
+                                    <Plus className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                            }
+                        />
+                        <button
+                            aria-label="Delete"
+                            title="Delete"
+                            onClick={handleDelete}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-background rounded-md border shadow-sm transition-all"
+                        >
+                            <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                        </button>
+                    </div>
                 )}
             </div>
 

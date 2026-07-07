@@ -45,6 +45,7 @@ export default async function ProjectWikiLayout({
             organizationId,
             namespace: WikiNamespace.PROJECT,
             projectId: projectId,
+            deletedAt: null,
         },
         include: {
             author: true,
