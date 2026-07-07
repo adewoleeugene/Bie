@@ -44,8 +44,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
-import { useMembers, useInviteMember, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
+import { Copy, Link2, MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
+import { useMembers, useInviteMember, useCreateInviteLink, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
 import { toast } from "sonner";
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof Shield }> = {
@@ -58,14 +58,23 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
 export function MemberManagement() {
     const { data: members = [], isLoading } = useMembers();
     const inviteMember = useInviteMember();
+    const createInviteLink = useCreateInviteLink();
     const removeMember = useRemoveMember();
     const updateRole = useUpdateMemberRole();
 
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState<OrgRole>(OrgRole.MEMBER);
-    const [inviteLink, setInviteLink] = useState("");
+    const [personalLink, setPersonalLink] = useState("");
+    const [shareLink, setShareLink] = useState("");
     const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
+
+    const resetInvite = () => {
+        setInviteEmail("");
+        setInviteRole(OrgRole.MEMBER);
+        setPersonalLink("");
+        setShareLink("");
+    };
 
     const handleInvite = async () => {
         if (!inviteEmail.trim()) return;
@@ -73,25 +82,33 @@ export function MemberManagement() {
         const result = await inviteMember.mutateAsync({ email: inviteEmail.trim(), role: inviteRole });
         if (result.success) {
             if (result.inviteUrl) {
-                setInviteLink(new URL(result.inviteUrl, window.location.origin).toString());
-                toast.success("Invite link created");
+                setPersonalLink(new URL(result.inviteUrl, window.location.origin).toString());
+                toast.success(`Invite sent to ${inviteEmail.trim()}`);
                 return;
             }
 
             toast.success("Member added successfully");
-            setInviteEmail("");
-            setInviteRole(OrgRole.MEMBER);
+            resetInvite();
             setInviteOpen(false);
         } else {
             toast.error(result.error || "Failed to invite member");
         }
     };
 
-    const handleCopyInviteLink = async () => {
-        if (!inviteLink) return;
+    const handleCreateShareLink = async () => {
+        const result = await createInviteLink.mutateAsync(inviteRole);
+        if (result.success && result.inviteUrl) {
+            setShareLink(new URL(result.inviteUrl, window.location.origin).toString());
+            toast.success("Shareable link ready");
+        } else {
+            toast.error(result.error || "Failed to create link");
+        }
+    };
 
-        await navigator.clipboard.writeText(inviteLink);
-        toast.success("Invite link copied");
+    const handleCopy = async (value: string, label: string) => {
+        if (!value) return;
+        await navigator.clipboard.writeText(value);
+        toast.success(`${label} copied`);
     };
 
     const handleRemove = async (userId: string) => {
@@ -127,9 +144,7 @@ export function MemberManagement() {
                             onOpenChange={(open) => {
                                 setInviteOpen(open);
                                 if (!open) {
-                                    setInviteEmail("");
-                                    setInviteRole(OrgRole.MEMBER);
-                                    setInviteLink("");
+                                    resetInvite();
                                 }
                             }}
                         >
@@ -143,27 +158,18 @@ export function MemberManagement() {
                                 <DialogHeader>
                                     <DialogTitle>Invite Member</DialogTitle>
                                     <DialogDescription>
-                                        Invite a user to your workspace by email.
+                                        Invite people by email, or share a link anyone can use to join.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="invite-email">Email address</Label>
-                                        <Input
-                                            id="invite-email"
-                                            type="email"
-                                            placeholder="colleague@example.com"
-                                            value={inviteEmail}
-                                            onChange={(e) => setInviteEmail(e.target.value)}
-                                            onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
                                         <Label>Role</Label>
                                         <Select
                                             value={inviteRole}
-                                            onValueChange={(v) => setInviteRole(v as OrgRole)}
-                                            disabled={!!inviteLink}
+                                            onValueChange={(v) => {
+                                                setInviteRole(v as OrgRole);
+                                                setShareLink("");
+                                            }}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue />
@@ -176,35 +182,105 @@ export function MemberManagement() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    {inviteLink && (
-                                        <div className="space-y-2">
-                                            <Label htmlFor="invite-link">Invite link</Label>
-                                            <div className="flex gap-2">
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="invite-email">Invite by email</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                id="invite-email"
+                                                type="email"
+                                                placeholder="colleague@example.com"
+                                                value={inviteEmail}
+                                                onChange={(e) => setInviteEmail(e.target.value)}
+                                                onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+                                            />
+                                            <Button
+                                                onClick={handleInvite}
+                                                disabled={!inviteEmail.trim() || inviteMember.isPending}
+                                            >
+                                                {inviteMember.isPending ? "Sending..." : "Send"}
+                                            </Button>
+                                        </div>
+                                        {personalLink && (
+                                            <div className="flex gap-2 pt-1">
                                                 <Input
-                                                    id="invite-link"
-                                                    value={inviteLink}
+                                                    value={personalLink}
                                                     readOnly
                                                     className="font-mono text-xs"
                                                 />
-                                                <Button type="button" variant="outline" size="icon" onClick={handleCopyInviteLink}>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => handleCopy(personalLink, "Invite link")}
+                                                >
                                                     <Copy className="h-4 w-4" />
                                                     <span className="sr-only">Copy invite link</span>
                                                 </Button>
                                             </div>
+                                        )}
+                                        {personalLink && (
+                                            <p className="text-xs text-muted-foreground">
+                                                This link only works for {inviteEmail.trim()}.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="relative py-1">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <span className="w-full border-t" />
                                         </div>
-                                    )}
+                                        <div className="relative flex justify-center">
+                                            <span className="bg-background px-2 text-xs uppercase text-muted-foreground">
+                                                or
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Shareable link</Label>
+                                        {shareLink ? (
+                                            <>
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        value={shareLink}
+                                                        readOnly
+                                                        className="font-mono text-xs"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        onClick={() => handleCopy(shareLink, "Shareable link")}
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                        <span className="sr-only">Copy shareable link</span>
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Anyone with this link can join as {ROLE_CONFIG[inviteRole].label}.
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={handleCreateShareLink}
+                                                disabled={createInviteLink.isPending}
+                                            >
+                                                <Link2 className="mr-2 h-4 w-4" />
+                                                {createInviteLink.isPending
+                                                    ? "Creating..."
+                                                    : `Create link for ${ROLE_CONFIG[inviteRole].label}s`}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                                 <DialogFooter>
-                                    {inviteLink ? (
-                                        <Button onClick={() => setInviteOpen(false)}>Done</Button>
-                                    ) : (
-                                        <Button
-                                            onClick={handleInvite}
-                                            disabled={!inviteEmail.trim() || inviteMember.isPending}
-                                        >
-                                            {inviteMember.isPending ? "Inviting..." : "Create Invite"}
-                                        </Button>
-                                    )}
+                                    <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                                        Done
+                                    </Button>
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>

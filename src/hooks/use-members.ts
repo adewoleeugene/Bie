@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getOrganizationMembers, inviteMember, removeMember, updateMemberRole } from "@/actions/members";
+import { createInviteLink, getOrganizationMembers, inviteMember, removeMember, updateMemberRole } from "@/actions/members";
 import { OrgRole } from "@prisma/client";
 
 export function useMembers() {
@@ -20,6 +20,12 @@ export function useInviteMember() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["members"] });
         },
+    });
+}
+
+export function useCreateInviteLink() {
+    return useMutation({
+        mutationFn: (role?: OrgRole) => createInviteLink(role),
     });
 }
 

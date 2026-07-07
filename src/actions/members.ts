@@ -187,6 +187,64 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
     }
 }
 
+// ─── Shareable Invite Link ──────────────────────────────
+
+// Shareable links are not tied to an email — anyone signed in who opens them joins
+// the workspace at the given role. They stay reusable, so we give them a long life.
+function shareableExpiry() {
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 10);
+    return expiresAt;
+}
+
+export async function createInviteLink(role: OrgRole = OrgRole.MEMBER) {
+    try {
+        const { userId, organizationId, role: callerRole } = await getUserOrganization();
+
+        if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
+            return { success: false, error: "Only owners and admins can create invite links" };
+        }
+
+        if (role === OrgRole.OWNER && callerRole !== OrgRole.OWNER) {
+            return { success: false, error: "Only owners can create owner invite links" };
+        }
+
+        // Reuse an existing open link for this role so the URL stays stable.
+        const existing = await db.organizationInvitation.findFirst({
+            where: {
+                organizationId,
+                scope: "ORGANIZATION",
+                email: null,
+                role,
+                acceptedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+            select: { token: true },
+        });
+
+        if (existing) {
+            return { success: true, inviteUrl: inviteLink(existing.token) };
+        }
+
+        const invitation = await db.organizationInvitation.create({
+            data: {
+                email: null,
+                scope: "ORGANIZATION",
+                token: inviteToken(),
+                role,
+                organizationId,
+                invitedById: userId,
+                expiresAt: shareableExpiry(),
+            },
+        });
+
+        return { success: true, inviteUrl: inviteLink(invitation.token) };
+    } catch (error) {
+        console.error("Create invite link error:", error);
+        return { success: false, error: "Failed to create invite link" };
+    }
+}
+
 export async function inviteProjectMember(
     projectId: string,
     email: string,
