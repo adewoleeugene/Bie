@@ -294,7 +294,7 @@ model OrganizationMember {
 
 model OrganizationInvitation {
   id             String      @id @default(cuid())
-  email          String
+  email          String?
   scope          InviteScope
   token          String      @unique
   role           OrgRole     @default(MEMBER)

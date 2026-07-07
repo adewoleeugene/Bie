@@ -147,8 +147,9 @@ export async function acceptInviteByTokenForUser(
         return { success: false, error: "This invite link is invalid." };
     }
 
+    // Email invites are locked to their address; shareable links (email = null) accept anyone.
     const email = user.email.toLowerCase().trim();
-    if (invitation.email !== email) {
+    if (invitation.email && invitation.email !== email) {
         return { success: false, error: `This invite was sent to ${invitation.email}. Sign in with that email to accept it.` };
     }
 
@@ -194,7 +195,8 @@ export async function acceptInviteByTokenForUser(
         });
     }
 
-    if (!invitation.acceptedAt) {
+    // Email invites are single-use; shareable links stay open for the next person.
+    if (invitation.email && !invitation.acceptedAt) {
         await db.organizationInvitation.update({
             where: { id: invitation.id },
             data: { acceptedAt: new Date() },
