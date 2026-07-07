@@ -27,6 +27,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { reorderWikiPages, createWikiPage, deleteWikiPage } from "@/actions/wiki";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 type WikiPageWithChildren = WikiPage & {
@@ -88,20 +98,19 @@ function WikiTreeItem({
     dragHandleProps,
 }: WikiTreeItemProps & { dragHandleProps?: Record<string, any> }) {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const router = useRouter();
     const hasChildren = page.childPages && page.childPages.length > 0;
+    const childCount = page.childPages?.length ?? 0;
     const isActive = currentPageId === page.id;
 
-    const handleDelete = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const childCount = page.childPages?.length ?? 0;
-        const msg = childCount
-            ? `Delete "${page.title}" and move its ${childCount} sub-page${childCount > 1 ? "s" : ""} up a level? It goes to Trash and can be restored.`
-            : `Delete "${page.title}"? It goes to Trash and can be restored.`;
-        if (!window.confirm(msg)) return;
+    const confirmDelete = async () => {
+        setDeleting(true);
         const res = await deleteWikiPage(page.id);
+        setDeleting(false);
         if (res.success) {
+            setConfirmOpen(false);
             toast.success("Moved to Trash");
             if (isActive) router.push(basePath);
             router.refresh();
@@ -188,7 +197,11 @@ function WikiTreeItem({
                         <button
                             aria-label="Delete"
                             title="Delete"
-                            onClick={handleDelete}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setConfirmOpen(true);
+                            }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-background rounded-md border shadow-sm transition-all"
                         >
                             <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
@@ -218,6 +231,38 @@ function WikiTreeItem({
                     </div>
                 </SortableContext>
             )}
+
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Delete “{page.title || "Untitled"}”?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {childCount > 0
+                                ? `Its ${childCount} sub-page${childCount > 1 ? "s" : ""} will move up a level. `
+                                : ""}
+                            This moves the {page.isFolder ? "folder" : "page"} to
+                            Trash — you can restore it later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={deleting}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmDelete();
+                            }}
+                            className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600"
+                        >
+                            {deleting ? "Deleting…" : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
