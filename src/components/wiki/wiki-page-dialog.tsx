@@ -234,7 +234,12 @@ export function WikiPageDialog({
                                 <Label htmlFor="template" className="text-sm font-semibold">Template</Label>
                                 <Select
                                     value={selectedTemplateId}
-                                    onValueChange={setSelectedTemplateId}
+                                    onValueChange={(v) => {
+                                        setSelectedTemplateId(v);
+                                        // Creating a page *from* a template shouldn't also
+                                        // re-save it as a template — clear the flag.
+                                        if (v !== "none") setIsTemplate(false);
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a template" />
@@ -255,26 +260,28 @@ export function WikiPageDialog({
                             </div>
                         )}
 
-                        <div className="flex items-center justify-between p-3 rounded-lg border bg-neutral-50 dark:bg-neutral-900 border-dashed">
-                            <div className="flex items-center gap-2">
-                                <Layout className="h-4 w-4 text-primary/60" />
-                                <div className="flex flex-col">
-                                    <Label htmlFor="template-mode" className="text-sm cursor-pointer select-none">Save as template</Label>
-                                    <span className="text-[10px] text-muted-foreground">Make this available for others to reuse</span>
+                        {selectedTemplateId === "none" && (
+                            <div className="flex items-center justify-between p-3 rounded-lg border bg-neutral-50 dark:bg-neutral-900 border-dashed">
+                                <div className="flex items-center gap-2">
+                                    <Layout className="h-4 w-4 text-primary/60" />
+                                    <div className="flex flex-col">
+                                        <Label htmlFor="template-mode" className="text-sm cursor-pointer select-none">Save as template</Label>
+                                        <span className="text-[10px] text-muted-foreground">Make this available for others to reuse</span>
+                                    </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTemplate(!isTemplate)}
+                                    className={cn(
+                                        "h-5 w-5 rounded border transition-colors flex items-center justify-center",
+                                        isTemplate ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"
+                                    )}
+                                    id="template-mode"
+                                >
+                                    {isTemplate && <Check className="h-3 w-3" />}
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsTemplate(!isTemplate)}
-                                className={cn(
-                                    "h-5 w-5 rounded border transition-colors flex items-center justify-center",
-                                    isTemplate ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"
-                                )}
-                                id="template-mode"
-                            >
-                                {isTemplate && <Check className="h-3 w-3" />}
-                            </button>
-                        </div>
+                        )}
                     </div>
 
                     <DialogFooter>
