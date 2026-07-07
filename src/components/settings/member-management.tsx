@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { OrgRole } from "@prisma/client";
+import { OrgRole, ProjectRole } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Copy, Link2, MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
 import { useMembers, useInviteMember, useCreateInviteLink, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
+import { useProjects } from "@/hooks/use-projects";
+import { inviteProjectMember, createProjectInviteLink } from "@/actions/members";
 import { toast } from "sonner";
+
+const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+    OWNER: "Owner",
+    ADMIN: "Admin",
+    EDITOR: "Editor",
+    VIEWER: "Viewer",
+};
+
+const PROJECT_INVITE_ROLES: ProjectRole[] = [ProjectRole.EDITOR, ProjectRole.VIEWER, ProjectRole.ADMIN];
+
+const WORKSPACE_SCOPE = "workspace";
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof Shield }> = {
     OWNER: { label: "Owner", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: ShieldCheck },
@@ -57,21 +70,33 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
 
 export function MemberManagement() {
     const { data: members = [], isLoading } = useMembers();
+    const { data: projects = [] } = useProjects();
     const inviteMember = useInviteMember();
     const createInviteLink = useCreateInviteLink();
     const removeMember = useRemoveMember();
     const updateRole = useUpdateMemberRole();
 
     const [inviteOpen, setInviteOpen] = useState(false);
+    const [inviteScope, setInviteScope] = useState<string>(WORKSPACE_SCOPE);
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState<OrgRole>(OrgRole.MEMBER);
+    const [projectRole, setProjectRole] = useState<ProjectRole>(ProjectRole.EDITOR);
     const [personalLink, setPersonalLink] = useState("");
     const [shareLink, setShareLink] = useState("");
+    const [isInviting, setIsInviting] = useState(false);
+    const [isLinking, setIsLinking] = useState(false);
     const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
 
+    const isProjectScope = inviteScope !== WORKSPACE_SCOPE;
+    const currentRoleLabel = isProjectScope
+        ? PROJECT_ROLE_LABELS[projectRole]
+        : ROLE_CONFIG[inviteRole].label;
+
     const resetInvite = () => {
+        setInviteScope(WORKSPACE_SCOPE);
         setInviteEmail("");
         setInviteRole(OrgRole.MEMBER);
+        setProjectRole(ProjectRole.EDITOR);
         setPersonalLink("");
         setShareLink("");
     };
@@ -79,15 +104,21 @@ export function MemberManagement() {
     const handleInvite = async () => {
         if (!inviteEmail.trim()) return;
 
-        const result = await inviteMember.mutateAsync({ email: inviteEmail.trim(), role: inviteRole });
+        setIsInviting(true);
+        const email = inviteEmail.trim();
+        const result = isProjectScope
+            ? await inviteProjectMember(inviteScope, email, projectRole)
+            : await inviteMember.mutateAsync({ email, role: inviteRole });
+        setIsInviting(false);
+
         if (result.success) {
             if (result.inviteUrl) {
                 setPersonalLink(new URL(result.inviteUrl, window.location.origin).toString());
-                toast.success(`Invite sent to ${inviteEmail.trim()}`);
+                toast.success(`Invite sent to ${email}`);
                 return;
             }
 
-            toast.success("Member added successfully");
+            toast.success(isProjectScope ? "Added to project" : "Member added successfully");
             resetInvite();
             setInviteOpen(false);
         } else {
@@ -96,7 +127,12 @@ export function MemberManagement() {
     };
 
     const handleCreateShareLink = async () => {
-        const result = await createInviteLink.mutateAsync(inviteRole);
+        setIsLinking(true);
+        const result = isProjectScope
+            ? await createProjectInviteLink(inviteScope, projectRole)
+            : await createInviteLink.mutateAsync(inviteRole);
+        setIsLinking(false);
+
         if (result.success && result.inviteUrl) {
             setShareLink(new URL(result.inviteUrl, window.location.origin).toString());
             toast.success("Shareable link ready");
@@ -163,24 +199,69 @@ export function MemberManagement() {
                                 </DialogHeader>
                                 <div className="space-y-4 py-2">
                                     <div className="space-y-2">
-                                        <Label>Role</Label>
+                                        <Label>Invite to</Label>
                                         <Select
-                                            value={inviteRole}
+                                            value={inviteScope}
                                             onValueChange={(v) => {
-                                                setInviteRole(v as OrgRole);
+                                                setInviteScope(v);
                                                 setShareLink("");
+                                                setPersonalLink("");
                                             }}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="MEMBER">Member</SelectItem>
-                                                <SelectItem value="GUEST">Guest</SelectItem>
-                                                <SelectItem value="ADMIN">Admin</SelectItem>
-                                                <SelectItem value="OWNER">Owner</SelectItem>
+                                                <SelectItem value={WORKSPACE_SCOPE}>Whole workspace</SelectItem>
+                                                {projects.map((project) => (
+                                                    <SelectItem key={project.id} value={project.id}>
+                                                        {project.name}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Role</Label>
+                                        {isProjectScope ? (
+                                            <Select
+                                                value={projectRole}
+                                                onValueChange={(v) => {
+                                                    setProjectRole(v as ProjectRole);
+                                                    setShareLink("");
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {PROJECT_INVITE_ROLES.map((r) => (
+                                                        <SelectItem key={r} value={r}>
+                                                            {PROJECT_ROLE_LABELS[r]}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <Select
+                                                value={inviteRole}
+                                                onValueChange={(v) => {
+                                                    setInviteRole(v as OrgRole);
+                                                    setShareLink("");
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="MEMBER">Member</SelectItem>
+                                                    <SelectItem value="GUEST">Guest</SelectItem>
+                                                    <SelectItem value="ADMIN">Admin</SelectItem>
+                                                    <SelectItem value="OWNER">Owner</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
@@ -196,9 +277,9 @@ export function MemberManagement() {
                                             />
                                             <Button
                                                 onClick={handleInvite}
-                                                disabled={!inviteEmail.trim() || inviteMember.isPending}
+                                                disabled={!inviteEmail.trim() || isInviting}
                                             >
-                                                {inviteMember.isPending ? "Sending..." : "Send"}
+                                                {isInviting ? "Sending..." : "Send"}
                                             </Button>
                                         </div>
                                         {personalLink && (
@@ -258,7 +339,8 @@ export function MemberManagement() {
                                                     </Button>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Anyone with this link can join as {ROLE_CONFIG[inviteRole].label}.
+                                                    Anyone with this link can join
+                                                    {isProjectScope ? " this project" : ""} as {currentRoleLabel}.
                                                 </p>
                                             </>
                                         ) : (
@@ -267,12 +349,12 @@ export function MemberManagement() {
                                                 variant="outline"
                                                 className="w-full"
                                                 onClick={handleCreateShareLink}
-                                                disabled={createInviteLink.isPending}
+                                                disabled={isLinking}
                                             >
                                                 <Link2 className="mr-2 h-4 w-4" />
-                                                {createInviteLink.isPending
+                                                {isLinking
                                                     ? "Creating..."
-                                                    : `Create link for ${ROLE_CONFIG[inviteRole].label}s`}
+                                                    : `Create link for ${currentRoleLabel}s`}
                                             </Button>
                                         )}
                                     </div>
