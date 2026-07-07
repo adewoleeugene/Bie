@@ -35,6 +35,8 @@ export default function SettingsPage() {
         OVERDUE: "Overdue Alerts",
         ASSIGNED: "Task Assignments",
         COMMENT: "Comments",
+        ACCESS_REQUEST: "Access Requests",
+        ACCESS_GRANTED: "Access Granted",
     };
 
     const handleSaveProfile = async () => {

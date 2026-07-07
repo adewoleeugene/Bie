@@ -5,8 +5,10 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import {
+    AccessRequestStatus,
     MentionTargetType,
     NotificationType,
+    OrgRole,
     ResourceMemberRole,
     ResourceVisibility,
     WikiNamespace,
@@ -1068,5 +1070,194 @@ export async function removeWikiPageMember(args: {
     } catch (error) {
         console.error("removeWikiPageMember error:", error);
         return { success: false, error: "Failed to remove member" };
+    }
+}
+
+// ─── Wiki page "request edit access" (Google-Docs style) ─────────────
+
+/**
+ * A view-only (or no-access) user asks the page owner for access. Creates or
+ * re-opens a PENDING request and notifies the owner + org admins, who can
+ * approve (granting a role of their choice) or deny.
+ */
+export async function requestWikiPageEditAccess(args: {
+    pageId: string;
+    message?: string;
+}) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+        const me = await db.user.findUnique({
+            where: { email: session.user.email },
+            include: { memberships: true },
+        });
+        if (!me || me.memberships.length === 0) {
+            return { success: false, error: "Unauthorized" };
+        }
+        const page = await db.wikiPage.findUnique({
+            where: { id: args.pageId },
+            select: {
+                id: true,
+                title: true,
+                organizationId: true,
+                authorId: true,
+                visibility: true,
+                members: { select: { userId: true, role: true } },
+            },
+        });
+        if (!page) return { success: false, error: "Page not found" };
+        if (page.organizationId !== me.memberships[0].organizationId) {
+            return { success: false, error: "Page not found" };
+        }
+
+        const access = resolveAccess(
+            {
+                visibility: page.visibility,
+                organizationId: page.organizationId,
+                creatorId: page.authorId,
+                members: page.members,
+            },
+            {
+                userId: me.id,
+                organizationId: me.memberships[0].organizationId,
+                orgRole: me.memberships[0].role,
+            },
+        );
+        if (access === "edit") {
+            return { success: false, error: "You already have edit access" };
+        }
+
+        await db.wikiPageAccessRequest.upsert({
+            where: { pageId_userId: { pageId: page.id, userId: me.id } },
+            create: {
+                pageId: page.id,
+                userId: me.id,
+                message: args.message?.trim() || null,
+                status: AccessRequestStatus.PENDING,
+            },
+            // Re-open a previously denied/approved request.
+            update: {
+                message: args.message?.trim() || null,
+                status: AccessRequestStatus.PENDING,
+            },
+        });
+
+        // Notify the owner + org admins/owners, who are the people able to grant.
+        const admins = await db.organizationMember.findMany({
+            where: {
+                organizationId: page.organizationId,
+                role: { in: [OrgRole.ADMIN, OrgRole.OWNER] },
+            },
+            select: { userId: true },
+        });
+        const recipientIds = Array.from(
+            new Set([page.authorId, ...admins.map((a) => a.userId)]),
+        );
+        const requesterName = me.name || me.email || "Someone";
+        sendNotifications({
+            recipientIds,
+            excludeUserId: me.id,
+            organizationId: page.organizationId,
+            type: NotificationType.ACCESS_REQUEST,
+            title: `${requesterName} requested access to "${page.title}"`,
+            body: args.message?.trim() || undefined,
+            linkUrl: `/wiki/${page.id}`,
+        }).catch((e) => console.error("Access request notification error:", e));
+
+        revalidatePath(`/wiki/${page.id}`);
+        return { success: true };
+    } catch (error) {
+        console.error("requestWikiPageEditAccess error:", error);
+        return { success: false, error: "Failed to request access" };
+    }
+}
+
+/** Owner/admin (anyone with edit access) lists the page's pending requests. */
+export async function getWikiPageAccessRequests(pageId: string) {
+    try {
+        await assertPageEditAccess(pageId);
+        return await db.wikiPageAccessRequest.findMany({
+            where: { pageId, status: AccessRequestStatus.PENDING },
+            include: {
+                user: {
+                    select: { id: true, name: true, email: true, image: true },
+                },
+            },
+            orderBy: { createdAt: "asc" },
+        });
+    } catch (error) {
+        console.error("getWikiPageAccessRequests error:", error);
+        return [];
+    }
+}
+
+/** Approve a pending request, granting the requester the chosen role. */
+export async function approveWikiPageAccessRequest(args: {
+    requestId: string;
+    role: ResourceMemberRole;
+}) {
+    try {
+        const request = await db.wikiPageAccessRequest.findUnique({
+            where: { id: args.requestId },
+            include: { page: { select: { id: true, title: true, organizationId: true } } },
+        });
+        if (!request) return { success: false, error: "Request not found" };
+        await assertPageEditAccess(request.pageId);
+
+        await db.$transaction([
+            db.wikiPageMember.upsert({
+                where: {
+                    pageId_userId: {
+                        pageId: request.pageId,
+                        userId: request.userId,
+                    },
+                },
+                create: {
+                    pageId: request.pageId,
+                    userId: request.userId,
+                    role: args.role,
+                },
+                update: { role: args.role },
+            }),
+            db.wikiPageAccessRequest.update({
+                where: { id: request.id },
+                data: { status: AccessRequestStatus.APPROVED },
+            }),
+        ]);
+
+        sendNotifications({
+            recipientIds: [request.userId],
+            organizationId: request.page.organizationId,
+            type: NotificationType.ACCESS_GRANTED,
+            title: `You were granted access to "${request.page.title}"`,
+            linkUrl: `/wiki/${request.pageId}`,
+        }).catch((e) => console.error("Access granted notification error:", e));
+
+        revalidatePath(`/wiki/${request.pageId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("approveWikiPageAccessRequest error:", error);
+        return { success: false, error: "Failed to approve request" };
+    }
+}
+
+/** Deny a pending request. */
+export async function denyWikiPageAccessRequest(args: { requestId: string }) {
+    try {
+        const request = await db.wikiPageAccessRequest.findUnique({
+            where: { id: args.requestId },
+            select: { id: true, pageId: true },
+        });
+        if (!request) return { success: false, error: "Request not found" };
+        await assertPageEditAccess(request.pageId);
+        await db.wikiPageAccessRequest.update({
+            where: { id: request.id },
+            data: { status: AccessRequestStatus.DENIED },
+        });
+        revalidatePath(`/wiki/${request.pageId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("denyWikiPageAccessRequest error:", error);
+        return { success: false, error: "Failed to deny request" };
     }
 }
