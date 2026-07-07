@@ -23,6 +23,10 @@ function inviteToken() {
     return randomBytes(32).toString("hex");
 }
 
+function inviteLink(token: string) {
+    return `/signup?invite=${token}`;
+}
+
 async function getUserOrganization() {
     const session = await auth();
     if (!session?.user?.email) {
@@ -118,10 +122,11 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
                     acceptedAt: null,
                     expiresAt: { gt: new Date() },
                 },
+                select: { token: true },
             });
 
             if (existingInvite) {
-                return { success: false, error: "An active invitation already exists for this email" };
+                return { success: true, inviteUrl: inviteLink(existingInvite.token) };
             }
 
             const organization = await db.organization.findUnique({
@@ -141,7 +146,7 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
                 },
             });
 
-            const inviteUrl = `/signup?invite=${invitation.token}`;
+            const inviteUrl = inviteLink(invitation.token);
             const emailBody = buildNotificationEmail({
                 title: `You're invited to ${organization?.name ?? "a workspace"} on Bie`,
                 body: `Create an account or sign in with ${targetEmail} to accept this workspace invitation.`,
@@ -150,7 +155,7 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
             await sendEmail({ to: targetEmail, ...emailBody });
 
             revalidatePath("/settings");
-            return { success: true };
+            return { success: true, inviteUrl };
         }
 
         const existing = await db.organizationMember.findUnique({
@@ -254,10 +259,11 @@ export async function inviteProjectMember(
                 acceptedAt: null,
                 expiresAt: { gt: new Date() },
             },
+            select: { token: true },
         });
 
         if (existingInvite) {
-            return { success: false, error: "An active invitation already exists for this email" };
+            return { success: true, inviteUrl: inviteLink(existingInvite.token) };
         }
 
         const invitation = await db.organizationInvitation.create({
@@ -277,12 +283,12 @@ export async function inviteProjectMember(
         const emailBody = buildNotificationEmail({
             title: `You're invited to ${project.name}`,
             body: `Create an account or sign in with ${targetEmail} to access this project in ${project.organization.name}.`,
-            linkUrl: `/signup?invite=${invitation.token}`,
+            linkUrl: inviteLink(invitation.token),
         });
         await sendEmail({ to: targetEmail, ...emailBody });
 
         revalidatePath(`/projects/${projectId}`);
-        return { success: true };
+        return { success: true, inviteUrl: inviteLink(invitation.token) };
     } catch (error) {
         console.error("Invite project member error:", error);
         return { success: false, error: "Failed to invite project member" };

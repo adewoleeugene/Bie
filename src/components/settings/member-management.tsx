@@ -44,7 +44,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
+import { Copy, MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
 import { useMembers, useInviteMember, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
 import { toast } from "sonner";
 
@@ -64,6 +64,7 @@ export function MemberManagement() {
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState<OrgRole>(OrgRole.MEMBER);
+    const [inviteLink, setInviteLink] = useState("");
     const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
 
     const handleInvite = async () => {
@@ -71,13 +72,26 @@ export function MemberManagement() {
 
         const result = await inviteMember.mutateAsync({ email: inviteEmail.trim(), role: inviteRole });
         if (result.success) {
-            toast.success("Member invited successfully");
+            if (result.inviteUrl) {
+                setInviteLink(new URL(result.inviteUrl, window.location.origin).toString());
+                toast.success("Invite link created");
+                return;
+            }
+
+            toast.success("Member added successfully");
             setInviteEmail("");
             setInviteRole(OrgRole.MEMBER);
             setInviteOpen(false);
         } else {
             toast.error(result.error || "Failed to invite member");
         }
+    };
+
+    const handleCopyInviteLink = async () => {
+        if (!inviteLink) return;
+
+        await navigator.clipboard.writeText(inviteLink);
+        toast.success("Invite link copied");
     };
 
     const handleRemove = async (userId: string) => {
@@ -108,7 +122,17 @@ export function MemberManagement() {
                             <CardTitle>Members</CardTitle>
                             <CardDescription>Manage workspace members and their roles.</CardDescription>
                         </div>
-                        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                        <Dialog
+                            open={inviteOpen}
+                            onOpenChange={(open) => {
+                                setInviteOpen(open);
+                                if (!open) {
+                                    setInviteEmail("");
+                                    setInviteRole(OrgRole.MEMBER);
+                                    setInviteLink("");
+                                }
+                            }}
+                        >
                             <DialogTrigger asChild>
                                 <Button size="sm">
                                     <Plus className="mr-1.5 h-4 w-4" />
@@ -139,6 +163,7 @@ export function MemberManagement() {
                                         <Select
                                             value={inviteRole}
                                             onValueChange={(v) => setInviteRole(v as OrgRole)}
+                                            disabled={!!inviteLink}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue />
@@ -151,14 +176,35 @@ export function MemberManagement() {
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    {inviteLink && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invite-link">Invite link</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="invite-link"
+                                                    value={inviteLink}
+                                                    readOnly
+                                                    className="font-mono text-xs"
+                                                />
+                                                <Button type="button" variant="outline" size="icon" onClick={handleCopyInviteLink}>
+                                                    <Copy className="h-4 w-4" />
+                                                    <span className="sr-only">Copy invite link</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <DialogFooter>
-                                    <Button
-                                        onClick={handleInvite}
-                                        disabled={!inviteEmail.trim() || inviteMember.isPending}
-                                    >
-                                        {inviteMember.isPending ? "Inviting..." : "Send Invite"}
-                                    </Button>
+                                    {inviteLink ? (
+                                        <Button onClick={() => setInviteOpen(false)}>Done</Button>
+                                    ) : (
+                                        <Button
+                                            onClick={handleInvite}
+                                            disabled={!inviteEmail.trim() || inviteMember.isPending}
+                                        >
+                                            {inviteMember.isPending ? "Inviting..." : "Create Invite"}
+                                        </Button>
+                                    )}
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
