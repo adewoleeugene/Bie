@@ -6,6 +6,7 @@ import { ActionResult } from "@/types";
 import bcrypt from "bcryptjs";
 import { signIn } from "@/lib/auth";
 import { AuthError } from "next-auth";
+import { acceptPendingInvitesForUser, ensurePersonalWorkspace } from "@/lib/workspaces";
 
 export async function signUp(input: SignUpInput): Promise<ActionResult> {
     try {
@@ -26,29 +27,20 @@ export async function signUp(input: SignUpInput): Promise<ActionResult> {
         // Hash password
         const hashedPassword = await bcrypt.hash(validated.password, 10);
 
-        // Create user
-        const user = await db.user.create({
-            data: {
-                name: validated.name,
-                email: validated.email,
-                password: hashedPassword,
-            },
-        });
-
-        // Add to default organization (since events only fire for adapter-created users)
-        const defaultOrg = await db.organization.findFirst({
-            where: { slug: "christex" },
-        });
-
-        if (defaultOrg) {
-            await db.organizationMember.create({
+        const user = await db.$transaction(async (tx) => {
+            const createdUser = await tx.user.create({
                 data: {
-                    userId: user.id,
-                    organizationId: defaultOrg.id,
-                    role: "MEMBER",
+                    name: validated.name,
+                    email: validated.email.toLowerCase().trim(),
+                    password: hashedPassword,
                 },
             });
-        }
+
+            await ensurePersonalWorkspace(tx, createdUser);
+            await acceptPendingInvitesForUser(tx, createdUser);
+
+            return createdUser;
+        });
 
         // Auto sign-in
         try {

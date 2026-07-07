@@ -2,8 +2,26 @@
 
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { OrgRole } from "@prisma/client";
+import { OrgRole, ProjectRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "crypto";
+import { buildNotificationEmail, sendEmail } from "@/lib/email";
+
+const INVITE_DAYS = 14;
+
+function normalizedEmail(email: string) {
+    return email.toLowerCase().trim();
+}
+
+function inviteExpiry() {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + INVITE_DAYS);
+    return expiresAt;
+}
+
+function inviteToken() {
+    return randomBytes(32).toString("hex");
+}
 
 async function getUserOrganization() {
     const session = await auth();
@@ -76,6 +94,7 @@ export async function getOrganizationMembers() {
 export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER) {
     try {
         const { userId, organizationId, role: callerRole } = await getUserOrganization();
+        const targetEmail = normalizedEmail(email);
 
         if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
             return { success: false, error: "Only owners and admins can invite members" };
@@ -87,11 +106,51 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
         }
 
         const targetUser = await db.user.findUnique({
-            where: { email: email.toLowerCase().trim() },
+            where: { email: targetEmail },
         });
 
         if (!targetUser) {
-            return { success: false, error: "No user found with that email. They must create an account first." };
+            const existingInvite = await db.organizationInvitation.findFirst({
+                where: {
+                    email: targetEmail,
+                    organizationId,
+                    scope: "ORGANIZATION",
+                    acceptedAt: null,
+                    expiresAt: { gt: new Date() },
+                },
+            });
+
+            if (existingInvite) {
+                return { success: false, error: "An active invitation already exists for this email" };
+            }
+
+            const organization = await db.organization.findUnique({
+                where: { id: organizationId },
+                select: { name: true },
+            });
+
+            const invitation = await db.organizationInvitation.create({
+                data: {
+                    email: targetEmail,
+                    scope: "ORGANIZATION",
+                    token: inviteToken(),
+                    role,
+                    organizationId,
+                    invitedById: userId,
+                    expiresAt: inviteExpiry(),
+                },
+            });
+
+            const inviteUrl = `/signup?invite=${invitation.token}`;
+            const emailBody = buildNotificationEmail({
+                title: `You're invited to ${organization?.name ?? "a workspace"} on Bie`,
+                body: `Create an account or sign in with ${targetEmail} to accept this workspace invitation.`,
+                linkUrl: inviteUrl,
+            });
+            await sendEmail({ to: targetEmail, ...emailBody });
+
+            revalidatePath("/settings");
+            return { success: true };
         }
 
         const existing = await db.organizationMember.findUnique({
@@ -120,6 +179,113 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
     } catch (error) {
         console.error("Invite member error:", error);
         return { success: false, error: "Failed to invite member" };
+    }
+}
+
+export async function inviteProjectMember(
+    projectId: string,
+    email: string,
+    role: ProjectRole = ProjectRole.EDITOR
+) {
+    try {
+        const { userId, organizationId, role: callerRole } = await getUserOrganization();
+        const targetEmail = normalizedEmail(email);
+
+        if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
+            return { success: false, error: "Only owners and admins can invite project members" };
+        }
+
+        const project = await db.project.findFirst({
+            where: { id: projectId, organizationId },
+            select: { id: true, name: true, organization: { select: { name: true } } },
+        });
+
+        if (!project) {
+            return { success: false, error: "Project not found" };
+        }
+
+        const targetUser = await db.user.findUnique({
+            where: { email: targetEmail },
+        });
+
+        if (targetUser) {
+            await db.$transaction(async (tx) => {
+                await tx.organizationMember.upsert({
+                    where: {
+                        organizationId_userId: {
+                            organizationId,
+                            userId: targetUser.id,
+                        },
+                    },
+                    update: {},
+                    create: {
+                        organizationId,
+                        userId: targetUser.id,
+                        role: OrgRole.GUEST,
+                    },
+                });
+
+                await tx.projectMember.upsert({
+                    where: {
+                        projectId_userId: {
+                            projectId,
+                            userId: targetUser.id,
+                        },
+                    },
+                    update: { role },
+                    create: {
+                        projectId,
+                        userId: targetUser.id,
+                        role,
+                    },
+                });
+            });
+
+            revalidatePath(`/projects/${projectId}`);
+            return { success: true };
+        }
+
+        const existingInvite = await db.organizationInvitation.findFirst({
+            where: {
+                email: targetEmail,
+                organizationId,
+                projectId,
+                scope: "PROJECT",
+                acceptedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+        });
+
+        if (existingInvite) {
+            return { success: false, error: "An active invitation already exists for this email" };
+        }
+
+        const invitation = await db.organizationInvitation.create({
+            data: {
+                email: targetEmail,
+                scope: "PROJECT",
+                token: inviteToken(),
+                role: OrgRole.GUEST,
+                projectRole: role,
+                organizationId,
+                projectId,
+                invitedById: userId,
+                expiresAt: inviteExpiry(),
+            },
+        });
+
+        const emailBody = buildNotificationEmail({
+            title: `You're invited to ${project.name}`,
+            body: `Create an account or sign in with ${targetEmail} to access this project in ${project.organization.name}.`,
+            linkUrl: `/signup?invite=${invitation.token}`,
+        });
+        await sendEmail({ to: targetEmail, ...emailBody });
+
+        revalidatePath(`/projects/${projectId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Invite project member error:", error);
+        return { success: false, error: "Failed to invite project member" };
     }
 }
 

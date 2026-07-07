@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
+import { acceptPendingInvitesForUser, ensurePersonalWorkspace } from "@/lib/workspaces";
 import bcrypt from "bcryptjs";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -58,6 +59,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }),
     ],
     callbacks: {
+        async signIn({ user }) {
+            if (!user.id) return true;
+            const signedInUser = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+            };
+
+            await db.$transaction(async (tx) => {
+                await ensurePersonalWorkspace(tx, signedInUser);
+                await acceptPendingInvitesForUser(tx, signedInUser);
+            });
+
+            return true;
+        },
         async session({ session, token }) {
             if (session.user && token.sub) {
                 session.user.id = token.sub;
@@ -73,20 +89,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     events: {
         async createUser({ user }) {
-            // Automatically add new users to the default organization
-            const defaultOrg = await db.organization.findFirst({
-                where: { slug: "christex" },
-            });
+            if (!user.id) return;
+            const createdUser = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+            };
 
-            if (defaultOrg && user.id) {
-                await db.organizationMember.create({
-                    data: {
-                        userId: user.id,
-                        organizationId: defaultOrg.id,
-                        role: "MEMBER", // Default role
-                    },
-                });
-            }
+            await db.$transaction(async (tx) => {
+                await ensurePersonalWorkspace(tx, createdUser);
+                await acceptPendingInvitesForUser(tx, createdUser);
+            });
         },
     },
     pages: {
