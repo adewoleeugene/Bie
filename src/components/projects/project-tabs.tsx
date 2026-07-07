@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, Table, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProjectInviteDialog } from "@/components/projects/project-invite-dialog";
 
 interface ProjectTabsProps {
     projectId: string;
@@ -18,7 +19,8 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
 
     return (
         <div className="border-b bg-white px-6 py-3 dark:bg-neutral-950">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                 <Link href={`/projects/${projectId}`}>
                     <Button
                         variant={isOverview ? "secondary" : "ghost"}
@@ -49,6 +51,8 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
                         Table
                     </Button>
                 </Link>
+                </div>
+                <ProjectInviteDialog projectId={projectId} />
             </div>
         </div>
     );

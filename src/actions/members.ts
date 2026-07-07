@@ -353,6 +353,65 @@ export async function inviteProjectMember(
     }
 }
 
+export async function createProjectInviteLink(
+    projectId: string,
+    role: ProjectRole = ProjectRole.EDITOR
+) {
+    try {
+        const { userId, organizationId, role: callerRole } = await getUserOrganization();
+
+        if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
+            return { success: false, error: "Only owners and admins can create invite links" };
+        }
+
+        const project = await db.project.findFirst({
+            where: { id: projectId, organizationId },
+            select: { id: true },
+        });
+
+        if (!project) {
+            return { success: false, error: "Project not found" };
+        }
+
+        // Reuse an existing open link for this project + role so the URL stays stable.
+        const existing = await db.organizationInvitation.findFirst({
+            where: {
+                organizationId,
+                projectId,
+                scope: "PROJECT",
+                email: null,
+                projectRole: role,
+                acceptedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+            select: { token: true },
+        });
+
+        if (existing) {
+            return { success: true, inviteUrl: inviteLink(existing.token) };
+        }
+
+        const invitation = await db.organizationInvitation.create({
+            data: {
+                email: null,
+                scope: "PROJECT",
+                token: inviteToken(),
+                role: OrgRole.GUEST,
+                projectRole: role,
+                organizationId,
+                projectId,
+                invitedById: userId,
+                expiresAt: shareableExpiry(),
+            },
+        });
+
+        return { success: true, inviteUrl: inviteLink(invitation.token) };
+    } catch (error) {
+        console.error("Create project invite link error:", error);
+        return { success: false, error: "Failed to create invite link" };
+    }
+}
+
 // ─── Remove Member ──────────────────────────────────────
 
 export async function removeMember(targetUserId: string) {
