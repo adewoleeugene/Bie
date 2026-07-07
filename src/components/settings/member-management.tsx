@@ -44,8 +44,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, Link2, MoreHorizontal, Plus, Shield, ShieldCheck, User, UserMinus } from "lucide-react";
-import { useMembers, useInviteMember, useCreateInviteLink, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
+import { Copy, Link2, Mail, MoreHorizontal, Plus, Shield, ShieldCheck, Trash2, User, UserMinus } from "lucide-react";
+import {
+    useMembers,
+    useInviteMember,
+    useCreateInviteLink,
+    useWorkspaceInvites,
+    useRevokeInvitation,
+    useRemoveMember,
+    useUpdateMemberRole,
+} from "@/hooks/use-members";
 import { useProjects } from "@/hooks/use-projects";
 import { inviteProjectMember, createProjectInviteLink } from "@/actions/members";
 import { toast } from "sonner";
@@ -61,6 +69,14 @@ const PROJECT_INVITE_ROLES: ProjectRole[] = [ProjectRole.EDITOR, ProjectRole.VIE
 
 const WORKSPACE_SCOPE = "workspace";
 
+function roleLabelOf(role: string) {
+    return (
+        ROLE_CONFIG[role as OrgRole]?.label ??
+        PROJECT_ROLE_LABELS[role as ProjectRole] ??
+        role
+    );
+}
+
 const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof Shield }> = {
     OWNER: { label: "Owner", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: ShieldCheck },
     ADMIN: { label: "Admin", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Shield },
@@ -71,10 +87,15 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
 export function MemberManagement() {
     const { data: members = [], isLoading } = useMembers();
     const { data: projects = [] } = useProjects();
+    const { data: invites } = useWorkspaceInvites();
     const inviteMember = useInviteMember();
     const createInviteLink = useCreateInviteLink();
+    const revokeInvite = useRevokeInvitation();
     const removeMember = useRemoveMember();
     const updateRole = useUpdateMemberRole();
+
+    const pendingInvites = invites?.pending ?? [];
+    const shareableLinks = invites?.links ?? [];
 
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteScope, setInviteScope] = useState<string>(WORKSPACE_SCOPE);
@@ -145,6 +166,15 @@ export function MemberManagement() {
         if (!value) return;
         await navigator.clipboard.writeText(value);
         toast.success(`${label} copied`);
+    };
+
+    const handleRevoke = async (invitationId: string) => {
+        const result = await revokeInvite.mutateAsync(invitationId);
+        if (result.success) {
+            toast.success("Invite revoked");
+        } else {
+            toast.error(result.error || "Failed to revoke invite");
+        }
     };
 
     const handleRemove = async (userId: string) => {
@@ -398,6 +428,19 @@ export function MemberManagement() {
                                                 <p className="text-xs text-muted-foreground">
                                                     {member.email}
                                                 </p>
+                                                {member.projects.length > 0 && (
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {member.projects.map((project) => (
+                                                            <Badge
+                                                                key={project.id}
+                                                                variant="outline"
+                                                                className="text-[10px] font-normal text-muted-foreground"
+                                                            >
+                                                                {project.name} · {PROJECT_ROLE_LABELS[project.role]}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -463,6 +506,94 @@ export function MemberManagement() {
                     )}
                 </CardContent>
             </Card>
+
+            {pendingInvites.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Pending invitations</CardTitle>
+                        <CardDescription>People invited by email who haven&apos;t accepted yet.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {pendingInvites.map((invite) => (
+                                <div key={invite.id} className="flex items-center justify-between gap-3 py-1">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-500/10">
+                                            <Mail className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium leading-tight">{invite.email}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {invite.scope === "PROJECT"
+                                                    ? `${invite.projectName ?? "Project"} · ${roleLabelOf(invite.role)}`
+                                                    : `Whole workspace · ${roleLabelOf(invite.role)}`}
+                                                {invite.invitedByName ? ` · invited by ${invite.invitedByName}` : ""}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground hover:text-destructive"
+                                        onClick={() => handleRevoke(invite.id)}
+                                        disabled={revokeInvite.isPending}
+                                    >
+                                        Revoke
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {shareableLinks.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Shareable links</CardTitle>
+                        <CardDescription>Open links anyone can use to join. Revoke to disable.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {shareableLinks.map((link) => {
+                                const url = new URL(`/invite/${link.token}`, window.location.origin).toString();
+                                return (
+                                    <div key={link.id} className="space-y-1.5">
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            {link.scope === "PROJECT"
+                                                ? `${link.projectName ?? "Project"} · ${roleLabelOf(link.role)}`
+                                                : `Whole workspace · ${roleLabelOf(link.role)}`}
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Input value={url} readOnly className="font-mono text-xs" />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => handleCopy(url, "Link")}
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                                <span className="sr-only">Copy link</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="text-muted-foreground hover:text-destructive"
+                                                onClick={() => handleRevoke(link.id)}
+                                                disabled={revokeInvite.isPending}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                <span className="sr-only">Revoke link</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <AlertDialog open={!!removeConfirm} onOpenChange={() => setRemoveConfirm(null)}>
                 <AlertDialogContent>
