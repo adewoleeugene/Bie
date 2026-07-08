@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDatabases, useCreateDatabase } from "@/hooks/use-databases";
+import { useDatabases, useCreateDatabase, useDeleteDatabase } from "@/hooks/use-databases";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +13,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { Database, Plus, Loader2 } from "lucide-react";
+import { Database, Plus, Loader2, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { DATABASE_TEMPLATES } from "@/lib/database-templates";
 import { createDatabaseFromTemplate } from "@/actions/databases";
@@ -25,6 +25,7 @@ export default function DatabasesPage() {
     const qc = useQueryClient();
     const { data: databases, isLoading } = useDatabases();
     const create = useCreateDatabase();
+    const deleteCollection = useDeleteDatabase();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -115,10 +116,10 @@ export default function DatabasesPage() {
                     </h2>
                     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {databases.map((db) => (
-                            <li key={db.id}>
+                            <li key={db.id} className="group relative">
                                 <Link
                                     href={`/databases/${db.id}`}
-                                    className="block rounded-md border border-neutral-200 p-4 hover:border-primary hover:shadow-sm dark:border-neutral-800"
+                                    className="block rounded-md border border-neutral-200 p-4 pr-12 hover:border-primary hover:shadow-sm dark:border-neutral-800"
                                 >
                                     <div className="flex items-start gap-3">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
@@ -141,6 +142,18 @@ export default function DatabasesPage() {
                                         </div>
                                     </div>
                                 </Link>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    title="Delete collection"
+                                    aria-label={`Delete ${db.name}`}
+                                    disabled={deleteCollection.isPending}
+                                    onClick={() => deleteCollection.mutate(db.id)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 text-neutral-500 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                             </li>
                         ))}
                     </ul>

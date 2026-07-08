@@ -42,7 +42,7 @@ export function useCreateDatabase() {
         onSuccess: (result) => {
             if (result.success) {
                 qc.invalidateQueries({ queryKey: ["databases"] });
-                toast.success("Database created");
+                toast.success("Collection created");
             } else {
                 toast.error(result.error || "Failed");
             }
@@ -69,7 +69,7 @@ export function useDeleteDatabase() {
         onSuccess: (result) => {
             if (result.success) {
                 qc.invalidateQueries({ queryKey: ["databases"] });
-                toast.success("Database deleted");
+                toast.success("Collection deleted");
             } else {
                 toast.error(result.error || "Failed");
             }
