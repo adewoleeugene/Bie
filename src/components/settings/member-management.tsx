@@ -77,6 +77,26 @@ function roleLabelOf(role: string) {
     );
 }
 
+const LINK_EXPIRY_OPTIONS: { label: string; value: string; minutes: number | null }[] = [
+    { label: "10 minutes", value: "10", minutes: 10 },
+    { label: "1 hour", value: "60", minutes: 60 },
+    { label: "24 hours", value: "1440", minutes: 60 * 24 },
+    { label: "7 days", value: "10080", minutes: 60 * 24 * 7 },
+    { label: "No expiry", value: "never", minutes: null },
+];
+
+function formatLinkExpiry(expiresAt: Date | string) {
+    const end = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt;
+    const ms = end.getTime() - Date.now();
+    if (ms <= 0) return "Expired";
+    if (ms / 86_400_000 > 365) return "No expiry";
+    const minutes = Math.floor(ms / 60_000);
+    if (minutes < 60) return `Expires in ${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Expires in ${hours}h`;
+    return `Expires in ${Math.floor(hours / 24)}d`;
+}
+
 const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof Shield }> = {
     OWNER: { label: "Owner", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: ShieldCheck },
     ADMIN: { label: "Admin", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Shield },
@@ -104,6 +124,7 @@ export function MemberManagement() {
     const [projectRole, setProjectRole] = useState<ProjectRole>(ProjectRole.EDITOR);
     const [personalLink, setPersonalLink] = useState("");
     const [shareLink, setShareLink] = useState("");
+    const [linkExpiry, setLinkExpiry] = useState<string>("1440");
     const [isInviting, setIsInviting] = useState(false);
     const [isLinking, setIsLinking] = useState(false);
     const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -120,6 +141,7 @@ export function MemberManagement() {
         setProjectRole(ProjectRole.EDITOR);
         setPersonalLink("");
         setShareLink("");
+        setLinkExpiry("1440");
     };
 
     const handleInvite = async () => {
@@ -148,10 +170,11 @@ export function MemberManagement() {
     };
 
     const handleCreateShareLink = async () => {
+        const expiresInMinutes = LINK_EXPIRY_OPTIONS.find((o) => o.value === linkExpiry)?.minutes ?? null;
         setIsLinking(true);
         const result = isProjectScope
-            ? await createProjectInviteLink(inviteScope, projectRole)
-            : await createInviteLink.mutateAsync(inviteRole);
+            ? await createProjectInviteLink(inviteScope, projectRole, expiresInMinutes)
+            : await createInviteLink.mutateAsync({ role: inviteRole, expiresInMinutes });
         setIsLinking(false);
 
         if (result.success && result.inviteUrl) {
@@ -374,18 +397,32 @@ export function MemberManagement() {
                                                 </p>
                                             </>
                                         ) : (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={handleCreateShareLink}
-                                                disabled={isLinking}
-                                            >
-                                                <Link2 className="mr-2 h-4 w-4" />
-                                                {isLinking
-                                                    ? "Creating..."
-                                                    : `Create link for ${currentRoleLabel}s`}
-                                            </Button>
+                                            <div className="space-y-2">
+                                                <Select value={linkExpiry} onValueChange={setLinkExpiry}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Link expires in..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {LINK_EXPIRY_OPTIONS.map((o) => (
+                                                            <SelectItem key={o.value} value={o.value}>
+                                                                {o.minutes === null ? o.label : `Expires in ${o.label}`}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={handleCreateShareLink}
+                                                    disabled={isLinking}
+                                                >
+                                                    <Link2 className="mr-2 h-4 w-4" />
+                                                    {isLinking
+                                                        ? "Creating..."
+                                                        : `Create link for ${currentRoleLabel}s`}
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -571,6 +608,9 @@ export function MemberManagement() {
                                             {link.scope === "PROJECT"
                                                 ? `${link.projectName ?? "Project"} · ${roleLabelOf(link.role)}`
                                                 : `Whole workspace · ${roleLabelOf(link.role)}`}
+                                            <span className="ml-2 font-normal text-neutral-500">
+                                                {formatLinkExpiry(link.expiresAt)}
+                                            </span>
                                         </p>
                                         <div className="flex gap-2">
                                             <Input value={url} readOnly className="font-mono text-xs" />
