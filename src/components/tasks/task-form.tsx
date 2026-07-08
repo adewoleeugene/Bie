@@ -26,6 +26,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
 import { TaskStatus } from "@prisma/client";
 import {
     Plus,
@@ -36,6 +49,8 @@ import {
     Rocket,
     Users,
     Clock,
+    Check,
+    X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -82,6 +97,7 @@ export function TaskForm({
     trigger,
 }: TaskFormProps) {
     const [open, setOpen] = useState(false);
+    const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
     const createTask = useCreateTask();
     const { data: members } = useMembers();
     const { data: projects } = useProjects();
@@ -122,6 +138,9 @@ export function TaskForm({
         ? allSprints?.filter((sprint) => sprint.projectId === watchedProjectId)
         : allSprints;
     const hasNoProjectSprints = watchedProjectId && (!sprints || sprints.length === 0);
+
+    const selectedMembers =
+        members?.filter((member) => selectedAssigneeIds?.includes(member.id)) ?? [];
 
     useEffect(() => {
         if (open) {
@@ -349,33 +368,75 @@ export function TaskForm({
                                 />
 
                                 <PropertyRow icon={Users} label="Assignees">
-                                    <div className="flex flex-wrap gap-1.5 px-2 py-1.5">
-                                        {members?.map((member) => {
-                                            const isSelected = selectedAssigneeIds?.includes(member.id);
-                                            return (
-                                                <button
-                                                    key={member.id}
-                                                    type="button"
-                                                    onClick={() => toggleAssignee(member.id)}
-                                                    className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors ${isSelected
-                                                        ? "border-primary bg-primary/10 text-primary"
-                                                        : "border-transparent bg-muted/60 hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/60"
-                                                        }`}
-                                                >
-                                                    <Avatar className="h-4 w-4">
-                                                        <AvatarImage src={member.image || undefined} />
-                                                        <AvatarFallback className="text-[9px]">
-                                                            {member.name?.substring(0, 2).toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    {member.name}
-                                                </button>
-                                            );
-                                        })}
-                                        {!members?.length && (
-                                            <p className="text-sm text-muted-foreground">No members found.</p>
-                                        )}
-                                    </div>
+                                    <Popover
+                                        open={assigneePopoverOpen}
+                                        onOpenChange={setAssigneePopoverOpen}
+                                    >
+                                        <PopoverTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="flex min-h-8 w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/60 dark:hover:bg-muted/40"
+                                            >
+                                                {selectedMembers.length > 0 ? (
+                                                    <div className="flex flex-wrap items-center gap-1">
+                                                        {selectedMembers.map((member) => (
+                                                            <span
+                                                                key={member.id}
+                                                                className="flex items-center gap-1 rounded-full bg-muted/60 py-0.5 pl-0.5 pr-2 text-xs dark:bg-muted/40"
+                                                            >
+                                                                <Avatar className="h-4 w-4">
+                                                                    <AvatarImage src={member.image || undefined} />
+                                                                    <AvatarFallback className="text-[9px]">
+                                                                        {member.name?.substring(0, 2).toUpperCase()}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                {member.name}
+                                                                <X
+                                                                    className="h-3 w-3 text-muted-foreground hover:text-foreground"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        toggleAssignee(member.id);
+                                                                    }}
+                                                                />
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm text-muted-foreground">Empty</span>
+                                                )}
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[280px] p-0" align="start">
+                                            <Command>
+                                                <CommandInput placeholder="Search members..." />
+                                                <CommandList>
+                                                    <CommandEmpty>No member found.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {members?.map((member) => {
+                                                            const isSelected = selectedAssigneeIds?.includes(member.id);
+                                                            return (
+                                                                <CommandItem
+                                                                    key={member.id}
+                                                                    value={member.name ?? member.id}
+                                                                    onSelect={() => toggleAssignee(member.id)}
+                                                                    className="gap-2"
+                                                                >
+                                                                    <Avatar className="h-5 w-5">
+                                                                        <AvatarImage src={member.image || undefined} />
+                                                                        <AvatarFallback className="text-[10px]">
+                                                                            {member.name?.substring(0, 2).toUpperCase()}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span className="flex-1 truncate">{member.name}</span>
+                                                                    {isSelected && <Check className="h-4 w-4" />}
+                                                                </CommandItem>
+                                                            );
+                                                        })}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </PropertyRow>
 
                                 <FormField
