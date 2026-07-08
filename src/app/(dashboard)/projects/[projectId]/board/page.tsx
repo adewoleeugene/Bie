@@ -8,11 +8,9 @@ import { useTasks } from "@/hooks/use-tasks";
 import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Calendar, CheckCircle2, ExternalLink, Download, ArrowUpDown, Plus } from "lucide-react";
+import { Calendar, CheckCircle2, ExternalLink, Download, Plus } from "lucide-react";
 import Link from "next/link";
 import { SprintDialog } from "@/components/sprints/sprint-dialog";
-import { AddTasksDialog } from "@/components/sprints/add-tasks-dialog";
 import { exportTasksToCSV } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import {
@@ -33,7 +31,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 
 type CarryOver = "next" | "backlog" | "leave";
 
@@ -51,7 +48,6 @@ export default function BoardPage() {
 
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [showSprintDialog, setShowSprintDialog] = useState(false);
-    const [showAddTasks, setShowAddTasks] = useState(false);
     const [sprintSelectOpen, setSprintSelectOpen] = useState(false);
     const [carryOver, setCarryOver] = useState<CarryOver>("next");
     const [taskFilters, setTaskFilters] = useState<TaskFilters>({
@@ -207,17 +203,6 @@ export default function BoardPage() {
                         {sprintId && sprint?.status !== "COMPLETED" && (
                             <button
                                 type="button"
-                                onClick={() => setShowAddTasks(true)}
-                                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
-                            >
-                                <Plus className="h-3.5 w-3.5" />
-                                Add tasks
-                            </button>
-                        )}
-
-                        {sprintId && sprint?.status !== "COMPLETED" && (
-                            <button
-                                type="button"
                                 onClick={() => setShowCompleteDialog(true)}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium transition-colors hover:bg-white/[0.04]"
                                 style={{ color: "var(--bz-green)" }}
@@ -253,17 +238,9 @@ export default function BoardPage() {
                         <div>
                             <p className="text-sm font-medium text-white">This sprint has no tasks yet.</p>
                             <p className="mt-1 text-xs text-neutral-500">
-                                Pull existing tasks in to start planning the sprint.
+                                Create a new task to start planning the sprint.
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowAddTasks(true)}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add tasks to sprint
-                        </button>
                     </div>
                 ) : (
                     <KanbanBoard
@@ -281,17 +258,6 @@ export default function BoardPage() {
                 onOpenChange={setShowSprintDialog}
                 defaultStatus="ACTIVE"
             />
-
-            {/* Add Tasks to Sprint Dialog */}
-            {sprintId && (
-                <AddTasksDialog
-                    projectId={projectId}
-                    sprintId={sprintId}
-                    sprintName={sprint?.name}
-                    open={showAddTasks}
-                    onOpenChange={setShowAddTasks}
-                />
-            )}
 
             {/* Complete Sprint Dialog */}
             <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
