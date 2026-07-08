@@ -2,16 +2,15 @@
 
 import type { ReactNode } from "react";
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createTaskSchema, CreateTaskInput } from "@/lib/validators/task";
-import { useCreateTask } from "@/hooks/use-tasks";
+import { useCreateTask, useTaskStatusColumns } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
 import { useProjects } from "@/hooks/use-projects";
 import { useSprints } from "@/hooks/use-sprints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { BlockEditor } from "@/components/wiki/block-editor";
 import {
     Dialog,
@@ -27,7 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { TaskStatus, TaskPriority } from "@prisma/client";
+import { TaskStatus } from "@prisma/client";
 import { Plus, Calendar as CalendarIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -37,6 +36,7 @@ interface TaskFormProps {
     projectId?: string;
     sprintId?: string;
     defaultStatus?: TaskStatus;
+    defaultStatusColumnId?: string;
     trigger?: ReactNode;
 }
 
@@ -44,19 +44,22 @@ export function TaskForm({
     projectId: initialProjectId,
     sprintId: initialSprintId,
     defaultStatus = "BACKLOG",
+    defaultStatusColumnId,
     trigger,
 }: TaskFormProps) {
     const [open, setOpen] = useState(false);
     const createTask = useCreateTask();
     const { data: members } = useMembers();
     const { data: projects } = useProjects();
+    const { data: statusColumnsResult } = useTaskStatusColumns(initialProjectId ?? null);
 
     const form = useForm<CreateTaskInput>({
-        resolver: zodResolver(createTaskSchema) as any,
+        resolver: zodResolver(createTaskSchema) as Resolver<CreateTaskInput>,
         defaultValues: {
             title: "",
             description: undefined,
             status: defaultStatus,
+            statusColumnId: defaultStatusColumnId,
             priority: "P2",
             assigneeIds: [],
             labels: [],
@@ -66,12 +69,23 @@ export function TaskForm({
             estimatedHours: undefined,
         },
     });
+    const selectedStatusColumnId = useWatch({
+        control: form.control,
+        name: "statusColumnId",
+    });
+    const selectedAssigneeIds = useWatch({
+        control: form.control,
+        name: "assigneeIds",
+    });
+    const watchedProjectId = useWatch({
+        control: form.control,
+        name: "projectId",
+    });
 
-    const watchedProjectId = form.watch("projectId");
     const { data: allSprints } = useSprints();
     // If a project is selected, show its sprints first, but always show all
     const sprints = watchedProjectId
-        ? allSprints?.filter((s: any) => s.projectId === watchedProjectId)
+        ? allSprints?.filter((sprint) => sprint.projectId === watchedProjectId)
         : allSprints;
     const hasNoProjectSprints = watchedProjectId && (!sprints || sprints.length === 0);
 
@@ -81,6 +95,7 @@ export function TaskForm({
                 title: "",
                 description: undefined,
                 status: defaultStatus,
+                statusColumnId: defaultStatusColumnId,
                 priority: "P2",
                 assigneeIds: [],
                 labels: [],
@@ -90,7 +105,7 @@ export function TaskForm({
                 estimatedHours: undefined,
             });
         }
-    }, [open, initialProjectId, initialSprintId, defaultStatus, form]);
+    }, [open, initialProjectId, initialSprintId, defaultStatus, defaultStatusColumnId, form]);
 
     const onSubmit = async (data: CreateTaskInput) => {
         try {
@@ -220,7 +235,7 @@ export function TaskForm({
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {displaySprints?.map((sprint: any) => (
+                                                    {displaySprints?.map((sprint) => (
                                                         <SelectItem key={sprint.id} value={sprint.id}>
                                                             <div className="flex flex-col">
                                                                 <span>{sprint.name}</span>
@@ -247,19 +262,44 @@ export function TaskForm({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Status</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
+                                        <Select
+                                            onValueChange={(value) => {
+                                                const statusColumn = statusColumnsResult?.success
+                                                    ? statusColumnsResult.data.find((column) => column.id === value)
+                                                    : undefined;
+
+                                                if (statusColumn) {
+                                                    form.setValue("statusColumnId", statusColumn.id);
+                                                    field.onChange(statusColumn.status || "TODO");
+                                                } else {
+                                                    form.setValue("statusColumnId", undefined);
+                                                    field.onChange(value);
+                                                }
+                                            }}
+                                            value={selectedStatusColumnId || field.value}
+                                        >
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Status" />
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="BACKLOG">Backlog</SelectItem>
-                                                <SelectItem value="TODO">To Do</SelectItem>
-                                                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                                                <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                                                <SelectItem value="DONE">Done</SelectItem>
-                                                <SelectItem value="ARCHIVED">Archived</SelectItem>
+                                                {statusColumnsResult?.success && statusColumnsResult.data.length > 0 ? (
+                                                    statusColumnsResult.data.map((column) => (
+                                                        <SelectItem key={column.id} value={column.id}>
+                                                            {column.name}
+                                                        </SelectItem>
+                                                    ))
+                                                ) : (
+                                                    <>
+                                                        <SelectItem value="BACKLOG">Backlog</SelectItem>
+                                                        <SelectItem value="TODO">To Do</SelectItem>
+                                                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                                                        <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                                                        <SelectItem value="DONE">Done</SelectItem>
+                                                        <SelectItem value="ARCHIVED">Archived</SelectItem>
+                                                    </>
+                                                )}
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -296,7 +336,7 @@ export function TaskForm({
                             <FormLabel>Assignees</FormLabel>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {members?.map((member) => {
-                                    const isSelected = form.watch("assigneeIds")?.includes(member.id);
+                                    const isSelected = selectedAssigneeIds?.includes(member.id);
                                     return (
                                         <button
                                             key={member.id}

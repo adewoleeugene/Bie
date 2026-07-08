@@ -14,8 +14,12 @@ import {
     ReorderTaskInput,
     BulkReorderTasksInput,
     bulkReorderTasksSchema,
+    createTaskStatusColumnSchema,
+    CreateTaskStatusColumnInput,
+    deleteTaskStatusColumnSchema,
+    DeleteTaskStatusColumnInput,
 } from "@/lib/validators/task";
-import { Task, ActivityAction, Prisma, NotificationType } from "@prisma/client";
+import { Task, ActivityAction, Prisma, NotificationType, TaskStatus, TaskStatusColumn } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { processAutomationRules } from "@/actions/automation";
 import { sendNotifications } from "@/lib/notifications";
@@ -49,18 +53,96 @@ async function getUserOrganization() {
     };
 }
 
+const DEFAULT_STATUS_COLUMNS: Array<{ name: string; status: TaskStatus; color: string; sortOrder: number }> = [
+    { name: "Backlog", status: "BACKLOG", color: "#858585", sortOrder: 0 },
+    { name: "To Do", status: "TODO", color: "#0099ff", sortOrder: 1 },
+    { name: "In Progress", status: "IN_PROGRESS", color: "#f6b73c", sortOrder: 2 },
+    { name: "In Review", status: "IN_REVIEW", color: "#df5cff", sortOrder: 3 },
+    { name: "Done", status: "DONE", color: "#20d990", sortOrder: 4 },
+    { name: "Archived", status: "ARCHIVED", color: "#474747", sortOrder: 5 },
+];
+
+async function assertProjectScope(projectId: string | null | undefined, organizationId: string) {
+    if (!projectId) return null;
+
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId },
+        select: { id: true },
+    });
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    return project.id;
+}
+
+async function ensureTaskStatusColumns(organizationId: string, projectId?: string | null) {
+    const scopedProjectId = projectId ?? null;
+
+    const existing = await db.taskStatusColumn.findMany({
+        where: { organizationId, projectId: scopedProjectId },
+        orderBy: { sortOrder: "asc" },
+    });
+
+    const missingDefaults = DEFAULT_STATUS_COLUMNS.filter(
+        (defaultColumn) => !existing.some((column) => column.status === defaultColumn.status)
+    );
+
+    if (missingDefaults.length > 0) {
+        await db.taskStatusColumn.createMany({
+            data: missingDefaults.map((column) => ({
+                ...column,
+                organizationId,
+                projectId: scopedProjectId,
+            })),
+        });
+    }
+
+    return db.taskStatusColumn.findMany({
+        where: { organizationId, projectId: scopedProjectId },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+}
+
+async function getColumnForTaskInput(input: { statusColumnId?: string | null; status?: TaskStatus }, organizationId: string, projectId?: string | null) {
+    if (input.statusColumnId) {
+        const column = await db.taskStatusColumn.findFirst({
+            where: {
+                id: input.statusColumnId,
+                organizationId,
+                projectId: projectId ?? null,
+            },
+        });
+
+        if (!column) {
+            throw new Error("Status column not found");
+        }
+
+        return column;
+    }
+
+    const columns = await ensureTaskStatusColumns(organizationId, projectId);
+    const status = input.status ?? "BACKLOG";
+    return columns.find((column) => column.status === status) ?? columns[0] ?? null;
+}
+
 export async function createTask(
     input: CreateTaskInput
 ): Promise<ActionResult<Task>> {
     try {
         const validated = createTaskSchema.parse(input);
         const { userId, organizationId } = await getUserOrganization();
+        await assertProjectScope(validated.projectId, organizationId);
+        const statusColumn = await getColumnForTaskInput(validated, organizationId, validated.projectId);
+        const taskStatus = statusColumn?.status ?? validated.status;
 
         const task = await db.task.create({
             data: {
                 title: validated.title,
                 description: validated.description || undefined,
-                status: validated.status,
+                status: taskStatus,
+                statusColumnId: statusColumn?.id,
                 priority: validated.priority,
                 projectId: validated.projectId || null,
                 sprintId: validated.sprintId || null,
@@ -83,6 +165,7 @@ export async function createTask(
                     },
                 },
                 project: true,
+                statusColumn: true,
                 parentTask: true,
             },
         });
@@ -140,11 +223,22 @@ export async function updateTask(
         }
 
         // Prepare update data
-        const updateData: any = {};
+        const updateData: Prisma.TaskUncheckedUpdateInput = {};
+        let statusColumn: TaskStatusColumn | null = null;
         if (validated.title !== undefined) updateData.title = validated.title;
         if (validated.description !== undefined)
             updateData.description = validated.description;
         if (validated.status !== undefined) updateData.status = validated.status;
+        if (validated.statusColumnId !== undefined) {
+            const nextProjectId = validated.projectId !== undefined ? validated.projectId : existingTask.projectId;
+            statusColumn = await getColumnForTaskInput(
+                { statusColumnId: validated.statusColumnId, status: validated.status ?? existingTask.status },
+                organizationId,
+                nextProjectId
+            );
+            updateData.statusColumnId = statusColumn?.id ?? null;
+            updateData.status = statusColumn?.status ?? validated.status ?? existingTask.status;
+        }
         if (validated.priority !== undefined)
             updateData.priority = validated.priority;
         if (validated.projectId !== undefined)
@@ -186,6 +280,7 @@ export async function updateTask(
                     },
                 },
                 project: true,
+                statusColumn: true,
                 parentTask: true,
             },
         });
@@ -193,7 +288,10 @@ export async function updateTask(
         // Create activity log
         let action: ActivityAction = ActivityAction.EDITED;
 
-        if (validated.status !== undefined && existingTask.status !== validated.status) {
+        if (
+            (validated.status !== undefined && existingTask.status !== validated.status) ||
+            (validated.statusColumnId !== undefined && existingTask.statusColumnId !== validated.statusColumnId)
+        ) {
             action = ActivityAction.STATUS_CHANGE;
         } else if (validated.assigneeIds !== undefined) {
             action = ActivityAction.ASSIGNED;
@@ -223,8 +321,11 @@ export async function updateTask(
 
         // Trigger Automation Rules (Fire and forget)
         if (task.projectId) {
-            if (validated.status !== undefined && existingTask.status !== validated.status) {
-                processAutomationRules(task.id, task.projectId, "STATUS_CHANGE", validated.status, userId).catch(e => console.error(e));
+            if (
+                (validated.status !== undefined && existingTask.status !== validated.status) ||
+                (validated.statusColumnId !== undefined && existingTask.statusColumnId !== validated.statusColumnId)
+            ) {
+                processAutomationRules(task.id, task.projectId, "STATUS_CHANGE", task.status, userId).catch(e => console.error(e));
             }
             if (validated.priority !== undefined && existingTask.priority !== validated.priority) {
                 processAutomationRules(task.id, task.projectId, "PRIORITY_CHANGE", validated.priority, userId).catch(e => console.error(e));
@@ -295,15 +396,20 @@ export async function reorderTask(
             return { success: false, error: "Task not found" };
         }
 
+        const reorderData: Prisma.TaskUncheckedUpdateInput = {
+            status: validated.status,
+            sortOrder: validated.sortOrder,
+        };
+        if (validated.statusColumnId !== undefined) {
+            reorderData.statusColumnId = validated.statusColumnId;
+        }
+
         await db.task.update({
             where: { id: validated.id },
-            data: {
-                status: validated.status,
-                sortOrder: validated.sortOrder,
-            },
+            data: reorderData,
         });
 
-        if (existingTask.status !== validated.status) {
+        if (existingTask.status !== validated.status || existingTask.statusColumnId !== validated.statusColumnId) {
             await db.taskActivity.create({
                 data: {
                     taskId: validated.id,
@@ -329,18 +435,21 @@ export async function bulkReorderTasks(
 ): Promise<ActionResult> {
     try {
         const validated = bulkReorderTasksSchema.parse(input);
-        const { userId, organizationId } = await getUserOrganization();
+        const { organizationId } = await getUserOrganization();
 
         // Perform updates in a transaction
         await db.$transaction(
             validated.tasks.map((taskInfo) => {
-                const data: any = { sortOrder: taskInfo.sortOrder };
+                const data: Prisma.TaskUncheckedUpdateInput = { sortOrder: taskInfo.sortOrder };
                 if (taskInfo.status) {
                     data.status = taskInfo.status;
                 }
+                if (taskInfo.statusColumnId) {
+                    data.statusColumnId = taskInfo.statusColumnId;
+                }
 
-                return db.task.update({
-                    where: { id: taskInfo.id },
+                return db.task.updateMany({
+                    where: { id: taskInfo.id, organizationId },
                     data,
                 });
             })
@@ -422,9 +531,11 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
                 },
                 project: true,
                 sprint: true,
+                statusColumn: true,
                 parentTask: true,
                 subtasks: {
                     include: {
+                        statusColumn: true,
                         assignees: {
                             include: {
                                 user: true,
@@ -442,5 +553,94 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
     } catch (error) {
         console.error("Get tasks error:", error);
         return [];
+    }
+}
+
+export async function getTaskStatusColumns(projectId?: string | null): Promise<ActionResult<TaskStatusColumn[]>> {
+    try {
+        const { organizationId } = await getUserOrganization();
+        const scopedProjectId = await assertProjectScope(projectId, organizationId);
+        const columns = await ensureTaskStatusColumns(organizationId, scopedProjectId);
+
+        return { success: true, data: columns };
+    } catch (error) {
+        console.error("Get task status columns error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to fetch task status columns",
+        };
+    }
+}
+
+export async function createTaskStatusColumn(
+    input: CreateTaskStatusColumnInput
+): Promise<ActionResult<TaskStatusColumn>> {
+    try {
+        const validated = createTaskStatusColumnSchema.parse(input);
+        const { organizationId } = await getUserOrganization();
+        const scopedProjectId = await assertProjectScope(validated.projectId, organizationId);
+        const columns = await ensureTaskStatusColumns(organizationId, scopedProjectId);
+        const highestOrder = Math.max(-1, ...columns.map((column) => column.sortOrder));
+
+        const column = await db.taskStatusColumn.create({
+            data: {
+                name: validated.name,
+                sortOrder: highestOrder + 1,
+                organizationId,
+                projectId: scopedProjectId,
+            },
+        });
+
+        revalidatePath("/");
+        return { success: true, data: column };
+    } catch (error) {
+        console.error("Create task status column error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to create task status column",
+        };
+    }
+}
+
+export async function deleteTaskStatusColumn(
+    input: DeleteTaskStatusColumnInput
+): Promise<ActionResult> {
+    try {
+        const validated = deleteTaskStatusColumnSchema.parse(input);
+        const { organizationId } = await getUserOrganization();
+
+        const column = await db.taskStatusColumn.findFirst({
+            where: { id: validated.id, organizationId },
+            include: {
+                _count: {
+                    select: { tasks: true },
+                },
+            },
+        });
+
+        if (!column) {
+            return { success: false, error: "Column not found" };
+        }
+
+        if (column.status) {
+            return { success: false, error: "Default columns cannot be deleted" };
+        }
+
+        if (column._count.tasks > 0) {
+            return { success: false, error: "Move tasks out of this column before deleting it" };
+        }
+
+        await db.taskStatusColumn.delete({
+            where: { id: column.id },
+        });
+
+        revalidatePath("/");
+        return { success: true, data: undefined };
+    } catch (error) {
+        console.error("Delete task status column error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to delete task status column",
+        };
     }
 }

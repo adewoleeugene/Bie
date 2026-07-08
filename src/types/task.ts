@@ -10,9 +10,11 @@ export type TaskWithRelations = Prisma.TaskGetPayload<{
         };
         project: true;
         sprint: true;
+        statusColumn: true;
         parentTask: true;
         subtasks: {
             include: {
+                statusColumn: true;
                 assignees: {
                     include: {
                         user: true;

@@ -194,6 +194,7 @@ model Organization {
   reflections   DailyReflection[]
   milestones    Milestone[]
   privacyRequests PrivacyRequest[]
+  taskStatusColumns TaskStatusColumn[]
 
   @@index([ownerId])
   @@index([type])
@@ -360,6 +361,7 @@ model Project {
   squads       Squad[]
   sprints      Sprint[]
   tasks        Task[]
+  statusColumns TaskStatusColumn[]
   wikiPages    WikiPage[]
   automationRules AutomationRule[]
   milestones   Milestone[]
@@ -408,6 +410,7 @@ model Task {
   title          String
   description    Json?
   status         TaskStatus   @default(BACKLOG)
+  statusColumnId String?
   priority       TaskPriority @default(P2)
   dueDate        DateTime?
   startDate      DateTime?
@@ -423,6 +426,7 @@ model Task {
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  statusColumn TaskStatusColumn? @relation(fields: [statusColumnId], references: [id], onDelete: SetNull)
   sprint       Sprint?        @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   parentTask   Task?          @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
   subtasks     Task[]         @relation("TaskSubtasks")
@@ -436,7 +440,28 @@ model Task {
   @@index([projectId])
   @@index([sprintId])
   @@index([status])
+  @@index([statusColumnId])
   @@index([parentTaskId])
+}
+
+model TaskStatusColumn {
+  id             String      @id @default(cuid())
+  name           String
+  status         TaskStatus?
+  color          String?
+  sortOrder      Int         @default(0)
+  organizationId String
+  projectId      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([status])
 }
 
 model TaskAssignee {

@@ -1,14 +1,80 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTasks, createTask, updateTask, deleteTask, reorderTask, bulkReorderTasks, addTasksToSprint } from "@/actions/task";
-import { CreateTaskInput, UpdateTaskInput, DeleteTaskInput, ReorderTaskInput, BulkReorderTasksInput } from "@/lib/validators/task";
+import {
+    getTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    reorderTask,
+    bulkReorderTasks,
+    addTasksToSprint,
+    getTaskStatusColumns,
+    createTaskStatusColumn,
+    deleteTaskStatusColumn,
+} from "@/actions/task";
+import {
+    CreateTaskInput,
+    UpdateTaskInput,
+    DeleteTaskInput,
+    ReorderTaskInput,
+    BulkReorderTasksInput,
+    CreateTaskStatusColumnInput,
+    DeleteTaskStatusColumnInput,
+} from "@/lib/validators/task";
+import { TaskWithRelations } from "@/types/task";
 import { toast } from "sonner";
 
 export function useTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
     return useQuery({
         queryKey: ["tasks", projectId, options?.sprintId],
         queryFn: () => getTasks(projectId, options),
+    });
+}
+
+export function useTaskStatusColumns(projectId?: string | null) {
+    return useQuery({
+        queryKey: ["task-status-columns", projectId],
+        queryFn: () => getTaskStatusColumns(projectId),
+    });
+}
+
+export function useCreateTaskStatusColumn() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: CreateTaskStatusColumnInput) => createTaskStatusColumn(input),
+        onSuccess: (result) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ["task-status-columns"] });
+                toast.success("Column created successfully");
+            } else {
+                toast.error(result.error);
+            }
+        },
+        onError: () => {
+            toast.error("Failed to create column");
+        },
+    });
+}
+
+export function useDeleteTaskStatusColumn() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: DeleteTaskStatusColumnInput) => deleteTaskStatusColumn(input),
+        onSuccess: (result) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ["task-status-columns"] });
+                queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                toast.success("Column deleted successfully");
+            } else {
+                toast.error(result.error);
+            }
+        },
+        onError: () => {
+            toast.error("Failed to delete column");
+        },
     });
 }
 
@@ -39,13 +105,28 @@ export function useUpdateTask() {
         onMutate: async (input) => {
             // Optimistic update
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
-            const previousTasks = queryClient.getQueryData(["tasks"]);
+            const previousTasks = queryClient.getQueryData<TaskWithRelations[]>(["tasks"]);
 
-            queryClient.setQueryData(["tasks"], (old: any) => {
+            queryClient.setQueryData<TaskWithRelations[]>(["tasks"], (old) => {
                 if (!old) return old;
-                return old.map((task: any) =>
-                    task.id === input.id ? { ...task, ...input } : task
-                );
+                return old.map((task) => {
+                    if (task.id !== input.id) return task;
+
+                    return {
+                        ...task,
+                        ...(input.title !== undefined ? { title: input.title } : {}),
+                        ...(input.description !== undefined ? { description: input.description } : {}),
+                        ...(input.status !== undefined ? { status: input.status } : {}),
+                        ...(input.statusColumnId !== undefined ? { statusColumnId: input.statusColumnId } : {}),
+                        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+                        ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+                        ...(input.sprintId !== undefined ? { sprintId: input.sprintId } : {}),
+                        ...(input.dueDate !== undefined ? { dueDate: input.dueDate ? new Date(input.dueDate) : null } : {}),
+                        ...(input.startDate !== undefined ? { startDate: input.startDate ? new Date(input.startDate) : null } : {}),
+                        ...(input.estimatedHours !== undefined ? { estimatedHours: input.estimatedHours } : {}),
+                        ...(input.labels !== undefined ? { labels: input.labels } : {}),
+                    };
+                });
             });
 
             return { previousTasks };
@@ -115,13 +196,13 @@ export function useReorderTask() {
         onMutate: async (input) => {
             // Optimistic update
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
-            const previousTasks = queryClient.getQueryData(["tasks"]);
+            const previousTasks = queryClient.getQueryData<TaskWithRelations[]>(["tasks"]);
 
-            queryClient.setQueryData(["tasks"], (old: any) => {
+            queryClient.setQueryData<TaskWithRelations[]>(["tasks"], (old) => {
                 if (!old) return old;
-                return old.map((task: any) =>
+                return old.map((task) =>
                     task.id === input.id
-                        ? { ...task, status: input.status, sortOrder: input.sortOrder }
+                        ? { ...task, status: input.status, statusColumnId: input.statusColumnId ?? task.statusColumnId, sortOrder: input.sortOrder }
                         : task
                 );
             });
@@ -152,12 +233,12 @@ export function useBulkReorderTasks() {
         onMutate: async (input) => {
             // Optimistic update
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
-            const previousTasks = queryClient.getQueryData(["tasks"]);
+            const previousTasks = queryClient.getQueryData<TaskWithRelations[]>(["tasks"]);
 
             // Input is array of { id, status, sortOrder }
-            queryClient.setQueryData(["tasks"], (old: any) => {
+            queryClient.setQueryData<TaskWithRelations[]>(["tasks"], (old) => {
                 if (!old) return old;
-                return old.map((task: any) => {
+                return old.map((task) => {
                     const update = input.tasks.find(t => t.id === task.id);
                     if (update) {
                         return { ...task, ...update };

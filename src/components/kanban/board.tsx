@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import {
     DndContext,
     DragEndEvent,
@@ -14,19 +14,31 @@ import {
     closestCorners,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
-import { TaskStatus } from "@prisma/client";
+import { TaskStatusColumn } from "@prisma/client";
 import { KanbanColumn } from "./column";
 import { TaskCard } from "./task-card";
-import { useBulkReorderTasks } from "@/hooks/use-tasks";
+import {
+    useBulkReorderTasks,
+    useCreateTaskStatusColumn,
+    useDeleteTaskStatusColumn,
+    useTaskStatusColumns,
+} from "@/hooks/use-tasks";
 import { TaskWithRelations } from "@/types/task";
 import { createPortal } from "react-dom";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { Layers, Settings2, Layout, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuCheckboxItem,
@@ -39,34 +51,20 @@ interface KanbanBoardProps {
     sprintId?: string;
 }
 
-const DEFAULT_COLUMN_IDS: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
-
-const ALL_COLUMNS: { id: TaskStatus; title: string }[] = [
-    { id: "BACKLOG", title: "Backlog" },
-    { id: "TODO", title: "To Do" },
-    { id: "IN_PROGRESS", title: "In Progress" },
-    { id: "IN_REVIEW", title: "In Review" },
-    { id: "DONE", title: "Done" },
-    { id: "ARCHIVED", title: "Archived" },
+const DEFAULT_COLUMN_FALLBACKS: Array<Pick<TaskStatusColumn, "id" | "name" | "status" | "color" | "sortOrder">> = [
+    { id: "legacy-BACKLOG", name: "Backlog", status: "BACKLOG", color: "#858585", sortOrder: 0 },
+    { id: "legacy-TODO", name: "To Do", status: "TODO", color: "#0099ff", sortOrder: 1 },
+    { id: "legacy-IN_PROGRESS", name: "In Progress", status: "IN_PROGRESS", color: "#f6b73c", sortOrder: 2 },
+    { id: "legacy-IN_REVIEW", name: "In Review", status: "IN_REVIEW", color: "#df5cff", sortOrder: 3 },
+    { id: "legacy-DONE", name: "Done", status: "DONE", color: "#20d990", sortOrder: 4 },
 ];
 
 export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: KanbanBoardProps) {
     const [tasks, setTasks] = useState<TaskWithRelations[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
     const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
-    const [visibleColumnIds, setVisibleColumnIds] = useState<TaskStatus[]>(() => {
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("kanban-visible-columns");
-            if (saved) {
-                const parsed = JSON.parse(saved) as TaskStatus[];
-                const validIds = ALL_COLUMNS.map((column) => column.id);
-                const savedIds = parsed.filter((id) => validIds.includes(id));
-                if (savedIds.length > 0) return savedIds;
-            }
-        }
-
-        return DEFAULT_COLUMN_IDS;
-    });
+    const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
+    const [newColumnName, setNewColumnName] = useState("");
 
     const [visibleProperties, setVisibleProperties] = useState({
         assignees: true,
@@ -92,6 +90,9 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
     });
 
     const bulkReorderTasks = useBulkReorderTasks();
+    const { data: statusColumnsResult } = useTaskStatusColumns(projectId ?? null);
+    const createStatusColumn = useCreateTaskStatusColumn();
+    const deleteStatusColumn = useDeleteTaskStatusColumn();
 
     useEffect(() => {
         setTasks(initialTasks);
@@ -104,12 +105,6 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
     }, [showSubtasks]);
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("kanban-visible-columns", JSON.stringify(visibleColumnIds));
-        }
-    }, [visibleColumnIds]);
-
-    useEffect(() => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('kanban-expanded-parents', JSON.stringify(Array.from(expandedParents)));
         }
@@ -120,11 +115,33 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const columns = useMemo(() => {
+        const savedColumns = statusColumnsResult?.success ? statusColumnsResult.data : [];
+        const taskColumns = tasks
+            .map((task) => task.statusColumn)
+            .filter((column): column is TaskStatusColumn => Boolean(column));
+
+        const columnsById = new Map<string, Pick<TaskStatusColumn, "id" | "name" | "status" | "color" | "sortOrder">>();
+        [...savedColumns, ...taskColumns].forEach((column) => {
+            columnsById.set(column.id, column);
+        });
+
+        const mergedColumns = Array.from(columnsById.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+        return mergedColumns.length > 0 ? mergedColumns : DEFAULT_COLUMN_FALLBACKS;
+    }, [statusColumnsResult, tasks]);
+
+    const getTaskColumnId = useCallback((task: TaskWithRelations) => {
+        if (task.statusColumnId) return task.statusColumnId;
+        const fallbackColumn = columns.find((column) => column.status === task.status);
+        return fallbackColumn?.id ?? columns[0]?.id ?? task.status;
+    }, [columns]);
+
     // Recursive helper to flatten tasks with depth calculation
     const tasksByStatus = useMemo(() => {
-        const grouped: Record<TaskStatus, (TaskWithRelations & { depth: number })[]> = {
-            BACKLOG: [], TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], ARCHIVED: [],
-        };
+        const grouped: Record<string, (TaskWithRelations & { depth: number })[]> = {};
+        columns.forEach((column) => {
+            grouped[column.id] = [];
+        });
 
         const buildHierarchy = (parentId: string | null, depth: number): (TaskWithRelations & { depth: number })[] => {
             const children = tasks.filter(t => t.parentTaskId === parentId);
@@ -145,38 +162,36 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
         };
 
         // Initialize with top-level parents (no parentTaskId)
-        ALL_COLUMNS.forEach(col => {
-            const columnTasks = tasks.filter(t => t.status === col.id);
+        columns.forEach(col => {
+            const columnTasks = tasks.filter(t => getTaskColumnId(t) === col.id);
             const topLevelInCol = columnTasks.filter(t => !t.parentTaskId);
             topLevelInCol.sort((a, b) => a.sortOrder - b.sortOrder);
 
             topLevelInCol.forEach(parent => {
                 grouped[col.id].push({ ...parent, depth: 0 });
                 if (showSubtasks && expandedParents.has(parent.id)) {
-                    grouped[col.id].push(...buildHierarchy(parent.id, 1).filter(t => t.status === col.id));
+                    grouped[col.id].push(...buildHierarchy(parent.id, 1).filter(t => getTaskColumnId(t) === col.id));
                 }
             });
         });
 
         return grouped;
-    }, [tasks, showSubtasks, expandedParents]);
+    }, [tasks, showSubtasks, expandedParents, columns, getTaskColumnId]);
 
-    const visibleColumns = useMemo(
-        () => visibleColumnIds
-            .map((id) => ALL_COLUMNS.find((column) => column.id === id))
-            .filter((column): column is { id: TaskStatus; title: string } => Boolean(column)),
-        [visibleColumnIds]
-    );
+    const handleAddColumnSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const name = newColumnName.trim();
+        if (!name) return;
 
-    const hiddenColumns = useMemo(
-        () => ALL_COLUMNS.filter((column) => !visibleColumnIds.includes(column.id)),
-        [visibleColumnIds]
-    );
+        const result = await createStatusColumn.mutateAsync({
+            name,
+            projectId: projectId ?? null,
+        });
 
-    const addColumn = (status: TaskStatus) => {
-        setVisibleColumnIds((current) => (
-            current.includes(status) ? current : [...current, status]
-        ));
+        if (result.success) {
+            setNewColumnName("");
+            setIsAddColumnOpen(false);
+        }
     };
 
     const toggleParent = (parentId: string) => {
@@ -224,22 +239,36 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
         setTasks((prev) => {
             const activeIndex = prev.findIndex((t) => t.id === activeId);
             const activeTask = prev[activeIndex];
+            const activeColumnId = getTaskColumnId(activeTask);
 
             if (isOverColumn) {
-                const overColumnId = over.id.toString().replace("column-", "") as TaskStatus;
-                if (activeTask.status !== overColumnId) {
+                const overColumnId = over.id.toString().replace("column-", "");
+                const overColumn = columns.find((column) => column.id === overColumnId);
+                if (overColumn && activeColumnId !== overColumnId) {
                     const newTasks = [...prev];
                     // Move to end of new column temporarily
-                    const highestOrder = Math.max(0, ...newTasks.filter(t => t.status === overColumnId).map(t => t.sortOrder));
-                    newTasks[activeIndex] = { ...activeTask, status: overColumnId, sortOrder: highestOrder + 1 };
+                    const highestOrder = Math.max(0, ...newTasks.filter(t => getTaskColumnId(t) === overColumnId).map(t => t.sortOrder));
+                    newTasks[activeIndex] = {
+                        ...activeTask,
+                        statusColumnId: overColumnId,
+                        status: overColumn.status ?? activeTask.status,
+                        sortOrder: highestOrder + 1,
+                    };
                     return newTasks;
                 }
             } else {
                 const overIndex = prev.findIndex((t) => t.id === overId);
                 const overTask = prev[overIndex];
-                if (activeTask.status !== overTask.status) {
+                const overColumnId = getTaskColumnId(overTask);
+                const overColumn = columns.find((column) => column.id === overColumnId);
+                if (activeColumnId !== overColumnId) {
                     const newTasks = [...prev];
-                    newTasks[activeIndex] = { ...activeTask, status: overTask.status, sortOrder: overTask.sortOrder };
+                    newTasks[activeIndex] = {
+                        ...activeTask,
+                        statusColumnId: overColumnId,
+                        status: overColumn?.status ?? activeTask.status,
+                        sortOrder: overTask.sortOrder,
+                    };
                     return newTasks;
                 }
             }
@@ -258,13 +287,16 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
         const activeItem = tasks.find(t => t.id === activeId);
         if (!activeItem) return;
 
-        let targetStatus: TaskStatus = activeItem.status;
+        let targetColumnId = getTaskColumnId(activeItem);
         if (overId.startsWith("column-")) {
-            targetStatus = overId.replace("column-", "") as TaskStatus;
+            targetColumnId = overId.replace("column-", "");
         } else {
             const overTask = tasks.find(t => t.id === overId);
-            if (overTask) targetStatus = overTask.status;
+            if (overTask) targetColumnId = getTaskColumnId(overTask);
         }
+        const targetColumn = columns.find((column) => column.id === targetColumnId);
+        if (!targetColumn) return;
+        const targetStatus = targetColumn.status ?? activeItem.status;
 
         // We calculate new order array for targetStatus
         setTasks((prev) => {
@@ -272,12 +304,16 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
 
             // First ensure active task is in target status
             const activeIndexFlat = workingTasks.findIndex((t) => t.id === activeId);
-            if (workingTasks[activeIndexFlat].status !== targetStatus) {
-                workingTasks[activeIndexFlat] = { ...workingTasks[activeIndexFlat], status: targetStatus };
+            if (getTaskColumnId(workingTasks[activeIndexFlat]) !== targetColumnId) {
+                workingTasks[activeIndexFlat] = {
+                    ...workingTasks[activeIndexFlat],
+                    status: targetStatus,
+                    statusColumnId: targetColumnId,
+                };
             }
 
             // Get all tasks in target column
-            const targetColTasks = workingTasks.filter(t => t.status === targetStatus);
+            const targetColTasks = workingTasks.filter(t => getTaskColumnId(t) === targetColumnId);
             targetColTasks.sort((a, b) => a.sortOrder - b.sortOrder);
 
             const activeIndex = targetColTasks.findIndex(t => t.id === activeId);
@@ -296,6 +332,7 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
             const bulkUpdatePayload = newTargetColTasks.map((task, index) => ({
                 id: task.id,
                 status: targetStatus,
+                statusColumnId: targetColumnId,
                 sortOrder: index,
             }));
 
@@ -306,7 +343,12 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
             return workingTasks.map(t => {
                 const updatedConfig = bulkUpdatePayload.find(b => b.id === t.id);
                 if (updatedConfig) {
-                    return { ...t, status: updatedConfig.status, sortOrder: updatedConfig.sortOrder };
+                    return {
+                        ...t,
+                        status: updatedConfig.status,
+                        statusColumnId: updatedConfig.statusColumnId,
+                        sortOrder: updatedConfig.sortOrder,
+                    };
                 }
                 return t;
             });
@@ -386,13 +428,18 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
             </div>
 
             <div className="scrollbar-thin flex h-full gap-4 overflow-x-auto px-6 py-5">
-                {visibleColumns.map((column) => (
+                {columns.map((column) => (
                     <KanbanColumn
                         key={column.id}
                         id={column.id}
-                        title={column.title}
-                        tasks={tasksByStatus[column.id]}
+                        title={column.name}
+                        status={column.status}
+                        accent={column.color}
+                        tasks={tasksByStatus[column.id] ?? []}
                         onTaskClick={setSelectedTask}
+                        canDelete={!column.status}
+                        isDeleting={deleteStatusColumn.isPending}
+                        onDelete={() => deleteStatusColumn.mutate({ id: column.id })}
                         projectId={projectId}
                         sprintId={sprintId}
                         showSubtasks={showSubtasks}
@@ -402,39 +449,51 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
                     />
                 ))}
 
-                {hiddenColumns.length > 0 && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "flex h-12 w-[300px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed",
-                                    "border-[color:var(--border)] bg-white/[0.015] text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500",
-                                    "transition-colors hover:border-[color:var(--bz-blue)]/60 hover:bg-white/[0.035] hover:text-white"
-                                )}
-                            >
-                                <Plus className="h-3.5 w-3.5" />
-                                New column
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-52 border-[color:var(--border)] bg-[color:var(--popover)]">
-                            <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
-                                Add status column
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-[color:var(--border)]" />
-                            {hiddenColumns.map((column) => (
-                                <DropdownMenuItem
-                                    key={column.id}
-                                    onSelect={() => addColumn(column.id)}
-                                    className="gap-2"
+                <Dialog open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
+                    <DialogTrigger asChild>
+                        <button
+                            type="button"
+                            className={cn(
+                                "flex h-12 w-[300px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed",
+                                "border-[color:var(--border)] bg-white/[0.015] text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500",
+                                "transition-colors hover:border-[color:var(--bz-blue)]/60 hover:bg-white/[0.035] hover:text-white"
+                            )}
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            New column
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="border-[color:var(--border)] bg-[color:var(--popover)] sm:max-w-[420px]">
+                        <DialogHeader>
+                            <DialogTitle>Add column</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddColumnSubmit} className="space-y-4">
+                            <Input
+                                autoFocus
+                                value={newColumnName}
+                                onChange={(event) => setNewColumnName(event.target.value)}
+                                placeholder="Column name"
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddColumnOpen(false)}
+                                    className="inline-flex h-9 items-center rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!newColumnName.trim() || createStatusColumn.isPending}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-3 text-[12px] font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
-                                    {column.title}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                                    {createStatusColumn.isPending ? "Adding..." : "Add column"}
+                                </button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {createPortal(
