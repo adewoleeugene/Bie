@@ -44,6 +44,7 @@ interface SprintDialogProps {
     trigger?: React.ReactNode;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    defaultStatus?: "PLANNING" | "ACTIVE" | "COMPLETED"; // Status a newly created sprint starts with
 }
 
 type SprintFormValues = {
@@ -62,6 +63,7 @@ export function SprintDialog({
     trigger,
     open: controlledOpen,
     onOpenChange: setControlledOpen,
+    defaultStatus = "PLANNING",
 }: SprintDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const isControlled = controlledOpen !== undefined;
@@ -77,7 +79,7 @@ export function SprintDialog({
         defaultValues: {
             name: "",
             goal: "",
-            status: "PLANNING",
+            status: defaultStatus,
             projectId: projectId,
             startDate: undefined, // Type assertion might be needed if strict
             endDate: undefined,
@@ -100,14 +102,14 @@ export function SprintDialog({
                 form.reset({
                     name: "",
                     goal: "",
-                    status: "PLANNING",
+                    status: defaultStatus,
                     projectId: projectId,
                     startDate: undefined,
                     endDate: undefined,
                 });
             }
         }
-    }, [open, sprint, form, projectId]);
+    }, [open, sprint, form, projectId, defaultStatus]);
 
     const onSubmit = async (data: SprintFormValues) => {
         try {

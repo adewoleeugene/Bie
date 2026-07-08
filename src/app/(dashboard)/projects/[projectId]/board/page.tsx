@@ -217,6 +217,7 @@ export default function BoardPage() {
                 projectId={projectId}
                 open={showSprintDialog}
                 onOpenChange={setShowSprintDialog}
+                defaultStatus="ACTIVE"
             />
 
             {/* Complete Sprint Dialog */}
