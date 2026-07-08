@@ -48,7 +48,8 @@ export function useInviteMember() {
 export function useCreateInviteLink() {
     const invalidate = useInvalidateInvites();
     return useMutation({
-        mutationFn: (role?: OrgRole) => createInviteLink(role),
+        mutationFn: ({ role, expiresInMinutes }: { role?: OrgRole; expiresInMinutes?: number | null }) =>
+            createInviteLink(role, expiresInMinutes),
         onSuccess: invalidate,
     });
 }
@@ -65,7 +66,8 @@ export function useInviteProjectMember(projectId: string) {
 export function useCreateProjectInviteLink(projectId: string) {
     const invalidate = useInvalidateInvites();
     return useMutation({
-        mutationFn: (role?: ProjectRole) => createProjectInviteLink(projectId, role),
+        mutationFn: ({ role, expiresInMinutes }: { role?: ProjectRole; expiresInMinutes?: number | null }) =>
+            createProjectInviteLink(projectId, role, expiresInMinutes),
         onSuccess: invalidate,
     });
 }

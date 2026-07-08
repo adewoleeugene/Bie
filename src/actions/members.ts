@@ -175,6 +175,7 @@ export async function getWorkspaceInvites() {
                 scope: i.scope,
                 projectName: i.project?.name ?? null,
                 role: inviteRoleLabel(i),
+                expiresAt: i.expiresAt,
             }));
 
         return { pending, links };
@@ -308,14 +309,21 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
 // ─── Shareable Invite Link ──────────────────────────────
 
 // Shareable links are not tied to an email — anyone signed in who opens them joins
-// the workspace at the given role. They stay reusable, so we give them a long life.
-function shareableExpiry() {
+// the workspace/project at the given role. The creator picks how long the link
+// lives; "no expiry" is stored as a far-future date so the schema stays simple.
+const NO_EXPIRY_MINUTES = 60 * 24 * 365 * 10; // ~10 years
+
+function linkExpiry(expiresInMinutes?: number | null) {
+    const minutes = expiresInMinutes && expiresInMinutes > 0 ? expiresInMinutes : NO_EXPIRY_MINUTES;
     const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 10);
+    expiresAt.setMinutes(expiresAt.getMinutes() + minutes);
     return expiresAt;
 }
 
-export async function createInviteLink(role: OrgRole = OrgRole.MEMBER) {
+export async function createInviteLink(
+    role: OrgRole = OrgRole.MEMBER,
+    expiresInMinutes?: number | null
+) {
     try {
         const { userId, organizationId, role: callerRole } = await getUserOrganization();
 
@@ -327,23 +335,6 @@ export async function createInviteLink(role: OrgRole = OrgRole.MEMBER) {
             return { success: false, error: "Only owners can create owner invite links" };
         }
 
-        // Reuse an existing open link for this role so the URL stays stable.
-        const existing = await db.organizationInvitation.findFirst({
-            where: {
-                organizationId,
-                scope: "ORGANIZATION",
-                email: null,
-                role,
-                acceptedAt: null,
-                expiresAt: { gt: new Date() },
-            },
-            select: { token: true },
-        });
-
-        if (existing) {
-            return { success: true, inviteUrl: inviteLink(existing.token) };
-        }
-
         const invitation = await db.organizationInvitation.create({
             data: {
                 email: null,
@@ -352,10 +343,11 @@ export async function createInviteLink(role: OrgRole = OrgRole.MEMBER) {
                 role,
                 organizationId,
                 invitedById: userId,
-                expiresAt: shareableExpiry(),
+                expiresAt: linkExpiry(expiresInMinutes),
             },
         });
 
+        revalidatePath("/settings");
         return { success: true, inviteUrl: inviteLink(invitation.token) };
     } catch (error) {
         console.error("Create invite link error:", error);
@@ -473,7 +465,8 @@ export async function inviteProjectMember(
 
 export async function createProjectInviteLink(
     projectId: string,
-    role: ProjectRole = ProjectRole.EDITOR
+    role: ProjectRole = ProjectRole.EDITOR,
+    expiresInMinutes?: number | null
 ) {
     try {
         const { userId, organizationId, role: callerRole } = await getUserOrganization();
@@ -491,24 +484,6 @@ export async function createProjectInviteLink(
             return { success: false, error: "Project not found" };
         }
 
-        // Reuse an existing open link for this project + role so the URL stays stable.
-        const existing = await db.organizationInvitation.findFirst({
-            where: {
-                organizationId,
-                projectId,
-                scope: "PROJECT",
-                email: null,
-                projectRole: role,
-                acceptedAt: null,
-                expiresAt: { gt: new Date() },
-            },
-            select: { token: true },
-        });
-
-        if (existing) {
-            return { success: true, inviteUrl: inviteLink(existing.token) };
-        }
-
         const invitation = await db.organizationInvitation.create({
             data: {
                 email: null,
@@ -519,10 +494,11 @@ export async function createProjectInviteLink(
                 organizationId,
                 projectId,
                 invitedById: userId,
-                expiresAt: shareableExpiry(),
+                expiresAt: linkExpiry(expiresInMinutes),
             },
         });
 
+        revalidatePath("/settings");
         return { success: true, inviteUrl: inviteLink(invitation.token) };
     } catch (error) {
         console.error("Create project invite link error:", error);

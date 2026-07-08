@@ -34,6 +34,14 @@ const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
 
 const INVITE_ROLES: ProjectRole[] = [ProjectRole.EDITOR, ProjectRole.VIEWER, ProjectRole.ADMIN];
 
+const LINK_EXPIRY_OPTIONS: { label: string; value: string; minutes: number | null }[] = [
+    { label: "10 minutes", value: "10", minutes: 10 },
+    { label: "1 hour", value: "60", minutes: 60 },
+    { label: "24 hours", value: "1440", minutes: 60 * 24 },
+    { label: "7 days", value: "10080", minutes: 60 * 24 * 7 },
+    { label: "No expiry", value: "never", minutes: null },
+];
+
 export function ProjectInviteDialog({ projectId }: { projectId: string }) {
     const inviteMember = useInviteProjectMember(projectId);
     const createLink = useCreateProjectInviteLink(projectId);
@@ -43,12 +51,14 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
     const [role, setRole] = useState<ProjectRole>(ProjectRole.EDITOR);
     const [personalLink, setPersonalLink] = useState("");
     const [shareLink, setShareLink] = useState("");
+    const [linkExpiry, setLinkExpiry] = useState<string>("1440");
 
     const reset = () => {
         setEmail("");
         setRole(ProjectRole.EDITOR);
         setPersonalLink("");
         setShareLink("");
+        setLinkExpiry("1440");
     };
 
     const handleInvite = async () => {
@@ -70,7 +80,8 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
     };
 
     const handleCreateShareLink = async () => {
-        const result = await createLink.mutateAsync(role);
+        const expiresInMinutes = LINK_EXPIRY_OPTIONS.find((o) => o.value === linkExpiry)?.minutes ?? null;
+        const result = await createLink.mutateAsync({ role, expiresInMinutes });
         if (result.success && result.inviteUrl) {
             setShareLink(new URL(result.inviteUrl, window.location.origin).toString());
             toast.success("Shareable link ready");
@@ -200,18 +211,32 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
                                 </p>
                             </>
                         ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full"
-                                onClick={handleCreateShareLink}
-                                disabled={createLink.isPending}
-                            >
-                                <Link2 className="mr-2 h-4 w-4" />
-                                {createLink.isPending
-                                    ? "Creating..."
-                                    : `Create link for ${PROJECT_ROLE_LABELS[role]}s`}
-                            </Button>
+                            <div className="space-y-2">
+                                <Select value={linkExpiry} onValueChange={setLinkExpiry}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Link expires in..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {LINK_EXPIRY_OPTIONS.map((o) => (
+                                            <SelectItem key={o.value} value={o.value}>
+                                                {o.minutes === null ? o.label : `Expires in ${o.label}`}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={handleCreateShareLink}
+                                    disabled={createLink.isPending}
+                                >
+                                    <Link2 className="mr-2 h-4 w-4" />
+                                    {createLink.isPending
+                                        ? "Creating..."
+                                        : `Create link for ${PROJECT_ROLE_LABELS[role]}s`}
+                                </Button>
+                            </div>
                         )}
                     </div>
                 </div>
