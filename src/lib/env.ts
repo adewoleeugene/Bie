@@ -17,6 +17,8 @@ const serverSchema = z.object({
     AUTH_TRUST_HOST: z.string().optional(),
 
     // Google OAuth (optional — credentials auth works without these)
+    AUTH_GOOGLE_ID: z.string().optional(),
+    AUTH_GOOGLE_SECRET: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
 

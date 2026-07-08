@@ -6,14 +6,30 @@ import { TaskStatus } from "@prisma/client";
 import { TaskCard } from "./task-card";
 import { TaskWithRelations } from "@/types/task";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { TaskForm } from "@/components/tasks/task-form";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface KanbanColumnProps {
-    id: TaskStatus;
+    id: string;
     title: string;
+    status?: TaskStatus | null;
+    accent?: string | null;
     tasks: (TaskWithRelations & { depth: number })[];
     onTaskClick: (task: TaskWithRelations) => void;
+    onDelete?: () => void;
+    canDelete?: boolean;
+    isDeleting?: boolean;
     projectId?: string;
     sprintId?: string;
     showSubtasks?: boolean;
@@ -39,8 +55,13 @@ const STATUS_ACCENT: Record<string, string> = {
 export function KanbanColumn({
     id,
     title,
+    status,
+    accent: accentProp,
     tasks,
     onTaskClick,
+    onDelete,
+    canDelete,
+    isDeleting,
     projectId,
     sprintId,
     showSubtasks,
@@ -49,7 +70,7 @@ export function KanbanColumn({
     visibleProperties,
 }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({ id: `column-${id}` });
-    const accent = STATUS_ACCENT[id] ?? "var(--bz-blue)";
+    const accent = accentProp || (status ? STATUS_ACCENT[status] : undefined) || "var(--bz-blue)";
     const isEmpty = tasks.length === 0;
 
     return (
@@ -74,20 +95,54 @@ export function KanbanColumn({
                         {String(tasks.length).padStart(2, "0")}
                     </span>
                 </div>
-                <TaskForm
-                    projectId={projectId}
-                    sprintId={sprintId}
-                    defaultStatus={id}
-                    trigger={
-                        <button
-                            type="button"
-                            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white"
-                            aria-label={`Add task to ${title}`}
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                        </button>
-                    }
-                />
+                <div className="flex shrink-0 items-center gap-1">
+                    {canDelete && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-red-400"
+                                    aria-label={`Delete ${title} column`}
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete column?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This removes the “{title}” column. Empty custom columns can be deleted; move any tasks out first.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={onDelete}
+                                        disabled={isDeleting}
+                                        className="bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        {isDeleting ? "Deleting..." : "Delete"}
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
+                    <TaskForm
+                        projectId={projectId}
+                        sprintId={sprintId}
+                        defaultStatus={status || "TODO"}
+                        defaultStatusColumnId={id}
+                        trigger={
+                            <button
+                                type="button"
+                                className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white"
+                                aria-label={`Add task to ${title}`}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                            </button>
+                        }
+                    />
+                </div>
             </div>
 
             {/* Accent rail */}

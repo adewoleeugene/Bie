@@ -97,17 +97,22 @@ Create a `.env` file:
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/christbase?schema=public"
 
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
+AUTH_GOOGLE_ID="your-google-client-id"
+AUTH_GOOGLE_SECRET="your-google-client-secret"
 
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
+AUTH_SECRET="your-secret-key"
+AUTH_URL="http://localhost:3000"
 ```
 
 For Google OAuth setup:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create OAuth 2.0 credentials
-3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+3. Add the authorized redirect URI that matches your local `AUTH_URL` exactly:
+   - If `AUTH_URL="http://localhost:3000"`, add `http://localhost:3000/api/auth/callback/google`
+   - If `AUTH_URL="http://localhost:3004"`, add `http://localhost:3004/api/auth/callback/google`
+
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL`
+are also supported for older local environments.
 
 ### 3. Initialize the database
 

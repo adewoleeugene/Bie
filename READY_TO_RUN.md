@@ -160,7 +160,9 @@ echo $DATABASE_URL
 ```
 
 ### Google OAuth not working
-- Verify redirect URI: `http://localhost:3000/api/auth/callback/google`
+- Verify the Google Cloud redirect URI matches your auth URL exactly:
+  - `http://localhost:3000/api/auth/callback/google` when `AUTH_URL` or `NEXTAUTH_URL` is `http://localhost:3000`
+  - `http://localhost:3004/api/auth/callback/google` when `AUTH_URL` or `NEXTAUTH_URL` is `http://localhost:3004`
 - Check client ID and secret in .env
 - Ensure Google+ API is enabled
 
