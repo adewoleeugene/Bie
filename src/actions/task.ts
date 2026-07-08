@@ -82,11 +82,41 @@ async function ensureTaskStatusColumns(organizationId: string, projectId?: strin
 
     const existing = await db.taskStatusColumn.findMany({
         where: { organizationId, projectId: scopedProjectId },
-        orderBy: { sortOrder: "asc" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
+    // Self-heal: collapse duplicate default columns that share the same status.
+    // Concurrent first-loads could each seed the defaults (there is no unique
+    // constraint), producing duplicates that carry a status and therefore can't
+    // be removed from the UI. Reassign their tasks to the keeper, then delete.
+    const keeperByStatus = new Map<TaskStatus, string>();
+    const duplicates: { dupeId: string; keepId: string }[] = [];
+    for (const column of existing) {
+        if (!column.status) continue;
+        const keepId = keeperByStatus.get(column.status);
+        if (keepId) {
+            duplicates.push({ dupeId: column.id, keepId });
+        } else {
+            keeperByStatus.set(column.status, column.id);
+        }
+    }
+
+    if (duplicates.length > 0) {
+        await db.$transaction([
+            ...duplicates.map(({ dupeId, keepId }) =>
+                db.task.updateMany({
+                    where: { statusColumnId: dupeId },
+                    data: { statusColumnId: keepId },
+                })
+            ),
+            db.taskStatusColumn.deleteMany({
+                where: { id: { in: duplicates.map((duplicate) => duplicate.dupeId) } },
+            }),
+        ]);
+    }
+
     const missingDefaults = DEFAULT_STATUS_COLUMNS.filter(
-        (defaultColumn) => !existing.some((column) => column.status === defaultColumn.status)
+        (defaultColumn) => !keeperByStatus.has(defaultColumn.status)
     );
 
     if (missingDefaults.length > 0) {
