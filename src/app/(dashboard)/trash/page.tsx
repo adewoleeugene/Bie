@@ -38,7 +38,7 @@ export default function TrashPage() {
         mutationFn: (id: string) => restoreDatabase(id),
         onSuccess: (r) => {
             if (r.success) {
-                toast.success("Database restored");
+                toast.success("Collection restored");
                 refresh();
             } else toast.error(r.error || "Failed");
         },
@@ -113,7 +113,7 @@ export default function TrashPage() {
                 <p className="text-sm text-neutral-500">Loading…</p>
             ) : totalCount === 0 ? (
                 <div className="rounded-md border-2 border-dashed border-neutral-200 p-12 text-center text-sm text-neutral-500 dark:border-neutral-800">
-                    Nothing in trash. Deleted pages, databases, and rows show up
+                    Nothing in trash. Deleted pages, collections, and rows show up
                     here so you can restore them.
                 </div>
             ) : (
@@ -136,7 +136,7 @@ export default function TrashPage() {
                     )}
                     {data?.databases.length! > 0 && (
                         <Section
-                            title="Databases"
+                            title="Collections"
                             icon={<Database className="h-4 w-4 text-neutral-500" />}
                         >
                             {data!.databases.map((d) => (
@@ -152,7 +152,7 @@ export default function TrashPage() {
                     )}
                     {data?.rows.length! > 0 && (
                         <Section
-                            title="Database rows"
+                            title="Collection rows"
                             icon={<Database className="h-4 w-4 text-neutral-500" />}
                         >
                             {data!.rows.map((r) => (

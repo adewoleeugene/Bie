@@ -67,17 +67,17 @@ function DatabasePicker({
     return (
         <div className="my-2 flex items-center gap-2 rounded-md border-2 border-dashed border-neutral-300 p-3 dark:border-neutral-700">
             <DatabaseIcon className="h-4 w-4 text-neutral-400" />
-            <span className="text-sm text-neutral-500">Embed database:</span>
+            <span className="text-sm text-neutral-500">Embed collection:</span>
             {isLoading ? (
                 <span className="text-xs text-neutral-400">Loading…</span>
             ) : !databases || databases.length === 0 ? (
                 <span className="text-xs text-neutral-400">
-                    No databases yet — create one first
+                    No collections yet — create one first
                 </span>
             ) : (
                 <Select disabled={disabled} onValueChange={(v) => onPick(v)}>
                     <SelectTrigger className="h-8 w-56">
-                        <SelectValue placeholder="Pick a database…" />
+                        <SelectValue placeholder="Pick a collection…" />
                     </SelectTrigger>
                     <SelectContent>
                         {databases.map((d) => (
@@ -98,7 +98,7 @@ function EmbeddedDatabase({ databaseId }: { databaseId: string }) {
     if (isLoading) {
         return (
             <div className="my-2 rounded-md border border-neutral-200 p-3 text-xs text-neutral-400 dark:border-neutral-800">
-                Loading database…
+                Loading collection…
             </div>
         );
     }
@@ -108,11 +108,11 @@ function EmbeddedDatabase({ databaseId }: { databaseId: string }) {
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="text-xs">
                     <div className="mb-0.5 font-medium text-amber-800 dark:text-amber-200">
-                        You don&apos;t have access to this embedded database
+                        You don&apos;t have access to this embedded collection
                     </div>
                     <div className="text-amber-700 dark:text-amber-300">
                         It&apos;s set to private. Ask the owner to share it with you, or
-                        switch the database&apos;s visibility to the whole org.
+                        switch the collection&apos;s visibility to the whole org.
                     </div>
                 </div>
             </div>

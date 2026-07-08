@@ -127,7 +127,7 @@ export default function DatabaseDetailPage({ params }: PageProps) {
         return <div className="p-8 text-sm text-neutral-500">Loading…</div>;
     }
     if (!database) {
-        return <div className="p-8 text-sm text-neutral-500">Database not found.</div>;
+        return <div className="p-8 text-sm text-neutral-500">Collection not found.</div>;
     }
 
     const activeView =
@@ -262,7 +262,7 @@ export default function DatabaseDetailPage({ params }: PageProps) {
                             }}
                         >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete database
+                            Delete collection
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

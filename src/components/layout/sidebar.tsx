@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-    FolderKanban,
     LayoutDashboard,
     Settings,
     Users,
@@ -20,7 +19,6 @@ import {
     PanelLeftClose,
     PanelLeft,
     Notebook,
-    Plus,
 } from "lucide-react";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
@@ -55,10 +53,13 @@ const PRIMARY: NavItem[] = [
 
 const SECONDARY: NavItem[] = [
     { href: "/wiki", label: "Wiki", icon: BookOpen, accent: "var(--bz-mint)", match: (p) => !!p?.startsWith("/wiki") },
-    { href: "/databases", label: "Databases", icon: Database, accent: "var(--bz-blue)", match: (p) => !!p?.startsWith("/databases") },
     { href: "/squads", label: "Squads", icon: Users, accent: "var(--bz-lime)", match: (p) => !!p?.startsWith("/squads") },
     { href: "/chat", label: "Chat", icon: MessageSquare, accent: "var(--bz-pink)" },
     { href: "/reflections", label: "Journal", icon: Notebook, accent: "var(--bz-amber)", match: (p) => !!p?.startsWith("/reflections") },
+];
+
+const UTILITY: NavItem[] = [
+    { href: "/databases", label: "Collections", icon: Database, accent: "var(--bz-peri)", match: (p) => !!p?.startsWith("/databases") },
     { href: "/trash", label: "Trash", icon: Trash2, accent: "var(--bz-amber)", match: (p) => !!p?.startsWith("/trash") },
 ];
 
@@ -236,6 +237,19 @@ export function Sidebar({ projects }: SidebarProps) {
                                 No projects yet
                             </div>
                         )}
+                    </div>
+                </div>
+
+                <div className="mt-5">
+                    {!collapsed && (
+                        <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                            More
+                        </div>
+                    )}
+                    <div className="space-y-0.5">
+                        {UTILITY.map((item) => (
+                            <NavRow key={item.href} item={item} active={isActive(item)} collapsed={collapsed} />
+                        ))}
                     </div>
                 </div>
             </nav>

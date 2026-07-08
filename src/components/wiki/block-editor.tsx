@@ -304,8 +304,8 @@ function BlockEditorInner({
                                     onItemClick: () => openLinkInput(),
                                 },
                                 {
-                                    title: "Database",
-                                    subtext: "Embed a database",
+                                    title: "Collection",
+                                    subtext: "Embed a collection",
                                     aliases: ["db", "database", "table"],
                                     group: "Wiki blocks",
                                     icon: <Database className="h-4 w-4 text-neutral-500" />,
