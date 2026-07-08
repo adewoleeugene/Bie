@@ -115,7 +115,7 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    const columns = useMemo(() => {
+    const { columns, columnAliases } = useMemo(() => {
         const savedColumns = statusColumnsResult?.success ? statusColumnsResult.data : [];
         const taskColumns = tasks
             .map((task) => task.statusColumn)
@@ -123,18 +123,39 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
 
         const columnsById = new Map<string, Pick<TaskStatusColumn, "id" | "name" | "status" | "color" | "sortOrder">>();
         [...savedColumns, ...taskColumns].forEach((column) => {
-            columnsById.set(column.id, column);
+            if (!columnsById.has(column.id)) columnsById.set(column.id, column);
         });
 
-        const mergedColumns = Array.from(columnsById.values()).sort((a, b) => a.sortOrder - b.sortOrder);
-        return mergedColumns.length > 0 ? mergedColumns : DEFAULT_COLUMN_FALLBACKS;
+        const orderedColumns = Array.from(columnsById.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+
+        // Collapse duplicate default columns that share the same status (a stray
+        // duplicate default carries a status and can't be deleted from the UI).
+        // Keep the first, and alias the duplicates' ids to it so any task still
+        // pointing at a dropped column stays visible in the kept one.
+        const keeperByStatus = new Map<string, string>();
+        const aliases = new Map<string, string>();
+        const dedupedColumns = orderedColumns.filter((column) => {
+            if (!column.status) return true;
+            const keeperId = keeperByStatus.get(column.status);
+            if (keeperId) {
+                aliases.set(column.id, keeperId);
+                return false;
+            }
+            keeperByStatus.set(column.status, column.id);
+            return true;
+        });
+
+        return {
+            columns: dedupedColumns.length > 0 ? dedupedColumns : DEFAULT_COLUMN_FALLBACKS,
+            columnAliases: aliases,
+        };
     }, [statusColumnsResult, tasks]);
 
     const getTaskColumnId = useCallback((task: TaskWithRelations) => {
-        if (task.statusColumnId) return task.statusColumnId;
+        if (task.statusColumnId) return columnAliases.get(task.statusColumnId) ?? task.statusColumnId;
         const fallbackColumn = columns.find((column) => column.status === task.status);
         return fallbackColumn?.id ?? columns[0]?.id ?? task.status;
-    }, [columns]);
+    }, [columns, columnAliases]);
 
     // Recursive helper to flatten tasks with depth calculation
     const tasksByStatus = useMemo(() => {
