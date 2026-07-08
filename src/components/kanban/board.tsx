@@ -21,12 +21,12 @@ import { useBulkReorderTasks } from "@/hooks/use-tasks";
 import { TaskWithRelations } from "@/types/task";
 import { createPortal } from "react-dom";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
-import { Button } from "@/components/ui/button";
-import { Layers, MoreHorizontal, Settings2, Eye, Layout } from "lucide-react";
+import { Layers, Settings2, Layout, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuCheckboxItem,
@@ -35,20 +35,38 @@ import {
 
 interface KanbanBoardProps {
     tasks: TaskWithRelations[];
+    projectId?: string;
+    sprintId?: string;
 }
 
-const COLUMNS: { id: TaskStatus; title: string }[] = [
+const DEFAULT_COLUMN_IDS: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
+
+const ALL_COLUMNS: { id: TaskStatus; title: string }[] = [
     { id: "BACKLOG", title: "Backlog" },
     { id: "TODO", title: "To Do" },
     { id: "IN_PROGRESS", title: "In Progress" },
     { id: "IN_REVIEW", title: "In Review" },
     { id: "DONE", title: "Done" },
+    { id: "ARCHIVED", title: "Archived" },
 ];
 
-export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
+export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: KanbanBoardProps) {
     const [tasks, setTasks] = useState<TaskWithRelations[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
     const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
+    const [visibleColumnIds, setVisibleColumnIds] = useState<TaskStatus[]>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("kanban-visible-columns");
+            if (saved) {
+                const parsed = JSON.parse(saved) as TaskStatus[];
+                const validIds = ALL_COLUMNS.map((column) => column.id);
+                const savedIds = parsed.filter((id) => validIds.includes(id));
+                if (savedIds.length > 0) return savedIds;
+            }
+        }
+
+        return DEFAULT_COLUMN_IDS;
+    });
 
     const [visibleProperties, setVisibleProperties] = useState({
         assignees: true,
@@ -86,6 +104,12 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
     }, [showSubtasks]);
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("kanban-visible-columns", JSON.stringify(visibleColumnIds));
+        }
+    }, [visibleColumnIds]);
+
+    useEffect(() => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('kanban-expanded-parents', JSON.stringify(Array.from(expandedParents)));
         }
@@ -121,7 +145,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
         };
 
         // Initialize with top-level parents (no parentTaskId)
-        COLUMNS.forEach(col => {
+        ALL_COLUMNS.forEach(col => {
             const columnTasks = tasks.filter(t => t.status === col.id);
             const topLevelInCol = columnTasks.filter(t => !t.parentTaskId);
             topLevelInCol.sort((a, b) => a.sortOrder - b.sortOrder);
@@ -136,6 +160,24 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
 
         return grouped;
     }, [tasks, showSubtasks, expandedParents]);
+
+    const visibleColumns = useMemo(
+        () => visibleColumnIds
+            .map((id) => ALL_COLUMNS.find((column) => column.id === id))
+            .filter((column): column is { id: TaskStatus; title: string } => Boolean(column)),
+        [visibleColumnIds]
+    );
+
+    const hiddenColumns = useMemo(
+        () => ALL_COLUMNS.filter((column) => !visibleColumnIds.includes(column.id)),
+        [visibleColumnIds]
+    );
+
+    const addColumn = (status: TaskStatus) => {
+        setVisibleColumnIds((current) => (
+            current.includes(status) ? current : [...current, status]
+        ));
+    };
 
     const toggleParent = (parentId: string) => {
         setExpandedParents(prev => {
@@ -226,7 +268,7 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
 
         // We calculate new order array for targetStatus
         setTasks((prev) => {
-            let workingTasks = [...prev];
+            const workingTasks = [...prev];
 
             // First ensure active task is in target status
             const activeIndexFlat = workingTasks.findIndex((t) => t.id === activeId);
@@ -344,19 +386,55 @@ export function KanbanBoard({ tasks: initialTasks }: KanbanBoardProps) {
             </div>
 
             <div className="scrollbar-thin flex h-full gap-4 overflow-x-auto px-6 py-5">
-                {COLUMNS.map((column) => (
+                {visibleColumns.map((column) => (
                     <KanbanColumn
                         key={column.id}
                         id={column.id}
                         title={column.title}
                         tasks={tasksByStatus[column.id]}
                         onTaskClick={setSelectedTask}
+                        projectId={projectId}
+                        sprintId={sprintId}
                         showSubtasks={showSubtasks}
                         expandedParents={expandedParents}
                         onToggleParent={toggleParent}
                         visibleProperties={visibleProperties}
                     />
                 ))}
+
+                {hiddenColumns.length > 0 && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                className={cn(
+                                    "flex h-12 w-[300px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed",
+                                    "border-[color:var(--border)] bg-white/[0.015] text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500",
+                                    "transition-colors hover:border-[color:var(--bz-blue)]/60 hover:bg-white/[0.035] hover:text-white"
+                                )}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                New column
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-52 border-[color:var(--border)] bg-[color:var(--popover)]">
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                                Add status column
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-[color:var(--border)]" />
+                            {hiddenColumns.map((column) => (
+                                <DropdownMenuItem
+                                    key={column.id}
+                                    onSelect={() => addColumn(column.id)}
+                                    className="gap-2"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    {column.title}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
             </div>
 
             {createPortal(

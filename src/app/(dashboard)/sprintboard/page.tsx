@@ -222,7 +222,15 @@ export default function SprintBoardPage() {
             </header>
 
             <div className="flex-1 overflow-hidden">
-                <KanbanBoard tasks={filteredTasks} />
+                <KanbanBoard
+                    tasks={filteredTasks}
+                    projectId={
+                        projectFilter !== "all" && projectFilter !== "general"
+                            ? projectFilter
+                            : undefined
+                    }
+                    sprintId={sprintFilter !== "all" ? sprintFilter : undefined}
+                />
             </div>
         </div>
     );
