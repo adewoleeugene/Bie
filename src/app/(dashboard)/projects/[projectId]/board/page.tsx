@@ -195,7 +195,11 @@ export default function BoardPage() {
                 </div>
             </header>
             <div className="flex-1 overflow-hidden">
-                <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
+                <KanbanBoard
+                    tasks={applyTaskFilters(tasks || [], taskFilters)}
+                    projectId={projectId}
+                    sprintId={sprintId || undefined}
+                />
             </div>
 
             {/* Complete Sprint Dialog */}

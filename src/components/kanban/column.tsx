@@ -7,12 +7,15 @@ import { TaskCard } from "./task-card";
 import { TaskWithRelations } from "@/types/task";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { TaskForm } from "@/components/tasks/task-form";
 
 interface KanbanColumnProps {
     id: TaskStatus;
     title: string;
     tasks: (TaskWithRelations & { depth: number })[];
     onTaskClick: (task: TaskWithRelations) => void;
+    projectId?: string;
+    sprintId?: string;
     showSubtasks?: boolean;
     expandedParents?: Set<string>;
     onToggleParent?: (parentId: string) => void;
@@ -38,6 +41,8 @@ export function KanbanColumn({
     title,
     tasks,
     onTaskClick,
+    projectId,
+    sprintId,
     showSubtasks,
     expandedParents,
     onToggleParent,
@@ -69,13 +74,20 @@ export function KanbanColumn({
                         {String(tasks.length).padStart(2, "0")}
                     </span>
                 </div>
-                <button
-                    type="button"
-                    className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white"
-                    aria-label={`Add task to ${title}`}
-                >
-                    <Plus className="h-3.5 w-3.5" />
-                </button>
+                <TaskForm
+                    projectId={projectId}
+                    sprintId={sprintId}
+                    defaultStatus={id}
+                    trigger={
+                        <button
+                            type="button"
+                            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.05] hover:text-white"
+                            aria-label={`Add task to ${title}`}
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                        </button>
+                    }
+                />
             </div>
 
             {/* Accent rail */}

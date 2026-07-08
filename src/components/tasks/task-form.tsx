@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,9 +36,16 @@ import { format } from "date-fns";
 interface TaskFormProps {
     projectId?: string;
     sprintId?: string;
+    defaultStatus?: TaskStatus;
+    trigger?: ReactNode;
 }
 
-export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintId }: TaskFormProps) {
+export function TaskForm({
+    projectId: initialProjectId,
+    sprintId: initialSprintId,
+    defaultStatus = "BACKLOG",
+    trigger,
+}: TaskFormProps) {
     const [open, setOpen] = useState(false);
     const createTask = useCreateTask();
     const { data: members } = useMembers();
@@ -48,7 +56,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
         defaultValues: {
             title: "",
             description: undefined,
-            status: "BACKLOG",
+            status: defaultStatus,
             priority: "P2",
             assigneeIds: [],
             labels: [],
@@ -72,7 +80,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
             form.reset({
                 title: "",
                 description: undefined,
-                status: "BACKLOG",
+                status: defaultStatus,
                 priority: "P2",
                 assigneeIds: [],
                 labels: [],
@@ -82,7 +90,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                 estimatedHours: undefined,
             });
         }
-    }, [open, initialProjectId, initialSprintId, form]);
+    }, [open, initialProjectId, initialSprintId, defaultStatus, form]);
 
     const onSubmit = async (data: CreateTaskInput) => {
         try {
@@ -114,10 +122,12 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Task
-                </Button>
+                {trigger ?? (
+                    <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Task
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] overflow-y-auto max-h-[90vh]">
                 <DialogHeader>
@@ -237,7 +247,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Status</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Status" />
@@ -249,6 +259,7 @@ export function TaskForm({ projectId: initialProjectId, sprintId: initialSprintI
                                                 <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                                                 <SelectItem value="IN_REVIEW">In Review</SelectItem>
                                                 <SelectItem value="DONE">Done</SelectItem>
+                                                <SelectItem value="ARCHIVED">Archived</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
