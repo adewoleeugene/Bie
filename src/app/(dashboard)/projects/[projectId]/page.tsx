@@ -94,7 +94,7 @@ export default function ProjectDashboardPage() {
         <div className="flex flex-col h-full overflow-y-auto">
             <ProjectDialog project={project} open={showEditDialog} onOpenChange={setShowEditDialog} />
 
-            <div className="space-y-6 p-6">
+            <div className="space-y-6 p-6 max-w-[1400px] w-full mx-auto">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1 min-w-0">
