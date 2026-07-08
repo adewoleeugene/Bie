@@ -9,8 +9,9 @@ import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Calendar, CheckCircle2, ExternalLink, Download, ArrowUpDown } from "lucide-react";
+import { Calendar, CheckCircle2, ExternalLink, Download, ArrowUpDown, Plus } from "lucide-react";
 import Link from "next/link";
+import { SprintDialog } from "@/components/sprints/sprint-dialog";
 import { exportTasksToCSV } from "@/lib/export";
 import {
     Select,
@@ -45,6 +46,8 @@ export default function BoardPage() {
     const completeSprint = useCompleteSprint();
 
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [showSprintDialog, setShowSprintDialog] = useState(false);
+    const [sprintSelectOpen, setSprintSelectOpen] = useState(false);
     const [taskFilters, setTaskFilters] = useState<TaskFilters>({
         statuses: [],
         priorities: [],
@@ -117,7 +120,7 @@ export default function BoardPage() {
                             <span className="mono text-[10px] uppercase tracking-[0.14em] text-neutral-500">
                                 Sprint
                             </span>
-                            <Select value={sprintId || "all"} onValueChange={handleSprintChange}>
+                            <Select value={sprintId || "all"} onValueChange={handleSprintChange} open={sprintSelectOpen} onOpenChange={setSprintSelectOpen}>
                                 <SelectTrigger className="h-7 min-w-[180px] border-none bg-transparent text-[12px] focus:ring-0">
                                     <SelectValue placeholder="Select sprint" />
                                 </SelectTrigger>
@@ -147,17 +150,28 @@ export default function BoardPage() {
                                             </div>
                                         </SelectItem>
                                     ))}
-                                    {sortedSprints.length > 3 && (
-                                        <div className="border-t border-[color:var(--border)] px-2 py-1.5">
+                                    <div className="mt-1 space-y-0.5 border-t border-[color:var(--border)] px-2 py-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSprintSelectOpen(false);
+                                                setShowSprintDialog(true);
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-xs font-medium text-neutral-300 transition-colors hover:text-white"
+                                        >
+                                            <Plus className="h-3 w-3" />
+                                            New sprint
+                                        </button>
+                                        {sortedSprints.length > 3 && (
                                             <Link
                                                 href={`/projects/${projectId}/sprints`}
-                                                className="flex items-center gap-2 text-xs text-neutral-500 transition-colors hover:text-white"
+                                                className="flex items-center gap-2 px-1 py-1 text-xs text-neutral-500 transition-colors hover:text-white"
                                             >
                                                 <ExternalLink className="h-3 w-3" />
                                                 View all sprints
                                             </Link>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -197,6 +211,13 @@ export default function BoardPage() {
             <div className="flex-1 overflow-hidden">
                 <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
             </div>
+
+            {/* Create Sprint Dialog */}
+            <SprintDialog
+                projectId={projectId}
+                open={showSprintDialog}
+                onOpenChange={setShowSprintDialog}
+            />
 
             {/* Complete Sprint Dialog */}
             <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
