@@ -179,12 +179,32 @@ export function KanbanColumn({
                 </SortableContext>
 
                 {isEmpty && (
-                    <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--border)] p-6 text-center">
-                        <div
-                            className="mb-2 h-1 w-8 rounded-full opacity-50"
-                            style={{ background: accent }}
+                    <div className="flex flex-1 flex-col items-start gap-1 p-1">
+                        <span
+                            className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                            style={{
+                                color: accent,
+                                background: `color-mix(in srgb, ${accent} 16%, transparent)`,
+                            }}
+                        >
+                            {title}
+                        </span>
+                        <TaskForm
+                            projectId={projectId}
+                            sprintId={sprintId}
+                            defaultStatus={status || "TODO"}
+                            defaultStatusColumnId={id}
+                            trigger={
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors hover:bg-white/[0.04]"
+                                    style={{ color: accent }}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    New task
+                                </button>
+                            }
                         />
-                        <p className="text-[11px] text-neutral-600">Drop tasks here</p>
                     </div>
                 )}
             </div>
