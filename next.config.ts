@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: ".",
+    root: __dirname,
   },
   experimental: {
     // Editor file uploads + wiki autosave go through Server Actions; the

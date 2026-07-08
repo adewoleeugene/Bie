@@ -358,6 +358,40 @@ export async function bulkReorderTasks(
     }
 }
 
+export async function addTasksToSprint(
+    input: { sprintId: string; taskIds: string[] }
+): Promise<ActionResult<{ count: number }>> {
+    try {
+        const { organizationId } = await getUserOrganization();
+
+        if (!input.taskIds.length) {
+            return { success: false, error: "No tasks selected" };
+        }
+
+        const sprint = await db.sprint.findFirst({
+            where: { id: input.sprintId, organizationId },
+        });
+
+        if (!sprint) {
+            return { success: false, error: "Sprint not found" };
+        }
+
+        const result = await db.task.updateMany({
+            where: { id: { in: input.taskIds }, organizationId },
+            data: { sprintId: input.sprintId },
+        });
+
+        revalidatePath(`/projects/${sprint.projectId}/board`);
+        return { success: true, data: { count: result.count } };
+    } catch (error) {
+        console.error("Add tasks to sprint error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to add tasks to sprint",
+        };
+    }
+}
+
 export async function getTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
     try {
         const { organizationId } = await getUserOrganization();

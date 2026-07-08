@@ -12,7 +12,7 @@ export default function SquadsPage() {
 
     if (isLoading) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 p-6 max-w-[1400px] w-full mx-auto">
                 <div className="flex items-center justify-between">
                     <Skeleton className="h-8 w-32" />
                     <Skeleton className="h-10 w-32" />
@@ -27,7 +27,7 @@ export default function SquadsPage() {
     }
 
     return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-6 max-w-[1400px] w-full mx-auto">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Squads</h1>

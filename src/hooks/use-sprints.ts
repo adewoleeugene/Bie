@@ -84,7 +84,7 @@ export function useCompleteSprint() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (input: { id: string }) => completeSprint(input),
+        mutationFn: (input: { id: string; carryOver?: "next" | "backlog" | "leave" }) => completeSprint(input),
         onSuccess: (result) => {
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: ["sprints"] });
