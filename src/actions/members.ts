@@ -59,6 +59,12 @@ export async function getOrganizationMembers() {
     try {
         const { organizationId } = await getUserOrganization();
 
+        const organization = await db.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        });
+        const workspaceName = organization?.name ?? "Workspace";
+
         // Get members via OrganizationMember relation
         const members = await db.organizationMember.findMany({
             where: {
@@ -106,6 +112,7 @@ export async function getOrganizationMembers() {
             email: member.user.email,
             image: member.user.image,
             role: member.role,
+            workspaceName,
             projects: projectsByUser.get(member.user.id) ?? [],
         }));
     } catch (error) {

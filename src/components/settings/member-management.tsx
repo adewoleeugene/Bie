@@ -435,7 +435,7 @@ export function MemberManagement() {
                                                                 variant="outline"
                                                                 className="text-[10px] font-normal text-muted-foreground"
                                                             >
-                                                                Whole workspace · {ROLE_CONFIG[member.role as OrgRole].label}
+                                                                {member.workspaceName} · {ROLE_CONFIG[member.role as OrgRole].label}
                                                             </Badge>
                                                         )}
                                                         {member.projects.map((project) => (
@@ -444,7 +444,7 @@ export function MemberManagement() {
                                                                 variant="outline"
                                                                 className="text-[10px] font-normal text-muted-foreground"
                                                             >
-                                                                {project.name} · {PROJECT_ROLE_LABELS[project.role]}
+                                                                {member.workspaceName} / {project.name} · {PROJECT_ROLE_LABELS[project.role]}
                                                             </Badge>
                                                         ))}
                                                     </div>
