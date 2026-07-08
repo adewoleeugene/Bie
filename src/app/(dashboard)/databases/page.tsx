@@ -48,7 +48,7 @@ export default function DatabasesPage() {
         try {
             const result = await createDatabaseFromTemplate(templateKey);
             if (result.success && result.data) {
-                toast.success("Database created from template");
+                toast.success("Collection created from template");
                 qc.invalidateQueries({ queryKey: ["databases"] });
                 router.push(`/databases/${result.data.id}`);
             } else {
@@ -62,10 +62,10 @@ export default function DatabasesPage() {
     return (
         <div className="mx-auto max-w-5xl p-8">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Databases</h1>
+                <h1 className="text-2xl font-semibold">Collections</h1>
                 <Button onClick={() => setOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
-                    New database
+                    New collection
                 </Button>
             </div>
 
@@ -98,20 +98,20 @@ export default function DatabasesPage() {
                 </div>
             </div>
 
-            {/* Existing databases */}
+            {/* Existing collections */}
             {isLoading ? (
                 <p className="text-sm text-neutral-500">Loading…</p>
             ) : !databases || databases.length === 0 ? (
                 <div className="rounded-md border-2 border-dashed border-neutral-200 p-12 text-center dark:border-neutral-800">
                     <Database className="mx-auto h-8 w-8 text-neutral-400" />
                     <p className="mt-3 text-sm text-neutral-500">
-                        No databases yet. Pick a template above or create a blank one.
+                        No collections yet. Pick a template above or create a blank one.
                     </p>
                 </div>
             ) : (
                 <>
                     <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                        Your databases
+                        Your collections
                     </h2>
                     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {databases.map((db) => (
@@ -150,11 +150,11 @@ export default function DatabasesPage() {
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>New database</DialogTitle>
+                        <DialogTitle>New collection</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
                         <Input
-                            placeholder="Database name"
+                            placeholder="Collection name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                         />
