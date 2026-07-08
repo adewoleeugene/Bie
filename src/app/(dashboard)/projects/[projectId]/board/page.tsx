@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar, CheckCircle2, ExternalLink, Download, ArrowUpDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { SprintDialog } from "@/components/sprints/sprint-dialog";
+import { AddTasksDialog } from "@/components/sprints/add-tasks-dialog";
 import { exportTasksToCSV } from "@/lib/export";
+import { cn } from "@/lib/utils";
 import {
     Select,
     SelectContent,
@@ -30,8 +32,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+
+type CarryOver = "next" | "backlog" | "leave";
 
 export default function BoardPage() {
     const params = useParams();
@@ -47,7 +51,9 @@ export default function BoardPage() {
 
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [showSprintDialog, setShowSprintDialog] = useState(false);
+    const [showAddTasks, setShowAddTasks] = useState(false);
     const [sprintSelectOpen, setSprintSelectOpen] = useState(false);
+    const [carryOver, setCarryOver] = useState<CarryOver>("next");
     const [taskFilters, setTaskFilters] = useState<TaskFilters>({
         statuses: [],
         priorities: [],
@@ -65,16 +71,38 @@ export default function BoardPage() {
         }
     };
 
+    const doneTasks = tasks?.filter((t: any) => t.status === "DONE") || [];
+    const incompleteTasks = tasks?.filter((t: any) => t.status !== "DONE" && t.status !== "ARCHIVED") || [];
+
+    // Where incomplete tasks roll over to: prefer another active sprint, else the
+    // earliest planned one. Used to label the "next sprint" option.
+    const rolloverTarget = [...(sprints || [])]
+        .filter((s) => s.id !== sprintId && (s.status === "ACTIVE" || s.status === "PLANNING"))
+        .sort((a, b) =>
+            a.status === b.status
+                ? new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+                : a.status === "ACTIVE" ? -1 : 1
+        )[0];
+
+    // When opening the complete dialog, default to rolling into the next sprint if
+    // one exists, otherwise send unfinished work to the backlog.
+    useEffect(() => {
+        if (showCompleteDialog) {
+            setCarryOver(rolloverTarget ? "next" : "backlog");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showCompleteDialog]);
+
     const handleCompleteSprint = async () => {
         if (!sprintId) return;
-        await completeSprint.mutateAsync({ id: sprintId });
+        await completeSprint.mutateAsync({
+            id: sprintId,
+            carryOver: incompleteTasks.length > 0 ? carryOver : "leave",
+        });
         setShowCompleteDialog(false);
         // Optionally redirect to sprints list or clear filter
         router.push(`/projects/${projectId}/sprints`);
     };
-
-    const doneTasks = tasks?.filter((t: any) => t.status === "DONE") || [];
-    const incompleteTasks = tasks?.filter((t: any) => t.status !== "DONE" && t.status !== "ARCHIVED") || [];
     // Sort sprints: most recent first (by startDate), take top 3
     const sortedSprints = [...(sprints || [])].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     const recentSprints = sortedSprints.slice(0, 3);
@@ -179,6 +207,17 @@ export default function BoardPage() {
                         {sprintId && sprint?.status !== "COMPLETED" && (
                             <button
                                 type="button"
+                                onClick={() => setShowAddTasks(true)}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Add tasks
+                            </button>
+                        )}
+
+                        {sprintId && sprint?.status !== "COMPLETED" && (
+                            <button
+                                type="button"
                                 onClick={() => setShowCompleteDialog(true)}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium transition-colors hover:bg-white/[0.04]"
                                 style={{ color: "var(--bz-green)" }}
@@ -209,7 +248,26 @@ export default function BoardPage() {
                 </div>
             </header>
             <div className="flex-1 overflow-hidden">
-                <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
+                {sprintId && (tasks?.length ?? 0) === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                        <div>
+                            <p className="text-sm font-medium text-white">This sprint has no tasks yet.</p>
+                            <p className="mt-1 text-xs text-neutral-500">
+                                Pull existing tasks in to start planning the sprint.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowAddTasks(true)}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add tasks to sprint
+                        </button>
+                    </div>
+                ) : (
+                    <KanbanBoard tasks={applyTaskFilters(tasks || [], taskFilters)} />
+                )}
             </div>
 
             {/* Create Sprint Dialog */}
@@ -220,16 +278,83 @@ export default function BoardPage() {
                 defaultStatus="ACTIVE"
             />
 
+            {/* Add Tasks to Sprint Dialog */}
+            {sprintId && (
+                <AddTasksDialog
+                    projectId={projectId}
+                    sprintId={sprintId}
+                    sprintName={sprint?.name}
+                    open={showAddTasks}
+                    onOpenChange={setShowAddTasks}
+                />
+            )}
+
             {/* Complete Sprint Dialog */}
             <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Complete Sprint: {sprint?.name}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will mark the sprint as completed and archive {doneTasks.length} task(s) in the DONE column.
-                            {incompleteTasks.length > 0 && ` ${incompleteTasks.length} incomplete task(s) will remain in their current state.`}
+                            This marks the sprint as completed and archives {doneTasks.length} finished task(s) from the DONE column.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+
+                    {incompleteTasks.length > 0 && (
+                        <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                                What should happen to the {incompleteTasks.length} unfinished task(s)?
+                            </p>
+                            <div className="space-y-1.5">
+                                {[
+                                    ...(rolloverTarget
+                                        ? [{
+                                            value: "next" as CarryOver,
+                                            label: `Move to ${rolloverTarget.name}`,
+                                            hint: "Roll unfinished work into the next sprint",
+                                        }]
+                                        : []),
+                                    {
+                                        value: "backlog" as CarryOver,
+                                        label: "Send to Backlog",
+                                        hint: "Unassign them from any sprint",
+                                    },
+                                    {
+                                        value: "leave" as CarryOver,
+                                        label: "Leave in this sprint",
+                                        hint: "Keep them attached to the completed sprint",
+                                    },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setCarryOver(opt.value)}
+                                        className={cn(
+                                            "flex w-full items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                                            carryOver === opt.value
+                                                ? "border-[color:var(--bz-blue)] bg-[color:var(--bz-blue)]/10"
+                                                : "border-[color:var(--border)] hover:bg-white/[0.03]"
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                                                carryOver === opt.value ? "border-[color:var(--bz-blue)]" : "border-neutral-500"
+                                            )}
+                                        >
+                                            {carryOver === opt.value && (
+                                                <span className="h-2 w-2 rounded-full bg-[color:var(--bz-blue)]" />
+                                            )}
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium">{opt.label}</span>
+                                            <span className="block text-xs text-muted-foreground">{opt.hint}</span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction

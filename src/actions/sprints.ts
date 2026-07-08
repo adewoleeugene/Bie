@@ -11,7 +11,7 @@ import {
     UpdateSprintInput,
     DeleteSprintInput
 } from "@/lib/validators/sprint";
-import { Sprint, SprintStatus } from "@prisma/client";
+import { Sprint, SprintStatus, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
 
@@ -236,7 +236,7 @@ export async function getSprint(id: string) {
 }
 
 export async function completeSprint(
-    input: { id: string }
+    input: { id: string; carryOver?: "next" | "backlog" | "leave" }
 ): Promise<ActionResult<Sprint>> {
     try {
         const { organizationId } = await getUserOrganization();
@@ -263,7 +263,43 @@ export async function completeSprint(
             },
         });
 
-        // Incomplete tasks remain in their current state, still linked to this sprint
+        // Carry over incomplete tasks (anything not DONE/ARCHIVED) based on choice.
+        // "leave" (default) keeps them linked to this now-completed sprint.
+        const carryOver = input.carryOver ?? "leave";
+        if (carryOver !== "leave") {
+            let targetSprintId: string | null = null; // null => Backlog
+            if (carryOver === "next") {
+                // Prefer another active sprint; otherwise the earliest planned sprint.
+                const nextSprint =
+                    (await db.sprint.findFirst({
+                        where: {
+                            projectId: existingSprint.projectId,
+                            organizationId,
+                            id: { not: input.id },
+                            status: "ACTIVE",
+                        },
+                        orderBy: { startDate: "asc" },
+                    })) ??
+                    (await db.sprint.findFirst({
+                        where: {
+                            projectId: existingSprint.projectId,
+                            organizationId,
+                            id: { not: input.id },
+                            status: "PLANNING",
+                        },
+                        orderBy: { startDate: "asc" },
+                    }));
+                targetSprintId = nextSprint?.id ?? null; // fall back to Backlog if none
+            }
+
+            await db.task.updateMany({
+                where: {
+                    sprintId: input.id,
+                    status: { notIn: [TaskStatus.DONE, TaskStatus.ARCHIVED] },
+                },
+                data: { sprintId: targetSprintId },
+            });
+        }
 
         // Mark sprint as completed
         const sprint = await db.sprint.update({
