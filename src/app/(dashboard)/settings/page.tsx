@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Camera, Loader2, Lock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export default function SettingsPage() {
     const updatePref = useUpdateNotificationPreference();
     const currentMembership = members.find((member) => member.email === session?.user?.email);
     const currentRole = (currentMembership?.role as OrgRole | undefined) ?? undefined;
+    const nameDirty = name.trim() !== (session?.user?.name || "").trim();
 
     const NOTIF_TYPE_LABELS: Record<string, string> = {
         MENTION: "Mentions",
@@ -82,33 +84,48 @@ export default function SettingsPage() {
                     <CardTitle>Profile</CardTitle>
                     <CardDescription>Manage your public profile information.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center gap-6">
-                        <Avatar className="h-20 w-20">
-                            <AvatarImage src={session?.user?.image || undefined} />
-                            <AvatarFallback className="text-xl">
-                                {session?.user?.name?.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/jpeg,image/png,image/gif,image/webp"
-                                className="hidden"
-                                onChange={handleAvatarChange}
-                            />
-                            <Button
-                                variant="outline"
-                                disabled={avatarUploading}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                {avatarUploading ? "Uploading..." : "Change Avatar"}
-                            </Button>
+                <CardContent className="space-y-8">
+                    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={handleAvatarChange}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={avatarUploading}
+                            aria-label="Change avatar"
+                            className="group relative shrink-0 rounded-full outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                        >
+                            <Avatar className="h-20 w-20 border border-border">
+                                <AvatarImage src={session?.user?.image || undefined} />
+                                <AvatarFallback className="text-xl">
+                                    {session?.user?.name?.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                            </Avatar>
+                            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/55 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                                {avatarUploading ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                                ) : (
+                                    <Camera className="h-5 w-5 text-white" />
+                                )}
+                            </span>
+                        </button>
+                        <div className="text-center sm:text-left">
+                            <p className="text-sm font-medium leading-tight">
+                                {session?.user?.name || "Your name"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+                            <p className="mt-1.5 text-xs text-muted-foreground">
+                                Click the avatar to upload a new photo. JPG, PNG, GIF or WebP.
+                            </p>
                         </div>
                     </div>
 
-                    <div className="grid gap-4 max-w-md">
+                    <div className="grid gap-5 max-w-md">
                         <div className="space-y-2">
                             <Label htmlFor="name">Display Name</Label>
                             <Input
@@ -119,19 +136,24 @@ export default function SettingsPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email Address</Label>
-                            <Input
-                                id="email"
-                                value={session?.user?.email || ""}
-                                disabled
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="email"
+                                    value={session?.user?.email || ""}
+                                    disabled
+                                    className="pr-9"
+                                />
+                                <Lock className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            </div>
                             <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
                         </div>
                     </div>
-
-                    <Button onClick={handleSaveProfile} disabled={loading}>
+                </CardContent>
+                <CardFooter className="justify-end border-t pt-6">
+                    <Button onClick={handleSaveProfile} disabled={loading || !nameDirty}>
                         {loading ? "Saving..." : "Save Changes"}
                     </Button>
-                </CardContent>
+                </CardFooter>
             </Card>
 
             <Card>
