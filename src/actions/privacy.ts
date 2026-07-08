@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { OrgRole } from "@prisma/client";
 import { z } from "zod";
 import type { ActionResult } from "@/types";
+import { activeMembership } from "@/lib/user-organization";
 
 const privacyRequestSchema = z.object({
     kind: z.enum(["EXPORT", "DELETION"]),
@@ -59,9 +60,9 @@ async function getCurrentUserContext() {
 
     return {
         user,
-        primaryOrganizationId: user.memberships[0].organizationId,
+        primaryOrganizationId: (await activeMembership(user.memberships)).organizationId,
         organizationIds: user.memberships.map((membership) => membership.organizationId),
-        primaryRole: user.memberships[0].role,
+        primaryRole: (await activeMembership(user.memberships)).role,
     };
 }
 
@@ -111,7 +112,7 @@ export async function createPrivacyRequest(input: {
                 : "ChristBase data export request";
         const lines = [
             `User: ${user.name} <${user.email}>`,
-            `Organization: ${user.memberships[0]?.organization.name || "Unknown"}`,
+            `Organization: ${(await activeMembership(user.memberships))?.organization.name || "Unknown"}`,
             `Request type: ${validated.kind}`,
             `Request ID: ${request.id}`,
             validated.details ? "" : null,

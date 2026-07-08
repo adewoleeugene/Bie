@@ -6,6 +6,7 @@ import { WikiPageView } from "@/components/wiki/wiki-page-view";
 import { resolveInheritedAccess } from "@/lib/permissions";
 import { loadPageAccessChain } from "@/lib/wiki-access";
 import { AccessRequestStatus } from "@prisma/client";
+import { activeMembership } from "@/lib/user-organization";
 
 export async function generateMetadata({
     params,
@@ -66,8 +67,8 @@ export default async function WikiPageDetail({
     const chain = await loadPageAccessChain(page.id);
     const access = resolveInheritedAccess(chain, {
         userId: me.id,
-        organizationId: me.memberships[0].organizationId,
-        orgRole: me.memberships[0].role,
+        organizationId: (await activeMembership(me.memberships)).organizationId,
+        orgRole: (await activeMembership(me.memberships)).role,
     });
 
     // No access at all — bounce to the wiki home rather than leaking the page.

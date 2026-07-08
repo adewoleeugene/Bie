@@ -14,6 +14,7 @@ import {
 import { Project } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ensurePersonalWorkspace, selectCurrentMembership } from "@/lib/workspaces";
+import { activeMembership } from "@/lib/user-organization";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -42,7 +43,10 @@ async function getUserOrganization() {
         where: { userId: user.id },
         include: { organization: true },
     });
-    const currentMembership = selectCurrentMembership(memberships);
+    const currentMembership = await activeMembership(
+        memberships,
+        selectCurrentMembership(memberships)
+    );
 
     if (!currentMembership) {
         throw new Error("No organization found");

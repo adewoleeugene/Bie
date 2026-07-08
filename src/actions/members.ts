@@ -6,6 +6,7 @@ import { OrgRole, ProjectRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { buildNotificationEmail, sendEmail } from "@/lib/email";
+import { activeMembership } from "@/lib/user-organization";
 
 const INVITE_DAYS = 14;
 
@@ -50,8 +51,8 @@ async function getUserOrganization() {
 
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
-        role: user.memberships[0].role,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
+        role: (await activeMembership(user.memberships)).role,
     };
 }
 

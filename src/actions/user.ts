@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveFile } from "@/lib/storage";
 import { revalidatePath } from "next/cache";
+import { activeMembership } from "@/lib/user-organization";
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -36,7 +37,7 @@ export async function updateUserAvatar(formData: FormData) {
         return { success: false, error: "User not found" };
     }
 
-    const organizationId = user.memberships[0].organizationId;
+    const organizationId = (await activeMembership(user.memberships)).organizationId;
     const buffer = Buffer.from(await file.arrayBuffer());
     const saved = await saveFile(organizationId, `avatar-${user.id}`, file.name, buffer);
 

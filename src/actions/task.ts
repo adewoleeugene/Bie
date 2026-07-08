@@ -19,6 +19,7 @@ import { Task, ActivityAction, Prisma, NotificationType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { processAutomationRules } from "@/actions/automation";
 import { sendNotifications } from "@/lib/notifications";
+import { activeMembership } from "@/lib/user-organization";
 
 // Helper to get user's organization
 async function getUserOrganization() {
@@ -44,7 +45,7 @@ async function getUserOrganization() {
 
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
     };
 }
 

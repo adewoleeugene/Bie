@@ -16,6 +16,7 @@ import { LogOut, User, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/layout/sidebar";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 
 interface TopNavProps {
     user: {
@@ -23,11 +24,12 @@ interface TopNavProps {
         email?: string | null;
         image?: string | null;
     };
-    organizationName: string;
+    workspaces: { id: string; name: string }[];
+    currentWorkspaceId: string;
     projects: any[];
 }
 
-export function TopNav({ user, organizationName, projects }: TopNavProps) {
+export function TopNav({ user, workspaces, currentWorkspaceId, projects }: TopNavProps) {
     const initials = user.name
         ?.split(" ")
         .map((n) => n[0])
@@ -48,9 +50,7 @@ export function TopNav({ user, organizationName, projects }: TopNavProps) {
                         <Sidebar projects={projects} />
                     </SheetContent>
                 </Sheet>
-                <span className="mono hidden text-[10px] uppercase tracking-[0.18em] text-neutral-500 sm:inline">
-                    {organizationName}
-                </span>
+                <WorkspaceSwitcher workspaces={workspaces} currentWorkspaceId={currentWorkspaceId} />
                 <div className="hidden h-4 w-px bg-[color:var(--border)] sm:block" />
                 <div className="w-[220px] sm:w-[320px]">
                     <SearchDialog />

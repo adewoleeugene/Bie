@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { MilestoneStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { activeMembership } from "@/lib/user-organization";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -15,7 +16,7 @@ async function getUserOrganization() {
     });
 
     if (!user || user.memberships.length === 0) throw new Error("No organization");
-    return { userId: user.id, organizationId: user.memberships[0].organizationId };
+    return { userId: user.id, organizationId: (await activeMembership(user.memberships)).organizationId };
 }
 
 export async function createMilestone(data: {

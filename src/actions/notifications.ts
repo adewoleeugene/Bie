@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { activeMembership } from "@/lib/user-organization";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -27,7 +28,7 @@ async function getUserOrganization() {
 
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
     };
 }
 

@@ -14,6 +14,7 @@ import { canEdit, canView, resolveAccess } from "@/lib/permissions";
 import { parseRelationConfig, parseRollupConfig } from "@/lib/database-types";
 import { computeRollup } from "@/lib/database-rollup";
 import { DATABASE_TEMPLATES } from "@/lib/database-templates";
+import { activeMembership } from "@/lib/user-organization";
 
 async function getMe() {
     const session = await auth();
@@ -27,8 +28,8 @@ async function getMe() {
     }
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
-        orgRole: user.memberships[0].role,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
+        orgRole: (await activeMembership(user.memberships)).role,
     };
 }
 

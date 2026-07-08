@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ActionResult } from "@/types";
 import { startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, addDays, format } from "date-fns";
+import { activeMembership } from "@/lib/user-organization";
 
 export type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -64,7 +65,7 @@ export async function getOverviewMetrics(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
         const { start, end } = getDateRange(params);
 
         // Total tasks in organization
@@ -170,7 +171,7 @@ export async function getTaskCompletionTrend(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
         const { start, end } = getDateRange(params);
 
         // Get all tasks created or completed in the date range
@@ -239,7 +240,7 @@ export async function getStatusDistribution(): Promise<ActionResult<Array<{ stat
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
 
         const tasks = await db.task.groupBy({
             by: ["status"],
@@ -278,7 +279,7 @@ export async function getPriorityBreakdown(): Promise<ActionResult<Array<{ prior
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
 
         const tasks = await db.task.groupBy({
             by: ["priority"],
@@ -327,7 +328,7 @@ export async function getTeamProductivity(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
         const { start, end } = getDateRange(params);
 
         // Get all team members
@@ -423,7 +424,7 @@ export async function getSprintVelocity(): Promise<ActionResult<Array<{
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
 
         // Get last 6 sprints
         const sprints = await db.sprint.findMany({
@@ -485,7 +486,7 @@ export async function getProjectProgress(): Promise<ActionResult<Array<{
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
 
         const projects = await db.project.findMany({
             where: {
@@ -650,7 +651,7 @@ export async function getPeakProductivityHours(params: DateRangeParams) {
         // Get task completion times (updatedAt when status changed to DONE)
         const completedTasks = await db.task.findMany({
             where: {
-                organizationId: user.memberships[0].organizationId,
+                organizationId: (await activeMembership(user.memberships)).organizationId,
                 status: "DONE",
                 updatedAt: { gte: start, lte: end },
             },
@@ -701,7 +702,7 @@ export async function getCompletionForecast(projectId: string) {
         });
         if (!user || user.memberships.length === 0) return { success: false, error: "No org" };
 
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
 
         const tasks = await db.task.findMany({
             where: { projectId, organizationId: orgId },
