@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTasks, createTask, updateTask, deleteTask, reorderTask, bulkReorderTasks } from "@/actions/task";
+import { getTasks, createTask, updateTask, deleteTask, reorderTask, bulkReorderTasks, addTasksToSprint } from "@/actions/task";
 import { CreateTaskInput, UpdateTaskInput, DeleteTaskInput, ReorderTaskInput, BulkReorderTasksInput } from "@/lib/validators/task";
 import { toast } from "sonner";
 
@@ -84,6 +84,25 @@ export function useDeleteTask() {
         },
         onError: () => {
             toast.error("Failed to delete task");
+        },
+    });
+}
+
+export function useAddTasksToSprint() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: { sprintId: string; taskIds: string[] }) => addTasksToSprint(input),
+        onSuccess: (result) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                toast.success(`Added ${result.data?.count ?? 0} task(s) to sprint`);
+            } else {
+                toast.error(result.error);
+            }
+        },
+        onError: () => {
+            toast.error("Failed to add tasks to sprint");
         },
     });
 }
