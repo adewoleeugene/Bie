@@ -13,12 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BlockEditor } from "@/components/wiki/block-editor";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 import {
     Select,
     SelectContent,
@@ -27,9 +27,18 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { TaskStatus } from "@prisma/client";
-import { Plus, Calendar as CalendarIcon } from "lucide-react";
+import {
+    Plus,
+    Calendar as CalendarIcon,
+    CircleDashed,
+    Flag,
+    FolderKanban,
+    Rocket,
+    Users,
+    Clock,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
 
 interface TaskFormProps {
@@ -39,6 +48,31 @@ interface TaskFormProps {
     defaultStatusColumnId?: string;
     trigger?: ReactNode;
 }
+
+// Notion-style property row: icon + muted label on the left, control on the right.
+function PropertyRow({
+    icon: Icon,
+    label,
+    children,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex items-start gap-2 py-0.5">
+            <div className="flex w-32 shrink-0 items-center gap-2 pt-2 text-sm text-muted-foreground">
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+            </div>
+            <div className="min-w-0 flex-1">{children}</div>
+        </div>
+    );
+}
+
+// Borderless select trigger so properties read like inline text until hovered.
+const ghostTrigger =
+    "w-full justify-between border-0 bg-transparent px-2 font-normal shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/40 focus-visible:ring-0";
 
 export function TaskForm({
     projectId: initialProjectId,
@@ -135,287 +169,250 @@ export function TaskForm({
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
                 {trigger ?? (
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         New Task
                     </Button>
                 )}
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] overflow-y-auto max-h-[90vh]">
-                <DialogHeader>
-                    <DialogTitle>Create New Task</DialogTitle>
-                </DialogHeader>
+            </SheetTrigger>
+            <SheetContent
+                side="right"
+                className="w-full gap-0 p-0 sm:max-w-[560px]"
+            >
+                <SheetTitle className="sr-only">Create New Task</SheetTitle>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="title"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Title</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Enter task title" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Description</FormLabel>
-                                    <FormControl>
-                                        <div className="min-h-[150px] border rounded-md p-1">
-                                            <BlockEditor
-                                                initialContent={field.value}
-                                                onChange={field.onChange}
-                                            />
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <div className="grid grid-cols-2 gap-4">
+                    <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="flex h-full flex-col"
+                    >
+                        {/* Scrollable body */}
+                        <div className="flex-1 overflow-y-auto px-6 pt-12 pb-6">
+                            {/* Title — large, borderless, the focal point */}
                             <FormField
                                 control={form.control}
-                                name="projectId"
+                                name="title"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Project</FormLabel>
-                                        <Select
-                                            onValueChange={(value) => field.onChange(value === "none" ? null : value)}
-                                            defaultValue={field.value || "none"}
-                                            value={field.value || "none"}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select Project" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="none">No Project (General Task)</SelectItem>
-                                                {projects?.map((project) => (
-                                                    <SelectItem key={project.id} value={project.id}>
-                                                        {project.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                    <FormItem className="space-y-0">
+                                        <FormControl>
+                                            <Input
+                                                autoFocus
+                                                placeholder="Untitled task"
+                                                className="h-auto border-0 bg-transparent px-0 !text-2xl font-semibold shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0 dark:bg-transparent"
+                                                {...field}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            <FormField
-                                control={form.control}
-                                name="sprintId"
-                                render={({ field }) => {
-                                    // Show project-specific sprints, or all if project has none
-                                    const displaySprints = hasNoProjectSprints ? allSprints : sprints;
-                                    return (
-                                        <FormItem>
-                                            <FormLabel>Sprint</FormLabel>
+                            {/* Properties */}
+                            <div className="mt-4 space-y-1 border-b pb-4">
+                                <FormField
+                                    control={form.control}
+                                    name="status"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={CircleDashed} label="Status">
                                             <Select
-                                                onValueChange={field.onChange}
-                                                defaultValue={field.value || undefined}
-                                                value={field.value || undefined}
-                                                disabled={!allSprints?.length}
+                                                onValueChange={(value) => {
+                                                    const statusColumn = statusColumnsResult?.success
+                                                        ? statusColumnsResult.data.find((column) => column.id === value)
+                                                        : undefined;
+
+                                                    if (statusColumn) {
+                                                        form.setValue("statusColumnId", statusColumn.id);
+                                                        field.onChange(statusColumn.status || "TODO");
+                                                    } else {
+                                                        form.setValue("statusColumnId", undefined);
+                                                        field.onChange(value);
+                                                    }
+                                                }}
+                                                value={selectedStatusColumnId || field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select Sprint" />
+                                                    <SelectTrigger className={ghostTrigger}>
+                                                        <SelectValue placeholder="Select status" />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {displaySprints?.map((sprint) => (
-                                                        <SelectItem key={sprint.id} value={sprint.id}>
-                                                            <div className="flex flex-col">
-                                                                <span>{sprint.name}</span>
-                                                                <span className="text-[10px] text-muted-foreground">
-                                                                    {sprint.project?.name ? `${sprint.project.name} · ` : ""}
-                                                                    {format(new Date(sprint.startDate), "MMM d, yyyy")} - {format(new Date(sprint.endDate), "MMM d, yyyy")}
-                                                                </span>
-                                                            </div>
+                                                    {statusColumnsResult?.success && statusColumnsResult.data.length > 0 ? (
+                                                        statusColumnsResult.data.map((column) => (
+                                                            <SelectItem key={column.id} value={column.id}>
+                                                                {column.name}
+                                                            </SelectItem>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="BACKLOG">Backlog</SelectItem>
+                                                            <SelectItem value="TODO">To Do</SelectItem>
+                                                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                                                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                                                            <SelectItem value="DONE">Done</SelectItem>
+                                                            <SelectItem value="ARCHIVED">Archived</SelectItem>
+                                                        </>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </PropertyRow>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="priority"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={Flag} label="Priority">
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className={ghostTrigger}>
+                                                        <SelectValue placeholder="Select priority" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="P0">P0 - Critical</SelectItem>
+                                                    <SelectItem value="P1">P1 - High</SelectItem>
+                                                    <SelectItem value="P2">P2 - Medium</SelectItem>
+                                                    <SelectItem value="P3">P3 - Low</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </PropertyRow>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="projectId"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={FolderKanban} label="Project">
+                                            <Select
+                                                onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                                                defaultValue={field.value || "none"}
+                                                value={field.value || "none"}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger className={ghostTrigger}>
+                                                        <SelectValue placeholder="Select project" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No Project (General Task)</SelectItem>
+                                                    {projects?.map((project) => (
+                                                        <SelectItem key={project.id} value={project.id}>
+                                                            {project.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    );
-                                }}
-                            />
-                        </div>
+                                        </PropertyRow>
+                                    )}
+                                />
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="status"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Status</FormLabel>
-                                        <Select
-                                            onValueChange={(value) => {
-                                                const statusColumn = statusColumnsResult?.success
-                                                    ? statusColumnsResult.data.find((column) => column.id === value)
-                                                    : undefined;
+                                <FormField
+                                    control={form.control}
+                                    name="sprintId"
+                                    render={({ field }) => {
+                                        // Show project-specific sprints, or all if project has none
+                                        const displaySprints = hasNoProjectSprints ? allSprints : sprints;
+                                        return (
+                                            <PropertyRow icon={Rocket} label="Sprint">
+                                                <Select
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value || undefined}
+                                                    value={field.value || undefined}
+                                                    disabled={!allSprints?.length}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger className={ghostTrigger}>
+                                                            <SelectValue placeholder="Select sprint" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {displaySprints?.map((sprint) => (
+                                                            <SelectItem key={sprint.id} value={sprint.id}>
+                                                                <div className="flex flex-col">
+                                                                    <span>{sprint.name}</span>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        {sprint.project?.name ? `${sprint.project.name} · ` : ""}
+                                                                        {format(new Date(sprint.startDate), "MMM d, yyyy")} - {format(new Date(sprint.endDate), "MMM d, yyyy")}
+                                                                    </span>
+                                                                </div>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </PropertyRow>
+                                        );
+                                    }}
+                                />
 
-                                                if (statusColumn) {
-                                                    form.setValue("statusColumnId", statusColumn.id);
-                                                    field.onChange(statusColumn.status || "TODO");
-                                                } else {
-                                                    form.setValue("statusColumnId", undefined);
-                                                    field.onChange(value);
-                                                }
-                                            }}
-                                            value={selectedStatusColumnId || field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select Status" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {statusColumnsResult?.success && statusColumnsResult.data.length > 0 ? (
-                                                    statusColumnsResult.data.map((column) => (
-                                                        <SelectItem key={column.id} value={column.id}>
-                                                            {column.name}
-                                                        </SelectItem>
-                                                    ))
-                                                ) : (
-                                                    <>
-                                                        <SelectItem value="BACKLOG">Backlog</SelectItem>
-                                                        <SelectItem value="TODO">To Do</SelectItem>
-                                                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                                                        <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                                                        <SelectItem value="DONE">Done</SelectItem>
-                                                        <SelectItem value="ARCHIVED">Archived</SelectItem>
-                                                    </>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                <PropertyRow icon={Users} label="Assignees">
+                                    <div className="flex flex-wrap gap-1.5 px-2 py-1.5">
+                                        {members?.map((member) => {
+                                            const isSelected = selectedAssigneeIds?.includes(member.id);
+                                            return (
+                                                <button
+                                                    key={member.id}
+                                                    type="button"
+                                                    onClick={() => toggleAssignee(member.id)}
+                                                    className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors ${isSelected
+                                                        ? "border-primary bg-primary/10 text-primary"
+                                                        : "border-transparent bg-muted/60 hover:bg-muted dark:bg-muted/40 dark:hover:bg-muted/60"
+                                                        }`}
+                                                >
+                                                    <Avatar className="h-4 w-4">
+                                                        <AvatarImage src={member.image || undefined} />
+                                                        <AvatarFallback className="text-[9px]">
+                                                            {member.name?.substring(0, 2).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {member.name}
+                                                </button>
+                                            );
+                                        })}
+                                        {!members?.length && (
+                                            <p className="text-sm text-muted-foreground">No members found.</p>
+                                        )}
+                                    </div>
+                                </PropertyRow>
 
-                            <FormField
-                                control={form.control}
-                                name="priority"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Priority</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select Priority" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="P0">P0 - Critical</SelectItem>
-                                                <SelectItem value="P1">P1 - High</SelectItem>
-                                                <SelectItem value="P2">P2 - Medium</SelectItem>
-                                                <SelectItem value="P3">P3 - Low</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
+                                <FormField
+                                    control={form.control}
+                                    name="startDate"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={CalendarIcon} label="Start date">
+                                            <Input
+                                                type="datetime-local"
+                                                {...field}
+                                                value={field.value || ""}
+                                                className={`h-8 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/40 focus-visible:ring-0 ${field.value ? "" : "text-muted-foreground"}`}
+                                            />
+                                        </PropertyRow>
+                                    )}
+                                />
 
-                        <div>
-                            <FormLabel>Assignees</FormLabel>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {members?.map((member) => {
-                                    const isSelected = selectedAssigneeIds?.includes(member.id);
-                                    return (
-                                        <button
-                                            key={member.id}
-                                            type="button"
-                                            onClick={() => toggleAssignee(member.id)}
-                                            className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${isSelected
-                                                ? "border-primary bg-primary/10 text-primary"
-                                                : "border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800"
-                                                }`}
-                                        >
-                                            <Avatar className="h-5 w-5">
-                                                <AvatarImage src={member.image || undefined} />
-                                                <AvatarFallback className="text-[10px]">
-                                                    {member.name?.substring(0, 2).toUpperCase()}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            {member.name}
-                                        </button>
-                                    );
-                                })}
-                                {!members?.length && (
-                                    <p className="text-sm text-neutral-500">No members found.</p>
-                                )}
-                            </div>
-                        </div>
+                                <FormField
+                                    control={form.control}
+                                    name="dueDate"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={CalendarIcon} label="Due date">
+                                            <Input
+                                                type="datetime-local"
+                                                {...field}
+                                                value={field.value || ""}
+                                                className={`h-8 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/40 focus-visible:ring-0 ${field.value ? "" : "text-muted-foreground"}`}
+                                            />
+                                        </PropertyRow>
+                                    )}
+                                />
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="startDate"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Start Date</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Input
-                                                    type="datetime-local"
-                                                    {...field}
-                                                    value={field.value || ""}
-                                                    className="pl-8"
-                                                />
-                                                <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="dueDate"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Due Date</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Input
-                                                    type="datetime-local"
-                                                    {...field}
-                                                    value={field.value || ""}
-                                                    className="pl-8"
-                                                />
-                                                <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="estimatedHours"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Est. Hours</FormLabel>
-                                        <FormControl>
+                                <FormField
+                                    control={form.control}
+                                    name="estimatedHours"
+                                    render={({ field }) => (
+                                        <PropertyRow icon={Clock} label="Est. hours">
                                             <Input
                                                 type="number"
                                                 placeholder="e.g. 4.5"
@@ -425,7 +422,26 @@ export function TaskForm({
                                                     field.onChange(isNaN(val) ? undefined : val);
                                                 }}
                                                 value={field.value || ""}
+                                                className="h-8 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/40 focus-visible:ring-0"
                                             />
+                                        </PropertyRow>
+                                    )}
+                                />
+                            </div>
+
+                            {/* Description — clean block editor, no boxed border */}
+                            <FormField
+                                control={form.control}
+                                name="description"
+                                render={({ field }) => (
+                                    <FormItem className="mt-4 space-y-0">
+                                        <FormControl>
+                                            <div className="min-h-[180px]">
+                                                <BlockEditor
+                                                    initialContent={field.value}
+                                                    onChange={field.onChange}
+                                                />
+                                            </div>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -433,10 +449,11 @@ export function TaskForm({
                             />
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-4">
+                        {/* Sticky footer */}
+                        <SheetFooter className="flex-row justify-end gap-2 border-t px-6 py-4">
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => setOpen(false)}
                             >
                                 Cancel
@@ -444,10 +461,10 @@ export function TaskForm({
                             <Button type="submit" disabled={createTask.isPending}>
                                 {createTask.isPending ? "Creating..." : "Create Task"}
                             </Button>
-                        </div>
+                        </SheetFooter>
                     </form>
                 </Form>
-            </DialogContent>
-        </Dialog>
+            </SheetContent>
+        </Sheet>
     );
 }
