@@ -24,12 +24,21 @@ interface TopNavProps {
         email?: string | null;
         image?: string | null;
     };
-    workspaces: { id: string; name: string }[];
-    currentWorkspaceId: string;
+    workspaces: { id: string; name: string; type: "PERSONAL" | "ORGANIZATION" }[];
+    invitedProjects: { id: string; name: string; organizationId: string; workspaceName: string }[];
+    currentWorkspaceId: string | null;
+    currentWorkspaceName: string | null;
     projects: any[];
 }
 
-export function TopNav({ user, workspaces, currentWorkspaceId, projects }: TopNavProps) {
+export function TopNav({
+    user,
+    workspaces,
+    invitedProjects,
+    currentWorkspaceId,
+    currentWorkspaceName,
+    projects,
+}: TopNavProps) {
     const initials = user.name
         ?.split(" ")
         .map((n) => n[0])
@@ -50,7 +59,12 @@ export function TopNav({ user, workspaces, currentWorkspaceId, projects }: TopNa
                         <Sidebar projects={projects} />
                     </SheetContent>
                 </Sheet>
-                <WorkspaceSwitcher workspaces={workspaces} currentWorkspaceId={currentWorkspaceId} />
+                <WorkspaceSwitcher
+                    workspaces={workspaces}
+                    invitedProjects={invitedProjects}
+                    currentWorkspaceId={currentWorkspaceId}
+                    currentWorkspaceName={currentWorkspaceName}
+                />
                 <div className="hidden h-4 w-px bg-[color:var(--border)] sm:block" />
                 <div className="w-[220px] sm:w-[320px]">
                     <SearchDialog />
