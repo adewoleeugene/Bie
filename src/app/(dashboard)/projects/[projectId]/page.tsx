@@ -44,8 +44,8 @@ function StatCard({
     children: React.ReactNode;
 }) {
     return (
-        <Card className="bz-card">
-            <CardContent className="p-5">
+        <Card>
+            <CardContent>
                 <div className="flex items-center gap-2 text-muted-foreground">
                     <Icon className="h-3.5 w-3.5" />
                     <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
@@ -91,40 +91,40 @@ export default function ProjectDashboardPage() {
     const activeCounts = counts.filter((c) => c.count > 0);
 
     return (
-        <div className="flex flex-col h-full bg-background overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-4 px-6 py-6 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-                <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold tracking-tight truncate">{project.name}</h1>
-                        <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1.5 border-transparent"
-                            style={{
-                                color: PROJECT_STATUS_COLOR[project.status as ProjectStatus],
-                                backgroundColor: `color-mix(in oklab, ${PROJECT_STATUS_COLOR[project.status as ProjectStatus]} 14%, transparent)`,
-                            }}
-                        >
-                            <span
-                                className="h-1.5 w-1.5 rounded-full"
-                                style={{ backgroundColor: "currentColor" }}
-                            />
-                            {project.status}
-                        </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                        {project.description || "No description provided."}
-                    </p>
-                </div>
-                <Button variant="outline" onClick={() => setShowEditDialog(true)} className="shrink-0">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                </Button>
-            </div>
-
+        <div className="flex flex-col h-full overflow-y-auto">
             <ProjectDialog project={project} open={showEditDialog} onOpenChange={setShowEditDialog} />
 
-            <div className="p-6 space-y-6 max-w-[1400px] w-full mx-auto">
+            <div className="space-y-6 p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold tracking-tight truncate">{project.name}</h1>
+                            <Badge
+                                variant="outline"
+                                className="shrink-0 gap-1.5 border-transparent"
+                                style={{
+                                    color: PROJECT_STATUS_COLOR[project.status as ProjectStatus],
+                                    backgroundColor: `color-mix(in oklab, ${PROJECT_STATUS_COLOR[project.status as ProjectStatus]} 14%, transparent)`,
+                                }}
+                            >
+                                <span
+                                    className="h-1.5 w-1.5 rounded-full"
+                                    style={{ backgroundColor: "currentColor" }}
+                                />
+                                {project.status}
+                            </Badge>
+                        </div>
+                        <p className="text-muted-foreground truncate">
+                            {project.description || "No description provided."}
+                        </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setShowEditDialog(true)} className="shrink-0">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
+                    </Button>
+                </div>
+
                 {/* Key metrics */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard label="Total Tasks" icon={ListChecks}>
@@ -196,7 +196,7 @@ export default function ProjectDashboardPage() {
                                         </Link>
                                         <div className="flex -space-x-2 shrink-0">
                                             {squad.members?.slice(0, 4).map((m: any) => (
-                                                <Avatar key={m.user.id} className="h-6 w-6 ring-2 ring-card">
+                                                <Avatar key={m.user.id} className="h-6 w-6 ring-2 ring-background">
                                                     <AvatarImage src={m.user.image} />
                                                     <AvatarFallback className="text-[10px]">
                                                         {m.user.name?.substring(0, 2)}
@@ -216,7 +216,7 @@ export default function ProjectDashboardPage() {
                 {/* Distribution + activity */}
                 <div className="grid gap-6 lg:grid-cols-5">
                     {/* Task distribution */}
-                    <Card className="bz-card lg:col-span-3">
+                    <Card className="lg:col-span-3">
                         <CardHeader>
                             <CardTitle className="text-base">Task Distribution</CardTitle>
                         </CardHeader>
@@ -269,7 +269,7 @@ export default function ProjectDashboardPage() {
                     </Card>
 
                     {/* Recent activity */}
-                    <Card className="bz-card lg:col-span-2">
+                    <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle className="text-base">Recent Activity</CardTitle>
                         </CardHeader>
@@ -312,8 +312,8 @@ export default function ProjectDashboardPage() {
                 </div>
 
                 {/* Milestones */}
-                <Card className="bz-card">
-                    <CardContent className="pt-6">
+                <Card>
+                    <CardContent>
                         <MilestoneList projectId={projectId} />
                     </CardContent>
                 </Card>
