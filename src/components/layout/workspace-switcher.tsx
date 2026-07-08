@@ -11,23 +11,43 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, FolderGit2, Home, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface WorkspaceSwitcherProps {
-    workspaces: { id: string; name: string }[];
-    currentWorkspaceId: string;
+interface Workspace {
+    id: string;
+    name: string;
+    type: "PERSONAL" | "ORGANIZATION";
 }
 
-export function WorkspaceSwitcher({ workspaces, currentWorkspaceId }: WorkspaceSwitcherProps) {
+interface InvitedProject {
+    id: string;
+    name: string;
+    organizationId: string;
+    workspaceName: string;
+}
+
+interface WorkspaceSwitcherProps {
+    workspaces: Workspace[];
+    invitedProjects: InvitedProject[];
+    currentWorkspaceId: string | null;
+    currentWorkspaceName: string | null;
+}
+
+export function WorkspaceSwitcher({
+    workspaces,
+    invitedProjects,
+    currentWorkspaceId,
+    currentWorkspaceName,
+}: WorkspaceSwitcherProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
-    const current = workspaces.find((w) => w.id === currentWorkspaceId);
-    const currentName = current?.name ?? "Workspace";
+    const currentName = currentWorkspaceName ?? workspaces.find((w) => w.id === currentWorkspaceId)?.name ?? "Workspace";
+    const totalOptions = workspaces.length + invitedProjects.length;
 
-    // Nothing to switch between — keep the plain label.
-    if (workspaces.length <= 1) {
+    // Only one place to be — keep the plain label.
+    if (totalOptions <= 1) {
         return (
             <span className="mono hidden max-w-[180px] truncate text-[10px] uppercase tracking-[0.18em] text-neutral-500 sm:inline">
                 {currentName}
@@ -35,14 +55,28 @@ export function WorkspaceSwitcher({ workspaces, currentWorkspaceId }: WorkspaceS
         );
     }
 
-    const handleSwitch = (id: string) => {
+    const handleSwitchWorkspace = (id: string) => {
         if (id === currentWorkspaceId || isPending) return;
         startTransition(async () => {
             const result = await switchWorkspace(id);
             if (result.success) {
+                router.push("/dashboard");
                 router.refresh();
             } else {
                 toast.error(result.error || "Couldn't switch workspace");
+            }
+        });
+    };
+
+    const handleOpenProject = (project: InvitedProject) => {
+        if (isPending) return;
+        startTransition(async () => {
+            const result = await switchWorkspace(project.organizationId);
+            if (result.success) {
+                router.push(`/projects/${project.id}`);
+                router.refresh();
+            } else {
+                toast.error(result.error || "Couldn't open project");
             }
         });
     };
@@ -58,23 +92,52 @@ export function WorkspaceSwitcher({ workspaces, currentWorkspaceId }: WorkspaceS
                     <ChevronsUpDown className="h-3 w-3 shrink-0 text-neutral-500" />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 border-[color:var(--border)] bg-[color:var(--popover)]">
+            <DropdownMenuContent align="start" className="w-64 border-[color:var(--border)] bg-[color:var(--popover)]">
                 <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
-                    Switch workspace
+                    Workspaces
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                 {workspaces.map((workspace) => (
                     <DropdownMenuItem
                         key={workspace.id}
-                        onClick={() => handleSwitch(workspace.id)}
-                        className="flex items-center justify-between gap-2"
+                        onClick={() => handleSwitchWorkspace(workspace.id)}
+                        className="flex items-center gap-2"
                     >
-                        <span className="truncate">{workspace.name}</span>
+                        {workspace.type === "PERSONAL" ? (
+                            <Home className="h-4 w-4 shrink-0 text-neutral-500" />
+                        ) : (
+                            <Building2 className="h-4 w-4 shrink-0 text-neutral-500" />
+                        )}
+                        <span className="flex-1 truncate">{workspace.name}</span>
                         {workspace.id === currentWorkspaceId && (
                             <Check className="h-4 w-4 shrink-0 text-emerald-500" />
                         )}
                     </DropdownMenuItem>
                 ))}
+
+                {invitedProjects.length > 0 && (
+                    <>
+                        <DropdownMenuLabel className="mt-1 text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                            Invited projects
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-[color:var(--border)]" />
+                        {invitedProjects.map((project) => (
+                            <DropdownMenuItem
+                                key={project.id}
+                                onClick={() => handleOpenProject(project)}
+                                className="flex items-center gap-2"
+                            >
+                                <FolderGit2 className="h-4 w-4 shrink-0 text-neutral-500" />
+                                <div className="flex-1 truncate">
+                                    <span className="truncate">{project.name}</span>
+                                    <span className="block truncate text-[10px] text-neutral-500">
+                                        {project.workspaceName}
+                                    </span>
+                                </div>
+                            </DropdownMenuItem>
+                        ))}
+                    </>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     );

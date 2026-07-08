@@ -26,33 +26,80 @@ export async function activeMembership<T extends { organizationId: string }>(
     return fallback ?? memberships[0];
 }
 
-/** Workspaces the current user belongs to, plus which one is active. */
+const EMPTY_WORKSPACES = {
+    workspaces: [] as { id: string; name: string; type: "PERSONAL" | "ORGANIZATION" }[],
+    invitedProjects: [] as { id: string; name: string; organizationId: string; workspaceName: string }[],
+    currentId: null as string | null,
+    currentName: null as string | null,
+};
+
+/**
+ * Everything the current user can switch to: their personal workspace, any
+ * workspaces they're a full member of, and any projects they were invited to
+ * as a guest (where they don't have the whole workspace).
+ */
 export async function getUserWorkspaces() {
     const session = await auth();
-    if (!session?.user?.email) return { workspaces: [], currentId: null };
+    if (!session?.user?.email) return EMPTY_WORKSPACES;
 
     const user = await db.user.findUnique({
         where: { email: session.user.email },
         select: { id: true },
     });
-    if (!user) return { workspaces: [], currentId: null };
+    if (!user) return EMPTY_WORKSPACES;
 
     const memberships = await db.organizationMember.findMany({
         where: { userId: user.id },
         include: { organization: { select: { id: true, name: true, type: true } } },
         orderBy: { joinedAt: "asc" },
     });
-    if (memberships.length === 0) return { workspaces: [], currentId: null };
+    if (memberships.length === 0) return EMPTY_WORKSPACES;
 
     const current = await activeMembership(memberships, selectCurrentMembership(memberships));
 
-    return {
-        workspaces: memberships.map((m) => ({
+    // Full workspaces: personal + anywhere the user is more than a guest.
+    // Personal first so it reads as the home base.
+    const workspaces = memberships
+        .filter((m) => m.organization.type === "PERSONAL" || m.role !== "GUEST")
+        .sort((a, b) => (a.organization.type === "PERSONAL" ? -1 : b.organization.type === "PERSONAL" ? 1 : 0))
+        .map((m) => ({
             id: m.organization.id,
             name: m.organization.name,
             type: m.organization.type,
-            role: m.role,
-        })),
+        }));
+
+    // Guest orgs only surface through the specific projects the user was invited to.
+    const guestOrgIds = memberships.filter((m) => m.role === "GUEST").map((m) => m.organizationId);
+    let invitedProjects: typeof EMPTY_WORKSPACES.invitedProjects = [];
+    if (guestOrgIds.length > 0) {
+        const projectMembers = await db.projectMember.findMany({
+            where: {
+                userId: user.id,
+                project: { organizationId: { in: guestOrgIds } },
+            },
+            select: {
+                project: {
+                    select: {
+                        id: true,
+                        name: true,
+                        organizationId: true,
+                        organization: { select: { name: true } },
+                    },
+                },
+            },
+        });
+        invitedProjects = projectMembers.map((pm) => ({
+            id: pm.project.id,
+            name: pm.project.name,
+            organizationId: pm.project.organizationId,
+            workspaceName: pm.project.organization.name,
+        }));
+    }
+
+    return {
+        workspaces,
+        invitedProjects,
         currentId: current?.organizationId ?? null,
+        currentName: current?.organization.name ?? null,
     };
 }

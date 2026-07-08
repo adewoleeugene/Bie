@@ -6,8 +6,8 @@ import { TopNav } from "@/components/layout/top-nav";
 import { getProjects } from "@/actions/project";
 import { DashboardClientProviders } from "@/components/layout/dashboard-client-providers";
 import { AssistantChat } from "@/components/ai/assistant-chat";
-import { ensurePersonalWorkspace, selectCurrentMembership } from "@/lib/workspaces";
-import { activeMembership } from "@/lib/user-organization";
+import { ensurePersonalWorkspace } from "@/lib/workspaces";
+import { getUserWorkspaces } from "@/lib/user-organization";
 
 export default async function DashboardLayout({
     children,
@@ -52,17 +52,8 @@ export default async function DashboardLayout({
         redirect("/login");
     }
 
-    const currentMembership = await activeMembership(
-        user.memberships,
-        selectCurrentMembership(user.memberships)
-    );
-    const organization = currentMembership.organization;
     const projects = await getProjects();
-
-    const workspaces = user.memberships.map((membership) => ({
-        id: membership.organization.id,
-        name: membership.organization.name,
-    }));
+    const { workspaces, invitedProjects, currentId, currentName } = await getUserWorkspaces();
 
     return (
         <div className="flex h-screen overflow-hidden">
@@ -77,7 +68,9 @@ export default async function DashboardLayout({
                         image: user.image,
                     }}
                     workspaces={workspaces}
-                    currentWorkspaceId={organization.id}
+                    invitedProjects={invitedProjects}
+                    currentWorkspaceId={currentId}
+                    currentWorkspaceName={currentName}
                     projects={projects}
                 />
                 <main className="flex-1 overflow-auto bg-neutral-50 dark:bg-neutral-900">
