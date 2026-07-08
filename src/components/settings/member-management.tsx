@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { OrgRole, ProjectRole } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
     GUEST: { label: "Guest", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20", icon: User },
 };
 
-export function MemberManagement() {
+export function MemberManagement({ limit }: { limit?: number } = {}) {
     const { data: members = [], isLoading } = useMembers();
     const { data: projects = [] } = useProjects();
     const { data: invites } = useWorkspaceInvites();
@@ -116,6 +117,8 @@ export function MemberManagement() {
 
     const pendingInvites = invites?.pending ?? [];
     const shareableLinks = invites?.links ?? [];
+    const visibleMembers = limit ? members.slice(0, limit) : members;
+    const hiddenCount = limit ? Math.max(0, members.length - limit) : 0;
 
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteScope, setInviteScope] = useState<string>(WORKSPACE_SCOPE);
@@ -440,7 +443,7 @@ export function MemberManagement() {
                         <p className="text-sm text-muted-foreground">Loading members...</p>
                     ) : (
                         <div className="space-y-3">
-                            {members.map((member) => {
+                            {visibleMembers.map((member) => {
                                 const config = ROLE_CONFIG[member.role as OrgRole] ?? ROLE_CONFIG.MEMBER;
                                 const initials = member.name
                                     ?.split(" ")
@@ -547,12 +550,22 @@ export function MemberManagement() {
                                     No members found.
                                 </p>
                             )}
+
+                            {hiddenCount > 0 && (
+                                <div className="pt-2">
+                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                        <Link href="/settings/members">
+                                            See all members ({members.length})
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {pendingInvites.length > 0 && (
+            {!limit && pendingInvites.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle>Pending invitations</CardTitle>
@@ -592,7 +605,7 @@ export function MemberManagement() {
                 </Card>
             )}
 
-            {shareableLinks.length > 0 && (
+            {!limit && shareableLinks.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle>Shareable links</CardTitle>
