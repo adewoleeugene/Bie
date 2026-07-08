@@ -13,6 +13,17 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Database, Plus, Loader2, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { DATABASE_TEMPLATES } from "@/lib/database-templates";
@@ -142,18 +153,38 @@ export default function DatabasesPage() {
                                         </div>
                                     </div>
                                 </Link>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    title="Delete collection"
-                                    aria-label={`Delete ${db.name}`}
-                                    disabled={deleteCollection.isPending}
-                                    onClick={() => deleteCollection.mutate(db.id)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 text-neutral-500 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            title="Delete collection"
+                                            aria-label={`Delete ${db.name}`}
+                                            disabled={deleteCollection.isPending}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 text-neutral-500 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete collection?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                &quot;{db.name}&quot; will be moved to Trash. You can restore it from Trash later.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={() => deleteCollection.mutate(db.id)}
+                                                className="bg-red-600 text-white hover:bg-red-700"
+                                            >
+                                                Delete collection
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </li>
                         ))}
                     </ul>

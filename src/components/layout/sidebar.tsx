@@ -23,6 +23,17 @@ import {
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
 import { useDeleteProject } from "@/hooks/use-projects";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Project {
     id: string;
@@ -235,27 +246,42 @@ export function Sidebar({ projects }: SidebarProps) {
                                         )}
                                     </Link>
                                     {!collapsed && (
-                                        <button
-                                            type="button"
-                                            title="Delete project"
-                                            aria-label={`Delete ${project.name}`}
-                                            disabled={deleteProject.isPending}
-                                            onClick={async () => {
-                                                const confirmed = window.confirm(
-                                                    `Delete "${project.name}"? This permanently deletes the project and its related data.`,
-                                                );
-                                                if (!confirmed) return;
-
-                                                const result = await deleteProject.mutateAsync({ id: project.id });
-                                                if (result.success) {
-                                                    if (active) router.push("/");
-                                                    router.refresh();
-                                                }
-                                            }}
-                                            className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-opacity hover:bg-white/[0.05] hover:text-red-400 focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-40 group-hover/project:opacity-100"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    title="Delete project"
+                                                    aria-label={`Delete ${project.name}`}
+                                                    disabled={deleteProject.isPending}
+                                                    className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-opacity hover:bg-white/[0.05] hover:text-red-400 focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-40 group-hover/project:opacity-100"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        &quot;{project.name}&quot; will be permanently deleted with its related data. This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={async () => {
+                                                            const result = await deleteProject.mutateAsync({ id: project.id });
+                                                            if (result.success) {
+                                                                if (active) router.push("/");
+                                                                router.refresh();
+                                                            }
+                                                        }}
+                                                        className="bg-red-600 text-white hover:bg-red-700"
+                                                    >
+                                                        Delete project
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     )}
                                 </div>
                             );
