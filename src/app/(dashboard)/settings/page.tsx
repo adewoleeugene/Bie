@@ -141,13 +141,13 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="grid grid-cols-[1fr,80px,80px] gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
+                        <div className="grid grid-cols-[1fr_80px_80px] gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
                             <span>Type</span>
                             <span className="text-center">In-App</span>
                             <span className="text-center">Email</span>
                         </div>
                         {notifPrefs?.map((pref) => (
-                            <div key={pref.type} className="grid grid-cols-[1fr,80px,80px] gap-2 items-center">
+                            <div key={pref.type} className="grid grid-cols-[1fr_80px_80px] gap-2 items-center">
                                 <span className="text-sm font-medium">
                                     {NOTIF_TYPE_LABELS[pref.type] || pref.type}
                                 </span>
@@ -173,7 +173,7 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
-            <MemberManagement />
+            <MemberManagement limit={5} />
             <PrivacyControls />
             <PrivacyAdminPanel role={currentRole} />
         </div>
