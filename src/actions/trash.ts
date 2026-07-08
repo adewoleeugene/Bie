@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { activeMembership } from "@/lib/user-organization";
 
 /**
  * Trash actions for wiki pages, databases, and database rows.
@@ -23,7 +24,7 @@ async function getMe() {
         throw new Error("No organization");
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
     };
 }
 

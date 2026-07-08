@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { WikiNamespace } from "@prisma/client";
+import { activeMembership } from "@/lib/user-organization";
 
 export default async function ProjectWikiIndex({
     params,
@@ -29,7 +30,7 @@ export default async function ProjectWikiIndex({
         redirect("/login");
     }
 
-    const organizationId = user.memberships[0].organizationId;
+    const organizationId = (await activeMembership(user.memberships)).organizationId;
 
     // Get the first wiki page or redirect to create one
     const firstPage = await db.wikiPage.findFirst({

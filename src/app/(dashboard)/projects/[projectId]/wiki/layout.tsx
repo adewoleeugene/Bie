@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { WikiSidebar } from "@/components/wiki/wiki-sidebar";
 import { WikiNamespace } from "@prisma/client";
+import { activeMembership } from "@/lib/user-organization";
 
 export const metadata: Metadata = {
     title: "Project Wiki",
@@ -38,7 +39,7 @@ export default async function ProjectWikiLayout({
         redirect("/login");
     }
 
-    const organizationId = user.memberships[0].organizationId;
+    const organizationId = (await activeMembership(user.memberships)).organizationId;
 
     const pages = await db.wikiPage.findMany({
         where: {

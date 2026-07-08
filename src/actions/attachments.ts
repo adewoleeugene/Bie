@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { AttachmentParent } from "@prisma/client";
 import { saveFile, deleteFile } from "@/lib/storage";
 import { revalidatePath } from "next/cache";
+import { activeMembership } from "@/lib/user-organization";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -41,7 +42,7 @@ async function getUserOrganization() {
 
     return {
         userId: user.id,
-        organizationId: user.memberships[0].organizationId,
+        organizationId: (await activeMembership(user.memberships)).organizationId,
     };
 }
 

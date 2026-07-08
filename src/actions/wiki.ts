@@ -17,6 +17,7 @@ import { extractMentions, newlyAddedTargets } from "@/lib/wiki-mentions";
 import { sendNotifications } from "@/lib/notifications";
 import { canView, resolveAccess, resolveInheritedAccess } from "@/lib/permissions";
 import { loadPageAccessChain } from "@/lib/wiki-access";
+import { activeMembership } from "@/lib/user-organization";
 
 const createWikiPageSchema = z.object({
     title: z.string().min(1, "Title is required"),
@@ -299,7 +300,7 @@ export async function getDeletedWikiPages() {
             include: { memberships: true },
         });
         if (!user || user.memberships.length === 0) return [];
-        const orgId = user.memberships[0].organizationId;
+        const orgId = (await activeMembership(user.memberships)).organizationId;
         return db.wikiPage.findMany({
             where: { organizationId: orgId, deletedAt: { not: null } },
             include: { author: true },
@@ -561,8 +562,8 @@ export async function getWikiPage(id: string) {
             },
             {
                 userId: me.id,
-                organizationId: me.memberships[0].organizationId,
-                orgRole: me.memberships[0].role,
+                organizationId: (await activeMembership(me.memberships)).organizationId,
+                orgRole: (await activeMembership(me.memberships)).role,
             },
         );
         if (!canView(access)) {
@@ -705,7 +706,7 @@ export async function searchMentionTargets(query: string) {
         if (!me || me.memberships.length === 0) {
             return { users: [], pages: [] };
         }
-        const organizationId = me.memberships[0].organizationId;
+        const organizationId = (await activeMembership(me.memberships)).organizationId;
 
         const q = (query || "").trim();
 
@@ -764,7 +765,7 @@ export async function getPagesMentioning(
         if (!me || me.memberships.length === 0) {
             return { success: false, data: [] };
         }
-        const organizationId = me.memberships[0].organizationId;
+        const organizationId = (await activeMembership(me.memberships)).organizationId;
 
         const mentions = await db.wikiMention.findMany({
             where: {
@@ -900,8 +901,8 @@ async function assertPageEditAccess(pageId: string) {
     const chain = await loadPageAccessChain(page.id);
     const access = resolveInheritedAccess(chain, {
         userId: me.id,
-        organizationId: me.memberships[0].organizationId,
-        orgRole: me.memberships[0].role,
+        organizationId: (await activeMembership(me.memberships)).organizationId,
+        orgRole: (await activeMembership(me.memberships)).role,
     });
     if (access !== "edit") throw new Error("Access denied");
     return { userId: me.id, page };
@@ -947,8 +948,8 @@ export async function getWikiPageSharing(pageId: string) {
             },
             {
                 userId: me.id,
-                organizationId: me.memberships[0].organizationId,
-                orgRole: me.memberships[0].role,
+                organizationId: (await activeMembership(me.memberships)).organizationId,
+                orgRole: (await activeMembership(me.memberships)).role,
             },
         );
         if (!canView(access)) return null;
@@ -1153,15 +1154,15 @@ export async function requestWikiPageEditAccess(args: {
             },
         });
         if (!page) return { success: false, error: "Page not found" };
-        if (page.organizationId !== me.memberships[0].organizationId) {
+        if (page.organizationId !== (await activeMembership(me.memberships)).organizationId) {
             return { success: false, error: "Page not found" };
         }
 
         const chain = await loadPageAccessChain(page.id);
         const access = resolveInheritedAccess(chain, {
             userId: me.id,
-            organizationId: me.memberships[0].organizationId,
-            orgRole: me.memberships[0].role,
+            organizationId: (await activeMembership(me.memberships)).organizationId,
+            orgRole: (await activeMembership(me.memberships)).role,
         });
         if (access === "edit") {
             return { success: false, error: "You already have edit access" };

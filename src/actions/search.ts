@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { WikiNamespace } from "@prisma/client";
+import { activeMembership } from "@/lib/user-organization";
 
 export type SearchResult = {
     type: "page" | "task" | "database";
@@ -37,7 +38,7 @@ export async function globalSearch(query: string): Promise<{
             return { success: false, error: "No organization found" };
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = (await activeMembership(user.memberships)).organizationId;
 
         if (!query || query.length < 2) {
             return { success: true, results: [] };
