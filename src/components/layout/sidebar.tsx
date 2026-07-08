@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
+import { useDeleteProject } from "@/hooks/use-projects";
 
 interface Project {
     id: string;
@@ -105,6 +106,8 @@ function NavRow({
 
 export function Sidebar({ projects }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
+    const deleteProject = useDeleteProject();
     const [collapsed, setCollapsed] = useState(false);
 
     const isActive = (item: NavItem) =>
@@ -205,31 +208,56 @@ export function Sidebar({ projects }: SidebarProps) {
                             ][idx % 6];
                             const active = pathname?.includes(project.id) ?? false;
                             return (
-                                <Link
-                                    key={project.id}
-                                    href={`/projects/${project.id}`}
-                                    title={collapsed ? project.name : undefined}
-                                    className={cn(
-                                        "group relative flex items-center gap-3 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
-                                        "text-neutral-400 hover:bg-white/[0.04] hover:text-white",
-                                        active && "bg-white/[0.06] text-white",
-                                    )}
-                                >
-                                    <span
-                                        className="h-2 w-2 shrink-0 rounded-[3px]"
-                                        style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
-                                    />
+                                <div key={project.id} className="group/project relative">
+                                    <Link
+                                        href={`/projects/${project.id}`}
+                                        title={collapsed ? project.name : undefined}
+                                        className={cn(
+                                            "relative flex items-center gap-3 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
+                                            "text-neutral-400 hover:bg-white/[0.04] hover:text-white",
+                                            !collapsed && "pr-8",
+                                            active && "bg-white/[0.06] text-white",
+                                        )}
+                                    >
+                                        <span
+                                            className="h-2 w-2 shrink-0 rounded-[3px]"
+                                            style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
+                                        />
+                                        {!collapsed && (
+                                            <>
+                                                <span className="flex-1 truncate font-medium">{project.name}</span>
+                                                {project._count && (
+                                                    <span className="mono text-[11px] text-neutral-500 transition-opacity group-hover/project:opacity-0">
+                                                        {project._count.tasks}
+                                                    </span>
+                                                )}
+                                            </>
+                                        )}
+                                    </Link>
                                     {!collapsed && (
-                                        <>
-                                            <span className="flex-1 truncate font-medium">{project.name}</span>
-                                            {project._count && (
-                                                <span className="mono text-[11px] text-neutral-500">
-                                                    {project._count.tasks}
-                                                </span>
-                                            )}
-                                        </>
+                                        <button
+                                            type="button"
+                                            title="Delete project"
+                                            aria-label={`Delete ${project.name}`}
+                                            disabled={deleteProject.isPending}
+                                            onClick={async () => {
+                                                const confirmed = window.confirm(
+                                                    `Delete "${project.name}"? This permanently deletes the project and its related data.`,
+                                                );
+                                                if (!confirmed) return;
+
+                                                const result = await deleteProject.mutateAsync({ id: project.id });
+                                                if (result.success) {
+                                                    if (active) router.push("/");
+                                                    router.refresh();
+                                                }
+                                            }}
+                                            className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-opacity hover:bg-white/[0.05] hover:text-red-400 focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-40 group-hover/project:opacity-100"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     )}
-                                </Link>
+                                </div>
                             );
                         })}
                         {projects.length === 0 && !collapsed && (

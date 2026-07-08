@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useFavorites, useRecentItems } from "@/hooks/use-favorites";
+import { useDeleteRecentItem, useFavorites, useRecentItems } from "@/hooks/use-favorites";
 import { Button } from "@/components/ui/button";
-import { Star, Clock, FolderKanban, CheckSquare, BookOpen, Database, ChevronDown, ChevronRight } from "lucide-react";
+import { Star, Clock, FolderKanban, CheckSquare, BookOpen, Database, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
     project: <FolderKanban className="h-3.5 w-3.5 text-blue-500" />,
@@ -13,9 +14,17 @@ const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
     database: <Database className="h-3.5 w-3.5 text-indigo-500" />,
 };
 
+type SidebarItem = {
+    id: string;
+    itemType: string;
+    itemTitle: string;
+    itemUrl: string;
+};
+
 export function FavoritesSection() {
     const { data: favorites } = useFavorites();
     const { data: recentItems } = useRecentItems(8);
+    const deleteRecent = useDeleteRecentItem();
     const [favoritesOpen, setFavoritesOpen] = useState(true);
     const [recentOpen, setRecentOpen] = useState(true);
 
@@ -43,7 +52,7 @@ export function FavoritesSection() {
                     </button>
                     {favoritesOpen && (
                         <div className="space-y-0.5 ml-1">
-                            {favorites.map((fav: any) => (
+                            {favorites.map((fav: SidebarItem) => (
                                 <Link key={fav.id} href={fav.itemUrl}>
                                     <Button
                                         variant="ghost"
@@ -77,17 +86,36 @@ export function FavoritesSection() {
                     </button>
                     {recentOpen && (
                         <div className="space-y-0.5 ml-1">
-                            {recentItems.map((item: any) => (
-                                <Link key={item.id} href={item.itemUrl}>
+                            {recentItems.map((item: SidebarItem) => (
+                                <div key={item.id} className="group/recent flex items-center">
+                                    <Link href={item.itemUrl} className="min-w-0 flex-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-full justify-start text-xs font-normal gap-2 px-3 text-muted-foreground"
+                                        >
+                                            {ITEM_TYPE_ICONS[item.itemType] || <Clock className="h-3.5 w-3.5" />}
+                                            <span className="truncate">{item.itemTitle}</span>
+                                        </Button>
+                                    </Link>
                                     <Button
+                                        type="button"
                                         variant="ghost"
-                                        size="sm"
-                                        className="h-7 w-full justify-start text-xs font-normal gap-2 px-3 text-muted-foreground"
+                                        size="icon-xs"
+                                        title="Remove from recent"
+                                        aria-label={`Remove ${item.itemTitle} from recent`}
+                                        disabled={deleteRecent.isPending}
+                                        onClick={async () => {
+                                            const result = await deleteRecent.mutateAsync(item.id);
+                                            if (!result.success) {
+                                                toast.error("Could not remove recent item");
+                                            }
+                                        }}
+                                        className="mr-1 opacity-0 text-neutral-500 hover:text-red-500 group-hover/recent:opacity-100 focus-visible:opacity-100"
                                     >
-                                        {ITEM_TYPE_ICONS[item.itemType] || <Clock className="h-3.5 w-3.5" />}
-                                        <span className="truncate">{item.itemTitle}</span>
+                                        <Trash2 className="h-3 w-3" />
                                     </Button>
-                                </Link>
+                                </div>
                             ))}
                         </div>
                     )}

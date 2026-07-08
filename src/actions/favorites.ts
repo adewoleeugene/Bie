@@ -108,7 +108,7 @@ export async function isFavorited(itemType: string, itemId: string) {
         });
 
         return !!fav;
-    } catch (error) {
+    } catch {
         return false;
     }
 }
@@ -134,6 +134,25 @@ export async function getRecentItems(limit = 10) {
     } catch (error) {
         console.error("Get recent items error:", error);
         return [];
+    }
+}
+
+export async function deleteRecentItem(recentItemId: string) {
+    try {
+        const { userId, organizationId } = await getUserOrganization();
+
+        await db.recentItem.deleteMany({
+            where: {
+                id: recentItemId,
+                userId,
+                organizationId,
+            },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("Delete recent item error:", error);
+        return { success: false };
     }
 }
 
