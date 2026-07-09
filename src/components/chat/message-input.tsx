@@ -236,7 +236,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
 
     return (
-        <div className="border-t border-white/10 bg-[#101116] px-5 py-4">
+        <div className="bg-[#0f1116] px-4 pb-5 pt-1">
             <div className="relative">
                 {trigger && visibleSuggestions.length > 0 && (
                     <div className="absolute bottom-full left-0 z-10 mb-3 w-full max-w-md overflow-hidden rounded-lg border border-white/10 bg-[#1c202a] shadow-2xl shadow-black/40">
@@ -293,7 +293,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                     </div>
                 )}
 
-                <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-[#1c202a] p-2 shadow-inner shadow-black/20 focus-within:border-bz-blue/50 focus-within:ring-2 focus-within:ring-bz-blue/10">
+                <div className="flex items-end gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1a1d24] p-1.5 pl-2.5 transition-colors focus-within:border-bz-blue/40 focus-within:bg-[#1c2028]">
                     <input
                         ref={fileInputRef}
                         type="file"

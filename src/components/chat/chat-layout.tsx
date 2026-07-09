@@ -34,33 +34,26 @@ export function ChatLayout() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[#0f1015] text-neutral-100">
+        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[#0a0b0e] text-neutral-100">
             {/* Sidebar */}
-            <aside className="flex w-[312px] shrink-0 flex-col border-r border-white/10 bg-[#171922]">
-                <div className="border-b border-white/10 px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#242834] text-bz-blue">
-                                    <MessageSquare className="h-4 w-4" />
-                                </span>
-                                <span className="truncate">Team Chat</span>
-                            </div>
-                            <p className="mt-1 truncate pl-10 text-xs text-neutral-500">
-                                Channels and direct messages
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
-                            <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
-                        </div>
+            <aside className="flex w-[264px] shrink-0 flex-col bg-[#131519]">
+                <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-black/40 px-4 shadow-[0_1px_0_0_rgba(255,255,255,0.03)]">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-bz-blue to-bz-peri text-white shadow-lg shadow-bz-blue/20">
+                            <MessageSquare className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="truncate text-[15px] font-semibold tracking-tight text-white">Team Chat</span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                        <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
+                        <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto px-2 py-3">
+                <div className="flex-1 overflow-y-auto px-2 py-3 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin]">
                     {isLoading ? (
-                        <div className="space-y-2 p-2">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-14 animate-pulse rounded-lg bg-white/5" />
+                        <div className="space-y-1.5 px-1">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="h-8 animate-pulse rounded-md bg-white/[0.04]" />
                             ))}
                         </div>
                     ) : (
@@ -75,7 +68,7 @@ export function ChatLayout() {
             </aside>
 
             {/* Main Area */}
-            <main className="flex min-w-0 flex-1 flex-col bg-[#101116]">
+            <main className="flex min-w-0 flex-1 flex-col rounded-tl-xl bg-[#0f1116] shadow-[inset_1px_0_0_0_rgba(255,255,255,0.04)]">
                 {selectedId ? (
                     <MessageThread
                         conversationId={selectedId}
@@ -89,7 +82,7 @@ export function ChatLayout() {
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
                         <div className="max-w-sm text-center">
-                            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#1c202a] text-bz-blue shadow-2xl shadow-black/30">
+                            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.06] bg-gradient-to-br from-[#1c2029] to-[#14161c] text-bz-blue shadow-2xl shadow-black/40">
                                 <Hash className="h-7 w-7" />
                             </div>
                             <h3 className="text-lg font-semibold text-white">Choose a room</h3>

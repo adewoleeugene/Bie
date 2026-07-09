@@ -104,43 +104,48 @@ export function MessageThread({
     };
 
     return (
-        <div className="flex h-full min-w-0 flex-col bg-[#101116]">
+        <div className="flex h-full min-w-0 flex-col bg-[#0f1116]">
             {/* Header */}
-            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#101116]/95 px-5 py-3">
-                {isChannel && (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1c202a] text-neutral-400">
-                        {isPrivateChannel ? (
-                            <Lock className="h-4 w-4" />
-                        ) : (
-                            <Hash className="h-4 w-4" />
-                        )}
-                    </div>
-                )}
-                <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold text-white">{conversationName}</h2>
+            <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-black/40 px-4 shadow-[0_1px_0_0_rgba(255,255,255,0.03)]">
+                {isChannel ? (
+                    isPrivateChannel ? (
+                        <Lock className="h-5 w-5 shrink-0 text-neutral-500" />
+                    ) : (
+                        <Hash className="h-5 w-5 shrink-0 text-neutral-500" />
+                    )
+                ) : null}
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <h2 className="truncate text-[15px] font-semibold text-white">
+                        {isChannel ? conversationName.replace(/^#\s*/, "") : conversationName}
+                    </h2>
                     {isChannel && conversationTopic && (
-                        <p className="mt-0.5 truncate text-xs text-neutral-500">{conversationTopic}</p>
+                        <>
+                            <span className="h-4 w-px shrink-0 bg-white/10" />
+                            <p className="truncate text-[13px] text-neutral-500">{conversationTopic}</p>
+                        </>
                     )}
                 </div>
-                {conversation && (
-                    <ChannelSettingsDialog
-                        conversation={conversation}
-                        onArchived={onConversationArchived}
-                    />
-                )}
+                <div className="ml-auto flex items-center">
+                    {conversation && (
+                        <ChannelSettingsDialog
+                            conversation={conversation}
+                            onArchived={onConversationArchived}
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Messages */}
             <div className="flex-1 space-y-0 overflow-y-auto py-4">
                 {(!allMessages || allMessages.length === 0) ? (
-                    <div className="flex h-full items-center justify-center px-8 text-center">
-                        <div>
-                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#1c202a] text-neutral-400">
-                                {isChannel ? <Hash className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-                            </div>
-                            <h3 className="text-base font-semibold text-white">This is the start of {conversationName}</h3>
-                            <p className="mt-2 text-sm text-neutral-500">Send the first message and get the thread moving.</p>
+                    <div className="flex h-full flex-col items-start justify-end px-6 pb-4 text-left">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#1c2029] to-[#14161c] text-neutral-300">
+                            {isChannel ? <Hash className="h-8 w-8" /> : <MessageSquare className="h-8 w-8" />}
                         </div>
+                        <h3 className="text-2xl font-bold text-white">Welcome to {conversationName}</h3>
+                        <p className="mt-1 text-[15px] text-neutral-500">
+                            This is the very beginning of the {isChannel ? conversationName : "conversation"}. Send the first message to get things moving.
+                        </p>
                     </div>
                 ) : (
                     <>
@@ -172,31 +177,34 @@ export function MessageThread({
                             <div
                                 key={msg.id}
                                 className={cn(
-                                    "group relative px-5 py-0.5 transition-colors hover:bg-white/[0.035]",
-                                    showHeader && "mt-4 pt-2"
+                                    "group relative px-4 py-0.5 transition-colors hover:bg-white/[0.025]",
+                                    showHeader && "mt-[17px]"
                                 )}
                             >
                                 {showHeader && (
-                                    <div className="mb-1 flex items-center gap-2">
-                                        <Avatar className="h-10 w-10 ring-1 ring-white/10">
+                                    <div className="absolute left-4 top-1">
+                                        <Avatar className="h-10 w-10">
                                             <AvatarImage src={msg.sender.image || undefined} />
-                                            <AvatarFallback className="bg-[#242834] text-xs text-neutral-200">
+                                            <AvatarFallback className="bg-gradient-to-br from-[#2a2f3a] to-[#20232d] text-sm font-medium text-neutral-200">
                                                 {msg.sender.name?.charAt(0).toUpperCase()}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <span className="text-sm font-semibold text-neutral-100">{msg.sender.name}</span>
+                                    </div>
+                                )}
+                                {showHeader && (
+                                    <div className="mb-0.5 flex items-baseline gap-2 pl-[52px]">
+                                        <span className="text-[15px] font-semibold text-neutral-100 hover:underline">{msg.sender.name}</span>
                                         <span className="text-[11px] text-neutral-600">
                                             {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                                         </span>
                                     </div>
                                 )}
                                 <div className={cn(
-                                    "relative min-h-6 text-[15px] leading-6",
-                                    showHeader ? "pl-12" : "pl-12",
+                                    "relative min-h-6 pl-[52px] text-[15px] leading-[1.4]",
                                     isMe ? "text-neutral-100" : "text-neutral-200"
                                 )}>
                                     {!showHeader && (
-                                        <span className="absolute left-0 top-0 hidden w-10 text-right text-[10px] text-neutral-700 group-hover:block">
+                                        <span className="absolute left-0 top-0.5 hidden w-[52px] pr-2.5 text-right text-[10px] font-medium text-neutral-600 group-hover:block">
                                             {new Date(msg.createdAt).toLocaleTimeString([], {
                                                 hour: "numeric",
                                                 minute: "2-digit",
@@ -286,9 +294,16 @@ export function MessageThread({
                     </>
                 )}
                 {visibleTypingUsers.length > 0 && (
-                    <div className="px-5 pl-[68px] pt-2 text-xs italic text-neutral-500">
-                        {visibleTypingUsers.map((user) => user.name).join(", ")}
-                        {visibleTypingUsers.length === 1 ? " is" : " are"} typing...
+                    <div className="flex items-center gap-2 px-4 pl-[52px] pt-2 text-xs text-neutral-400">
+                        <span className="flex gap-0.5">
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500" />
+                        </span>
+                        <span>
+                            <span className="font-semibold text-neutral-300">{visibleTypingUsers.map((user) => user.name).join(", ")}</span>
+                            {visibleTypingUsers.length === 1 ? " is" : " are"} typing…
+                        </span>
                     </div>
                 )}
                 <div ref={bottomRef} />
