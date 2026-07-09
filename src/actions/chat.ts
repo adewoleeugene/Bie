@@ -144,45 +144,6 @@ async function projectMemberIds(projectIds: string[]): Promise<string[]> {
     return Array.from(new Set(members.map((member) => member.userId)));
 }
 
-// Surface the chat to referenced people (task assignees, project members): for a
-// public channel we add the (non-guest) recipients so the conversation shows up
-// in their list and the notification opens. For private channels / DMs we do NOT
-// pull outsiders in (that would leak the conversation's history) — we only notify
-// recipients already in it. Returns the userIds to notify.
-async function fanoutRecipientsToConversation(params: {
-    conversation: { id: string; type: ConversationType; isPrivate: boolean };
-    userIds: string[];
-    senderId: string;
-    organizationId: string;
-}): Promise<string[]> {
-    const { conversation, userIds, senderId, organizationId } = params;
-    const candidateIds = Array.from(new Set(userIds)).filter((id) => id !== senderId);
-    if (candidateIds.length === 0) return [];
-
-    // Guests can't be channel members — keep only non-guest org members.
-    const eligible = await db.organizationMember.findMany({
-        where: { organizationId, userId: { in: candidateIds }, role: { not: OrgRole.GUEST } },
-        select: { userId: true },
-    });
-    const eligibleIds = eligible.map((member) => member.userId);
-    if (eligibleIds.length === 0) return [];
-
-    if (conversation.type === ConversationType.CHANNEL && !conversation.isPrivate) {
-        await db.$transaction(
-            eligibleIds.map((userId) =>
-                db.conversationMember.upsert({
-                    where: { conversationId_userId: { conversationId: conversation.id, userId } },
-                    update: {},
-                    create: { conversationId: conversation.id, userId },
-                }),
-            ),
-        );
-        return eligibleIds;
-    }
-
-    return filterConversationMemberRecipients(conversation.id, eligibleIds);
-}
-
 // ─── Types ───────────────────────────────────────────────
 
 export interface ConversationWithPreview {
@@ -726,7 +687,7 @@ export async function createChannel(input: {
                 select: { userId: true },
             })).map((member) => member.userId);
         const orgMembers = await assertOrgMembers(organizationId, memberIds);
-        const allowedMembers = orgMembers.filter((member) => member.role !== OrgRole.GUEST);
+        const allowedMembers = orgMembers;
 
         const conversation = await db.conversation.create({
             data: {
@@ -810,7 +771,7 @@ export async function addChannelMembers(
     try {
         const { organizationId } = await assertConversationAccess(conversationId, "manage");
         const orgMembers = await assertOrgMembers(organizationId, memberIds);
-        const allowedMembers = orgMembers.filter((member) => member.role !== OrgRole.GUEST);
+        const allowedMembers = orgMembers;
 
         await db.$transaction(
             allowedMembers.map((member) =>
@@ -895,7 +856,7 @@ export async function sendMessage(input: {
     body: string;
 }): Promise<ActionResult<{ id: string }>> {
     try {
-        const { userId, organizationId, role, conversation } = await assertConversationAccess(input.conversationId, "post");
+        const { userId, organizationId, role } = await assertConversationAccess(input.conversationId, "post");
         const body = input.body.trim();
 
         if (!body) {
@@ -971,16 +932,13 @@ export async function sendMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const fanoutRecipients = await fanoutRecipientsToConversation({
-            conversation: { id: conversation.id, type: conversation.type, isPrivate: conversation.isPrivate },
-            userIds: [...taskRecipientIds, ...(await projectMemberIds(validProjects.map((project) => project.id)))],
-            senderId: userId,
-            organizationId,
-        });
-        const notificationRecipients = Array.from(new Set([
-            ...(await filterConversationMemberRecipients(input.conversationId, mentionedUserIds)),
-            ...fanoutRecipients,
-        ]));
+        const projectRecipientIds = await projectMemberIds(validProjects.map((project) => project.id));
+        // Discord model: mentions/tags notify only people already in the conversation.
+        // To include someone else, add them to the channel explicitly.
+        const notificationRecipients = await filterConversationMemberRecipients(
+            input.conversationId,
+            [...mentionedUserIds, ...taskRecipientIds, ...projectRecipientIds],
+        );
 
         if (notificationRecipients.length > 0) {
             sendNotifications({
@@ -1062,11 +1020,7 @@ export async function updateMessage(input: {
                     members: { some: { userId } },
                 },
             },
-            select: {
-                id: true,
-                conversationId: true,
-                conversation: { select: { id: true, type: true, isPrivate: true } },
-            },
+            select: { id: true, conversationId: true },
         });
 
         if (!existing) {
@@ -1143,16 +1097,11 @@ export async function updateMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const fanoutRecipients = await fanoutRecipientsToConversation({
-            conversation: existing.conversation,
-            userIds: [...taskRecipientIds, ...(await projectMemberIds(validProjects.map((project) => project.id)))],
-            senderId: userId,
-            organizationId,
-        });
-        const notificationRecipients = Array.from(new Set([
-            ...(await filterConversationMemberRecipients(existing.conversationId, mentionedUserIds)),
-            ...fanoutRecipients,
-        ]));
+        const projectRecipientIds = await projectMemberIds(validProjects.map((project) => project.id));
+        const notificationRecipients = await filterConversationMemberRecipients(
+            existing.conversationId,
+            [...mentionedUserIds, ...taskRecipientIds, ...projectRecipientIds],
+        );
 
         if (notificationRecipients.length > 0) {
             sendNotifications({
