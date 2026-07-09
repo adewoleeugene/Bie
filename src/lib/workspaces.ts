@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { joinPublicChannelsForMember } from "@/lib/chat-channels";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 type MembershipWithOrganization = {
@@ -51,7 +52,7 @@ export async function ensurePersonalWorkspace(
     const displayName = user.name?.trim() || user.email?.split("@")[0] || "Personal";
     const slug = await uniqueWorkspaceSlug(db, `${displayName}-personal`);
 
-    return db.organization.create({
+    const organization = await db.organization.create({
         data: {
             name: `${displayName}'s Space`,
             slug,
@@ -65,6 +66,10 @@ export async function ensurePersonalWorkspace(
             },
         },
     });
+
+    await joinPublicChannelsForMember(db, organization.id, user.id, "OWNER");
+
+    return organization;
 }
 
 export async function acceptPendingInvitesForUser(
@@ -99,6 +104,8 @@ export async function acceptPendingInvitesForUser(
                 role: orgRole,
             },
         });
+
+        await joinPublicChannelsForMember(db, invitation.organizationId, user.id, orgRole);
 
         if (invitation.scope === "PROJECT" && invitation.projectId) {
             await db.projectMember.upsert({
@@ -175,6 +182,8 @@ export async function acceptInviteByTokenForUser(
             role: orgRole,
         },
     });
+
+    await joinPublicChannelsForMember(db, invitation.organizationId, user.id, orgRole);
 
     if (invitation.scope === "PROJECT" && invitation.projectId) {
         await db.projectMember.upsert({

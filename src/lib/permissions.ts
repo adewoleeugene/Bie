@@ -13,7 +13,15 @@
  * WikiPage and WikiDatabase without coupling to a Prisma type.
  */
 
-import { OrgRole, ResourceMemberRole, ResourceVisibility } from "@prisma/client";
+import {
+    ConversationType,
+    OrgRole,
+    Prisma,
+    ProjectRole,
+    ProjectVisibility,
+    ResourceMemberRole,
+    ResourceVisibility,
+} from "@prisma/client";
 
 interface ResourceShape {
     visibility: ResourceVisibility;
@@ -29,7 +37,7 @@ interface ViewerShape {
     orgRole?: OrgRole;
 }
 
-export type AccessLevel = "none" | "view" | "edit";
+export type AccessLevel = "none" | "view" | "edit" | "manage";
 
 export function resolveAccess(
     resource: ResourceShape,
@@ -70,13 +78,146 @@ export function canView(level: AccessLevel): boolean {
 }
 
 export function canEdit(level: AccessLevel): boolean {
-    return level === "edit";
+    return level === "edit" || level === "manage";
 }
 
-const RANK: Record<AccessLevel, number> = { none: 0, view: 1, edit: 2 };
+export function canManage(level: AccessLevel): boolean {
+    return level === "manage";
+}
+
+export const canComment = canView;
+
+interface ChannelShape {
+    type: ConversationType;
+    isPrivate: boolean;
+    archived?: boolean;
+    createdById?: string | null;
+    organizationId: string;
+    members: { userId: string }[];
+}
+
+export type ChannelAction = "read" | "post" | "manage" | "join";
+
+export function isOrgAdmin(role?: OrgRole) {
+    return role === OrgRole.ADMIN || role === OrgRole.OWNER;
+}
+
+export function resolveChannelAccess(
+    conversation: ChannelShape,
+    viewer: ViewerShape,
+    action: ChannelAction,
+): boolean {
+    if (conversation.organizationId !== viewer.organizationId) return false;
+    if (conversation.archived && action === "post") return false;
+
+    const isMember = conversation.members.some((member) => member.userId === viewer.userId);
+    const isCreator = conversation.createdById === viewer.userId;
+
+    if (conversation.type !== ConversationType.CHANNEL) {
+        return action === "read" || action === "post" ? isMember : false;
+    }
+
+    if (action === "manage") {
+        return isOrgAdmin(viewer.orgRole) || isCreator;
+    }
+
+    if (action === "join") {
+        return !conversation.isPrivate && viewer.orgRole !== OrgRole.GUEST;
+    }
+
+    return isMember;
+}
+
+const RANK: Record<AccessLevel, number> = { none: 0, view: 1, edit: 2, manage: 3 };
 
 function maxAccess(a: AccessLevel, b: AccessLevel): AccessLevel {
     return RANK[a] >= RANK[b] ? a : b;
+}
+
+interface ProjectShape {
+    visibility: ProjectVisibility;
+    organizationId: string;
+    leadId?: string | null;
+    members: { userId: string; role: ProjectRole }[];
+}
+
+const PROJECT_ROLE_ACCESS: Record<ProjectRole, AccessLevel> = {
+    [ProjectRole.OWNER]: "manage",
+    [ProjectRole.ADMIN]: "manage",
+    [ProjectRole.EDITOR]: "edit",
+    [ProjectRole.VIEWER]: "view",
+};
+
+export function resolveProjectAccess(
+    project: ProjectShape,
+    viewer: ViewerShape,
+): AccessLevel {
+    if (project.organizationId !== viewer.organizationId) return "none";
+
+    const explicit = project.members.find((member) => member.userId === viewer.userId);
+    let access: AccessLevel = explicit ? PROJECT_ROLE_ACCESS[explicit.role] : "none";
+
+    if (project.leadId === viewer.userId) {
+        access = maxAccess(access, "manage");
+    }
+
+    if (viewer.orgRole !== OrgRole.GUEST && isOrgAdmin(viewer.orgRole)) {
+        access = maxAccess(access, "manage");
+    }
+
+    if (viewer.orgRole !== OrgRole.GUEST && project.visibility === ProjectVisibility.ORG_VISIBLE) {
+        access = maxAccess(access, "edit");
+    }
+
+    return access;
+}
+
+export function canManageProject(level: AccessLevel): boolean {
+    return canManage(level);
+}
+
+export function projectAccessWhere(viewer: ViewerShape): Prisma.ProjectWhereInput {
+    const base = { organizationId: viewer.organizationId };
+
+    if (viewer.orgRole !== OrgRole.GUEST && isOrgAdmin(viewer.orgRole)) {
+        return base;
+    }
+
+    if (viewer.orgRole === OrgRole.GUEST) {
+        return {
+            ...base,
+            members: { some: { userId: viewer.userId } },
+        };
+    }
+
+    return {
+        ...base,
+        OR: [
+            { visibility: ProjectVisibility.ORG_VISIBLE },
+            { members: { some: { userId: viewer.userId } } },
+        ],
+    };
+}
+
+export function taskAccessWhere(viewer: ViewerShape): Prisma.TaskWhereInput {
+    if (viewer.orgRole === OrgRole.GUEST) {
+        return {
+            organizationId: viewer.organizationId,
+            project: projectAccessWhere(viewer),
+        };
+    }
+
+    if (isOrgAdmin(viewer.orgRole)) {
+        return { organizationId: viewer.organizationId };
+    }
+
+    return {
+        organizationId: viewer.organizationId,
+        OR: [
+            { projectId: null },
+            { project: projectAccessWhere(viewer) },
+        ],
+    };
 }
 
 /**
@@ -102,7 +243,7 @@ export function resolveInheritedAccess(
         best = maxAccess(best, resolveAccess(node, viewer));
         // Protected node blocks inheritance from anything above it.
         if (node.inheritAccess === false) break;
-        if (best === "edit") break;
+        if (canEdit(best)) break;
     }
     return best;
 }

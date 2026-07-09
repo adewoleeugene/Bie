@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { buildNotificationEmail, sendEmail } from "@/lib/email";
 import { activeMembership } from "@/lib/user-organization";
+import { joinPublicChannelsForMember } from "@/lib/chat-channels";
+import { canManageProject, resolveProjectAccess } from "@/lib/permissions";
 
 const INVITE_DAYS = 14;
 
@@ -49,11 +51,44 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
-        role: (await activeMembership(user.memberships)).role,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
+}
+
+async function assertProjectManage(projectId: string, viewer: { userId: string; organizationId: string; role: OrgRole }) {
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId: viewer.organizationId },
+        select: {
+            id: true,
+            name: true,
+            visibility: true,
+            organizationId: true,
+            leadId: true,
+            organization: { select: { name: true } },
+            members: { select: { userId: true, role: true } },
+        },
+    });
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    const access = resolveProjectAccess(project, {
+        userId: viewer.userId,
+        organizationId: viewer.organizationId,
+        orgRole: viewer.role,
+    });
+
+    if (!canManageProject(access)) {
+        throw new Error("Forbidden");
+    }
+
+    return project;
 }
 
 export async function getOrganizationMembers() {
@@ -290,12 +325,15 @@ export async function inviteMember(email: string, role: OrgRole = OrgRole.MEMBER
             return { success: false, error: "User is already a member of this workspace" };
         }
 
-        await db.organizationMember.create({
-            data: {
-                organizationId,
-                userId: targetUser.id,
-                role,
-            },
+        await db.$transaction(async (tx) => {
+            await tx.organizationMember.create({
+                data: {
+                    organizationId,
+                    userId: targetUser.id,
+                    role,
+                },
+            });
+            await joinPublicChannelsForMember(tx, organizationId, targetUser.id, role);
         });
 
         revalidatePath("/settings");
@@ -361,21 +399,11 @@ export async function inviteProjectMember(
     role: ProjectRole = ProjectRole.EDITOR
 ) {
     try {
-        const { userId, organizationId, role: callerRole } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
         const targetEmail = normalizedEmail(email);
 
-        if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
-            return { success: false, error: "Only owners and admins can invite project members" };
-        }
-
-        const project = await db.project.findFirst({
-            where: { id: projectId, organizationId },
-            select: { id: true, name: true, organization: { select: { name: true } } },
-        });
-
-        if (!project) {
-            return { success: false, error: "Project not found" };
-        }
+        const project = await assertProjectManage(projectId, viewer);
 
         const targetUser = await db.user.findUnique({
             where: { email: targetEmail },
@@ -469,20 +497,10 @@ export async function createProjectInviteLink(
     expiresInMinutes?: number | null
 ) {
     try {
-        const { userId, organizationId, role: callerRole } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
 
-        if (callerRole !== OrgRole.OWNER && callerRole !== OrgRole.ADMIN) {
-            return { success: false, error: "Only owners and admins can create invite links" };
-        }
-
-        const project = await db.project.findFirst({
-            where: { id: projectId, organizationId },
-            select: { id: true },
-        });
-
-        if (!project) {
-            return { success: false, error: "Project not found" };
-        }
+        await assertProjectManage(projectId, viewer);
 
         const invitation = await db.organizationInvitation.create({
             data: {

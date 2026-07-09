@@ -23,6 +23,7 @@ import {
 import { ProjectDialog } from "@/components/projects/project-dialog";
 import { FavoritesSection } from "@/components/layout/favorites-section";
 import { useDeleteProject } from "@/hooks/use-projects";
+import { useChatUnreadCount } from "@/hooks/use-chat";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -79,10 +80,12 @@ function NavRow({
     item,
     active,
     collapsed,
+    badgeCount,
 }: {
     item: NavItem;
     active: boolean;
     collapsed: boolean;
+    badgeCount?: number;
 }) {
     const Icon = item.icon;
     return (
@@ -111,6 +114,16 @@ function NavRow({
                 <Icon className="h-[18px] w-[18px] transition-colors" />
             </span>
             {!collapsed && <span className="truncate font-medium tracking-tight">{item.label}</span>}
+            {Boolean(badgeCount) && (
+                <span
+                    className={cn(
+                        "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--bz-pink)] px-1.5 text-[10px] font-semibold text-white",
+                        collapsed && "absolute right-1 top-1 h-4 min-w-4 px-1 text-[9px]",
+                    )}
+                >
+                    {badgeCount && badgeCount > 99 ? "99+" : badgeCount}
+                </span>
+            )}
         </Link>
     );
 }
@@ -119,6 +132,7 @@ export function Sidebar({ projects }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const deleteProject = useDeleteProject();
+    const { data: chatUnreadCount = 0 } = useChatUnreadCount();
     const [collapsed, setCollapsed] = useState(false);
 
     const isActive = (item: NavItem) =>
@@ -186,7 +200,13 @@ export function Sidebar({ projects }: SidebarProps) {
                     )}
                     <div className="space-y-0.5">
                         {SECONDARY.map((item) => (
-                            <NavRow key={item.href} item={item} active={isActive(item)} collapsed={collapsed} />
+                            <NavRow
+                                key={item.href}
+                                item={item}
+                                active={isActive(item)}
+                                collapsed={collapsed}
+                                badgeCount={item.href === "/chat" ? chatUnreadCount : undefined}
+                            />
                         ))}
                     </div>
                 </div>

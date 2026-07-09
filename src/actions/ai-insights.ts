@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -14,7 +15,8 @@ async function getUserOrganization() {
     });
 
     if (!user || user.memberships.length === 0) throw new Error("No organization");
-    return { userId: user.id, organizationId: (await activeMembership(user.memberships)).organizationId };
+    const membership = await activeMembership(user.memberships);
+    return { userId: user.id, organizationId: membership.organizationId, role: membership.role };
 }
 
 // ─── Assistant Message Persistence ───────────────────────
@@ -57,7 +59,8 @@ export interface BottleneckInsight {
 
 export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
+        const accessibleTask = taskAccessWhere({ userId, organizationId, orgRole: role });
         const insights: BottleneckInsight[] = [];
 
         const now = new Date();
@@ -66,7 +69,7 @@ export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
         const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
         const staleReviews = await db.task.count({
             where: {
-                organizationId,
+                ...accessibleTask,
                 status: "IN_REVIEW",
                 updatedAt: { lt: threeDaysAgo },
             },
@@ -83,7 +86,7 @@ export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
         // 2. Tasks with no assignee that are overdue
         const unassignedOverdue = await db.task.count({
             where: {
-                organizationId,
+                ...accessibleTask,
                 status: { notIn: ["DONE", "ARCHIVED"] },
                 dueDate: { lt: now },
                 assignees: { none: {} },
@@ -103,7 +106,7 @@ export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
             by: ["userId"],
             where: {
                 task: {
-                    organizationId,
+                    ...accessibleTask,
                     status: { in: ["TODO", "IN_PROGRESS", "IN_REVIEW"] },
                 },
             },
@@ -129,7 +132,7 @@ export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const staleTasks = await db.task.count({
             where: {
-                organizationId,
+                ...accessibleTask,
                 status: "IN_PROGRESS",
                 updatedAt: { lt: sevenDaysAgo },
             },
@@ -154,12 +157,12 @@ export async function getBottleneckInsights(): Promise<BottleneckInsight[]> {
 
 export async function getTaskEstimation(taskTitle: string, projectId?: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         // Find similar completed tasks to estimate duration
         const similarTasks = await db.task.findMany({
             where: {
-                organizationId,
+                ...taskAccessWhere({ userId, organizationId, orgRole: role }),
                 status: "DONE",
                 ...(projectId ? { projectId } : {}),
             },
@@ -224,7 +227,8 @@ export interface ResourceInsight {
 
 export async function getResourceAllocation(): Promise<ResourceInsight[]> {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
+        const accessibleTask = taskAccessWhere({ userId, organizationId, orgRole: role });
         const now = new Date();
 
         const members = await db.organizationMember.findMany({
@@ -236,7 +240,7 @@ export async function getResourceAllocation(): Promise<ResourceInsight[]> {
                         taskAssignees: {
                             where: {
                                 task: {
-                                    organizationId,
+                                    ...accessibleTask,
                                     status: { notIn: ["DONE", "ARCHIVED"] },
                                 },
                             },

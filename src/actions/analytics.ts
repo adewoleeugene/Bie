@@ -5,6 +5,22 @@ import { db } from "@/lib/db";
 import { ActionResult } from "@/types";
 import { startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInDays, addDays, format } from "date-fns";
 import { activeMembership } from "@/lib/user-organization";
+import { projectAccessWhere, taskAccessWhere } from "@/lib/permissions";
+
+async function getAnalyticsViewer() {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await db.user.findUnique({
+        where: { email: session.user.email },
+        include: { memberships: true },
+    });
+
+    if (!user || user.memberships.length === 0) throw new Error("No organization found");
+
+    const membership = await activeMembership(user.memberships);
+    return { userId: user.id, organizationId: membership.organizationId, role: membership.role };
+}
 
 export type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -65,18 +81,21 @@ export async function getOverviewMetrics(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
+        const accessibleProject = projectAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
         const { start, end } = getDateRange(params);
 
         // Total tasks in organization
         const totalTasks = await db.task.count({
-            where: { organizationId: orgId },
+            where: accessibleTask,
         });
 
         // Tasks created in this period
         const tasksCreatedThisPeriod = await db.task.count({
             where: {
-                organizationId: orgId,
+                ...accessibleTask,
                 createdAt: { gte: start, lte: end },
             },
         });
@@ -84,7 +103,7 @@ export async function getOverviewMetrics(
         // Completed tasks (all time)
         const completedTasks = await db.task.count({
             where: {
-                organizationId: orgId,
+                ...accessibleTask,
                 status: "DONE",
             },
         });
@@ -96,6 +115,7 @@ export async function getOverviewMetrics(
         const activeSprints = await db.sprint.count({
             where: {
                 organizationId: orgId,
+                project: accessibleProject,
                 status: "ACTIVE",
             },
         });
@@ -108,7 +128,7 @@ export async function getOverviewMetrics(
         // Overdue tasks
         const overdueTasks = await db.task.count({
             where: {
-                organizationId: orgId,
+                ...accessibleTask,
                 status: { notIn: ["DONE", "ARCHIVED"] },
                 dueDate: { lt: new Date() },
             },
@@ -117,7 +137,7 @@ export async function getOverviewMetrics(
         // Average completion time (tasks completed in this period)
         const completedTasksInPeriod = await db.task.findMany({
             where: {
-                organizationId: orgId,
+                ...accessibleTask,
                 status: "DONE",
                 updatedAt: { gte: start, lte: end },
             },
@@ -171,13 +191,15 @@ export async function getTaskCompletionTrend(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
         const { start, end } = getDateRange(params);
 
         // Get all tasks created or completed in the date range
         const tasks = await db.task.findMany({
             where: {
-                organizationId: orgId,
+                ...accessibleTask,
                 OR: [
                     { createdAt: { gte: start, lte: end } },
                     {
@@ -240,11 +262,13 @@ export async function getStatusDistribution(): Promise<ActionResult<Array<{ stat
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
 
         const tasks = await db.task.groupBy({
             by: ["status"],
-            where: { organizationId: orgId },
+            where: accessibleTask,
             _count: { status: true },
         });
 
@@ -279,11 +303,13 @@ export async function getPriorityBreakdown(): Promise<ActionResult<Array<{ prior
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
 
         const tasks = await db.task.groupBy({
             by: ["priority"],
-            where: { organizationId: orgId },
+            where: accessibleTask,
             _count: { priority: true },
         });
 
@@ -328,7 +354,9 @@ export async function getTeamProductivity(
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
         const { start, end } = getDateRange(params);
 
         // Get all team members
@@ -342,7 +370,7 @@ export async function getTeamProductivity(
                 // Tasks completed
                 const tasksCompleted = await db.task.count({
                     where: {
-                        organizationId: orgId,
+                        ...accessibleTask,
                         status: "DONE",
                         updatedAt: { gte: start, lte: end },
                         assignees: {
@@ -356,7 +384,7 @@ export async function getTeamProductivity(
                     where: {
                         userId: member.userId,
                         task: {
-                            organizationId: orgId,
+                            ...accessibleTask,
                             status: { notIn: ["DONE", "ARCHIVED"] },
                         },
                     },
@@ -367,6 +395,10 @@ export async function getTeamProductivity(
                     where: {
                         userId: member.userId,
                         startedAt: { gte: start, lte: end },
+                        OR: [
+                            { taskId: null },
+                            { task: accessibleTask },
+                        ],
                         completed: true,
                     },
                     _sum: { duration: true },
@@ -377,6 +409,7 @@ export async function getTeamProductivity(
                     where: {
                         userId: member.userId,
                         startedAt: { gte: start, lte: end },
+                        task: accessibleTask,
                     },
                     _sum: { duration: true },
                 });
@@ -424,15 +457,19 @@ export async function getSprintVelocity(): Promise<ActionResult<Array<{
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleProject = projectAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
 
         // Get last 6 sprints
         const sprints = await db.sprint.findMany({
-            where: { organizationId: orgId },
+            where: { organizationId: orgId, project: accessibleProject },
             orderBy: { startDate: "desc" },
             take: 6,
             include: {
                 tasks: {
+                    where: accessibleTask,
                     select: {
                         status: true,
                     },
@@ -486,15 +523,19 @@ export async function getProjectProgress(): Promise<ActionResult<Array<{
             return { success: false, error: "No organization found" };
         }
 
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const orgId = membership.organizationId;
+        const accessibleProject = projectAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
+        const accessibleTask = taskAccessWhere({ userId: user.id, organizationId: orgId, orgRole: membership.role });
 
         const projects = await db.project.findMany({
             where: {
-                organizationId: orgId,
+                ...accessibleProject,
                 status: { in: ["ACTIVE", "PAUSED"] },
             },
             include: {
                 tasks: {
+                    where: accessibleTask,
                     select: {
                         status: true,
                         dueDate: true,
@@ -532,13 +573,23 @@ export async function getProjectProgress(): Promise<ActionResult<Array<{
 
 export async function getSprintBurndown(sprintId: string) {
     try {
-        const session = await auth();
-        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+        const viewer = await getAnalyticsViewer();
+        const accessibleProject = projectAccessWhere({
+            userId: viewer.userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
+        const accessibleTask = taskAccessWhere({
+            userId: viewer.userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
 
-        const sprint = await db.sprint.findUnique({
-            where: { id: sprintId },
+        const sprint = await db.sprint.findFirst({
+            where: { id: sprintId, organizationId: viewer.organizationId, project: accessibleProject },
             include: {
                 tasks: {
+                    where: accessibleTask,
                     select: { id: true, status: true, createdAt: true, updatedAt: true },
                 },
             },
@@ -584,13 +635,22 @@ export type SprintHealth = "on_track" | "at_risk" | "behind";
 
 export async function getSprintHealth(sprintId: string) {
     try {
-        const session = await auth();
-        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+        const viewer = await getAnalyticsViewer();
+        const accessibleProject = projectAccessWhere({
+            userId: viewer.userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
+        const accessibleTask = taskAccessWhere({
+            userId: viewer.userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
 
-        const sprint = await db.sprint.findUnique({
-            where: { id: sprintId },
+        const sprint = await db.sprint.findFirst({
+            where: { id: sprintId, organizationId: viewer.organizationId, project: accessibleProject },
             include: {
-                tasks: { select: { status: true } },
+                tasks: { where: accessibleTask, select: { status: true } },
             },
         });
 
@@ -637,21 +697,18 @@ export async function getSprintHealth(sprintId: string) {
 
 export async function getPeakProductivityHours(params: DateRangeParams) {
     try {
-        const session = await auth();
-        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
-
-        const user = await db.user.findUnique({
-            where: { email: session.user.email },
-            include: { memberships: true },
-        });
-        if (!user || user.memberships.length === 0) return { success: false, error: "No org" };
-
+        const viewer = await getAnalyticsViewer();
         const { start, end } = getDateRange(params);
+        const accessibleTask = taskAccessWhere({
+            userId: viewer.userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
 
         // Get task completion times (updatedAt when status changed to DONE)
         const completedTasks = await db.task.findMany({
             where: {
-                organizationId: (await activeMembership(user.memberships)).organizationId,
+                ...accessibleTask,
                 status: "DONE",
                 updatedAt: { gte: start, lte: end },
             },
@@ -661,8 +718,12 @@ export async function getPeakProductivityHours(params: DateRangeParams) {
         // Also get focus session start times
         const focusSessions = await db.focusSession.findMany({
             where: {
-                userId: user.id,
+                userId: viewer.userId,
                 startedAt: { gte: start, lte: end },
+                OR: [
+                    { taskId: null },
+                    { task: accessibleTask },
+                ],
             },
             select: { startedAt: true },
         });
@@ -693,19 +754,17 @@ export async function getPeakProductivityHours(params: DateRangeParams) {
 
 export async function getCompletionForecast(projectId: string) {
     try {
-        const session = await auth();
-        if (!session?.user?.email) return { success: false, error: "Unauthorized" };
-
-        const user = await db.user.findUnique({
-            where: { email: session.user.email },
-            include: { memberships: true },
-        });
-        if (!user || user.memberships.length === 0) return { success: false, error: "No org" };
-
-        const orgId = (await activeMembership(user.memberships)).organizationId;
+        const viewer = await getAnalyticsViewer();
 
         const tasks = await db.task.findMany({
-            where: { projectId, organizationId: orgId },
+            where: {
+                projectId,
+                ...taskAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
             select: { status: true, createdAt: true, updatedAt: true },
             orderBy: { updatedAt: "asc" },
         });

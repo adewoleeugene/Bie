@@ -19,11 +19,20 @@ import {
     deleteTaskStatusColumnSchema,
     DeleteTaskStatusColumnInput,
 } from "@/lib/validators/task";
-import { Task, ActivityAction, Prisma, NotificationType, TaskStatus, TaskStatusColumn } from "@prisma/client";
+import { Task, ActivityAction, Prisma, NotificationType, OrgRole, TaskStatus, TaskStatusColumn } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { processAutomationRules } from "@/actions/automation";
 import { sendNotifications } from "@/lib/notifications";
 import { activeMembership } from "@/lib/user-organization";
+import {
+    AccessLevel,
+    canEdit,
+    canView,
+    resolveProjectAccess,
+    taskAccessWhere,
+} from "@/lib/permissions";
+
+type TaskViewer = { userId: string; organizationId: string; role: OrgRole };
 
 // Helper to get user's organization
 async function getUserOrganization() {
@@ -47,9 +56,12 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
 }
 
@@ -62,19 +74,101 @@ const DEFAULT_STATUS_COLUMNS: Array<{ name: string; status: TaskStatus; color: s
     { name: "Archived", status: "ARCHIVED", color: "#474747", sortOrder: 5 },
 ];
 
-async function assertProjectScope(projectId: string | null | undefined, organizationId: string) {
-    if (!projectId) return null;
+async function assertProjectScope(
+    projectId: string | null | undefined,
+    viewer: TaskViewer,
+    required: AccessLevel = "view",
+) {
+    if (!projectId) {
+        assertUnfiledTaskAccess(viewer, required);
+        return null;
+    }
 
     const project = await db.project.findFirst({
-        where: { id: projectId, organizationId },
-        select: { id: true },
+        where: { id: projectId, organizationId: viewer.organizationId },
+        select: {
+            id: true,
+            visibility: true,
+            organizationId: true,
+            leadId: true,
+            members: { select: { userId: true, role: true } },
+        },
     });
 
     if (!project) {
         throw new Error("Project not found");
     }
 
+    const access = resolveProjectAccess(project, {
+        userId: viewer.userId,
+        organizationId: viewer.organizationId,
+        orgRole: viewer.role,
+    });
+
+    const allowed = required === "edit" ? canEdit(access) : canView(access);
+    if (!allowed) {
+        // Distinguish "can see but not edit" (read-only) from "no access at all",
+        // so a Viewer looking right at the task gets a truthful message instead
+        // of a confusing "not found".
+        if (required === "edit" && canView(access)) {
+            throw new Error("You have view-only access to this task");
+        }
+        throw new Error("Forbidden");
+    }
+
     return project.id;
+}
+
+function assertUnfiledTaskAccess(viewer: Pick<TaskViewer, "role">, required: AccessLevel = "view") {
+    if (viewer.role === "GUEST") throw new Error("Forbidden");
+}
+
+async function assertTaskAccess(
+    taskId: string,
+    viewer: TaskViewer,
+    required: AccessLevel = "view",
+) {
+    const task = await db.task.findFirst({
+        where: {
+            id: taskId,
+            organizationId: viewer.organizationId,
+            ...taskAccessWhere({ userId: viewer.userId, organizationId: viewer.organizationId, orgRole: viewer.role }),
+        },
+        select: {
+            id: true,
+            projectId: true,
+            status: true,
+            statusColumnId: true,
+            priority: true,
+        },
+    });
+
+    if (!task) throw new Error("Task not found");
+
+    if (required === "edit") {
+        if (task.projectId) {
+            await assertProjectScope(task.projectId, viewer, "edit");
+        } else {
+            assertUnfiledTaskAccess(viewer, "edit");
+        }
+    }
+
+    return task;
+}
+
+// Resolve edit access for a mutation and preserve the *reason* on failure.
+// Without this, callers `.catch(() => null)` collapse both "Task not found"
+// (no view access — hides existence) and "view-only" (visible but read-only)
+// into a single misleading "Task not found".
+async function requireEditableTask(taskId: string, viewer: TaskViewer) {
+    try {
+        return { ok: true as const, task: await assertTaskAccess(taskId, viewer, "edit") };
+    } catch (error) {
+        return {
+            ok: false as const,
+            error: error instanceof Error ? error.message : "Task not found",
+        };
+    }
 }
 
 async function ensureTaskStatusColumns(organizationId: string, projectId?: string | null) {
@@ -162,8 +256,9 @@ export async function createTask(
 ): Promise<ActionResult<Task>> {
     try {
         const validated = createTaskSchema.parse(input);
-        const { userId, organizationId } = await getUserOrganization();
-        await assertProjectScope(validated.projectId, organizationId);
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
+        await assertProjectScope(validated.projectId, viewer, "edit");
         const statusColumn = await getColumnForTaskInput(validated, organizationId, validated.projectId);
         const taskStatus = statusColumn?.status ?? validated.status;
 
@@ -238,18 +333,17 @@ export async function updateTask(
 ): Promise<ActionResult<Task>> {
     try {
         const validated = updateTaskSchema.parse(input);
-        const { userId, organizationId } = await getUserOrganization(); // Added userId here
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
 
         // Verify task belongs to user's organization
-        const existingTask = await db.task.findFirst({
-            where: {
-                id: validated.id,
-                organizationId,
-            },
-        });
-
-        if (!existingTask) {
-            return { success: false, error: "Task not found" };
+        const editable = await requireEditableTask(validated.id, viewer);
+        if (!editable.ok) {
+            return { success: false, error: editable.error };
+        }
+        const existingTask = editable.task;
+        if (validated.projectId !== undefined) {
+            await assertProjectScope(validated.projectId, viewer, "edit");
         }
 
         // Prepare update data
@@ -378,19 +472,13 @@ export async function deleteTask(
 ): Promise<ActionResult> {
     try {
         const validated = deleteTaskSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
-
-        // Verify task belongs to user's organization
-        const existingTask = await db.task.findFirst({
-            where: {
-                id: validated.id,
-                organizationId,
-            },
-        });
-
-        if (!existingTask) {
-            return { success: false, error: "Task not found" };
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+        const editable = await requireEditableTask(validated.id, viewer);
+        if (!editable.ok) {
+            return { success: false, error: editable.error };
         }
+        const existingTask = editable.task;
 
         await db.task.delete({
             where: { id: validated.id },
@@ -412,19 +500,13 @@ export async function reorderTask(
 ): Promise<ActionResult> {
     try {
         const validated = reorderTaskSchema.parse(input);
-        const { userId, organizationId } = await getUserOrganization();
-
-        // Verify task belongs to user's organization
-        const existingTask = await db.task.findFirst({
-            where: {
-                id: validated.id,
-                organizationId,
-            },
-        });
-
-        if (!existingTask) {
-            return { success: false, error: "Task not found" };
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
+        const editable = await requireEditableTask(validated.id, viewer);
+        if (!editable.ok) {
+            return { success: false, error: editable.error };
         }
+        const existingTask = editable.task;
 
         const reorderData: Prisma.TaskUncheckedUpdateInput = {
             status: validated.status,
@@ -465,7 +547,10 @@ export async function bulkReorderTasks(
 ): Promise<ActionResult> {
     try {
         const validated = bulkReorderTasksSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+
+        await Promise.all(validated.tasks.map((taskInfo) => assertTaskAccess(taskInfo.id, viewer, "edit")));
 
         // Perform updates in a transaction
         await db.$transaction(
@@ -501,7 +586,8 @@ export async function addTasksToSprint(
     input: { sprintId: string; taskIds: string[] }
 ): Promise<ActionResult<{ count: number }>> {
     try {
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         if (!input.taskIds.length) {
             return { success: false, error: "No tasks selected" };
@@ -514,6 +600,9 @@ export async function addTasksToSprint(
         if (!sprint) {
             return { success: false, error: "Sprint not found" };
         }
+
+        await assertProjectScope(sprint.projectId, viewer, "edit");
+        await Promise.all(input.taskIds.map((taskId) => assertTaskAccess(taskId, viewer, "edit")));
 
         const result = await db.task.updateMany({
             where: { id: { in: input.taskIds }, organizationId },
@@ -533,13 +622,18 @@ export async function addTasksToSprint(
 
 export async function getTasks(projectId?: string | null, options?: { sprintId?: string | null }) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         // If sprintId is specifically null (for backlog), filter for it
         // If sprintId is undefined, don't filter by sprintId
         // If filters are provided, combine them
 
-        const where: Prisma.TaskWhereInput = { organizationId };
+        const where: Prisma.TaskWhereInput = taskAccessWhere({
+            userId: viewer.userId,
+            organizationId,
+            orgRole: viewer.role,
+        });
 
         // Handle projectId filter: 
         // If projectId is generic string, filter by it.
@@ -588,8 +682,9 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
 
 export async function getTaskStatusColumns(projectId?: string | null): Promise<ActionResult<TaskStatusColumn[]>> {
     try {
-        const { organizationId } = await getUserOrganization();
-        const scopedProjectId = await assertProjectScope(projectId, organizationId);
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+        const scopedProjectId = await assertProjectScope(projectId, viewer, "view");
         const columns = await ensureTaskStatusColumns(organizationId, scopedProjectId);
 
         return { success: true, data: columns };
@@ -607,8 +702,9 @@ export async function createTaskStatusColumn(
 ): Promise<ActionResult<TaskStatusColumn>> {
     try {
         const validated = createTaskStatusColumnSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
-        const scopedProjectId = await assertProjectScope(validated.projectId, organizationId);
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+        const scopedProjectId = await assertProjectScope(validated.projectId, viewer, "edit");
         const columns = await ensureTaskStatusColumns(organizationId, scopedProjectId);
         const highestOrder = Math.max(-1, ...columns.map((column) => column.sortOrder));
 
@@ -637,7 +733,8 @@ export async function deleteTaskStatusColumn(
 ): Promise<ActionResult> {
     try {
         const validated = deleteTaskStatusColumnSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         const column = await db.taskStatusColumn.findFirst({
             where: { id: validated.id, organizationId },
@@ -651,6 +748,8 @@ export async function deleteTaskStatusColumn(
         if (!column) {
             return { success: false, error: "Column not found" };
         }
+
+        await assertProjectScope(column.projectId, viewer, "edit");
 
         if (column.status) {
             return { success: false, error: "Default columns cannot be deleted" };

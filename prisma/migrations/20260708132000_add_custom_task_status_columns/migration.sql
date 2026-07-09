@@ -31,7 +31,7 @@ SELECT
 FROM (
     SELECT DISTINCT "organizationId", "projectId" FROM "Task"
     UNION
-    SELECT "organizationId", NULL::text AS "projectId" FROM "Organization"
+    SELECT "id" AS "organizationId", NULL::text AS "projectId" FROM "Organization"
     UNION
     SELECT "organizationId", "id" AS "projectId" FROM "Project"
 ) AS scope

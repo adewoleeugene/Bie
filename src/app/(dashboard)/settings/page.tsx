@@ -32,7 +32,7 @@ export default function SettingsPage() {
     const nameDirty = name.trim() !== (session?.user?.name || "").trim();
 
     const NOTIF_TYPE_LABELS: Record<string, string> = {
-        MENTION: "Mentions",
+        MENTION: "Chat Mentions",
         DUE_SOON: "Due Soon Reminders",
         OVERDUE: "Overdue Alerts",
         ASSIGNED: "Task Assignments",

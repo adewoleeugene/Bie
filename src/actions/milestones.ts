@@ -2,9 +2,12 @@
 
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { MilestoneStatus } from "@prisma/client";
+import { MilestoneStatus, OrgRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
+import { canEdit, projectAccessWhere, resolveProjectAccess } from "@/lib/permissions";
+
+type MilestoneViewer = { userId: string; organizationId: string; role: OrgRole };
 
 async function getUserOrganization() {
     const session = await auth();
@@ -16,7 +19,28 @@ async function getUserOrganization() {
     });
 
     if (!user || user.memberships.length === 0) throw new Error("No organization");
-    return { userId: user.id, organizationId: (await activeMembership(user.memberships)).organizationId };
+    const membership = await activeMembership(user.memberships);
+    return { userId: user.id, organizationId: membership.organizationId, role: membership.role };
+}
+
+async function assertProjectEdit(projectId: string, viewer: MilestoneViewer) {
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId: viewer.organizationId },
+        select: {
+            id: true,
+            visibility: true,
+            organizationId: true,
+            leadId: true,
+            members: { select: { userId: true, role: true } },
+        },
+    });
+    if (!project) throw new Error("Project not found");
+    const access = resolveProjectAccess(project, {
+        userId: viewer.userId,
+        organizationId: viewer.organizationId,
+        orgRole: viewer.role,
+    });
+    if (!canEdit(access)) throw new Error("Forbidden");
 }
 
 export async function createMilestone(data: {
@@ -26,7 +50,9 @@ export async function createMilestone(data: {
     projectId: string;
 }) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+        await assertProjectEdit(data.projectId, viewer);
 
         const milestone = await db.milestone.create({
             data: {
@@ -48,10 +74,14 @@ export async function createMilestone(data: {
 
 export async function getMilestones(projectId: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         return await db.milestone.findMany({
-            where: { projectId, organizationId },
+            where: {
+                projectId,
+                organizationId,
+                project: projectAccessWhere({ userId, organizationId, orgRole: role }),
+            },
             orderBy: { dueDate: "asc" },
         });
     } catch (error) {
@@ -65,7 +95,22 @@ export async function updateMilestone(
     data: { title?: string; description?: string; dueDate?: string; status?: MilestoneStatus }
 ) {
     try {
-        await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const existing = await db.milestone.findFirst({
+            where: {
+                id: milestoneId,
+                organizationId: viewer.organizationId,
+                project: projectAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            select: { id: true, projectId: true },
+        });
+
+        if (!existing) return { success: false, error: "Milestone not found" };
+        await assertProjectEdit(existing.projectId, viewer);
 
         const milestone = await db.milestone.update({
             where: { id: milestoneId },
@@ -87,7 +132,22 @@ export async function updateMilestone(
 
 export async function deleteMilestone(milestoneId: string) {
     try {
-        await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const existing = await db.milestone.findFirst({
+            where: {
+                id: milestoneId,
+                organizationId: viewer.organizationId,
+                project: projectAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            select: { id: true, projectId: true },
+        });
+
+        if (!existing) return { success: false, error: "Milestone not found" };
+        await assertProjectEdit(existing.projectId, viewer);
 
         const milestone = await db.milestone.delete({
             where: { id: milestoneId },

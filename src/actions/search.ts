@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { WikiNamespace } from "@prisma/client";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
 
 export type SearchResult = {
     type: "page" | "task" | "database";
@@ -11,7 +12,7 @@ export type SearchResult = {
     title: string;
     subtitle?: string;
     url: string;
-    meta?: any;
+    meta?: unknown;
 };
 
 export async function globalSearch(query: string): Promise<{
@@ -29,7 +30,7 @@ export async function globalSearch(query: string): Promise<{
             where: { email: session.user.email },
             include: {
                 memberships: {
-                    select: { organizationId: true },
+                    select: { organizationId: true, role: true },
                 },
             },
         });
@@ -38,7 +39,8 @@ export async function globalSearch(query: string): Promise<{
             return { success: false, error: "No organization found" };
         }
 
-        const organizationId = (await activeMembership(user.memberships)).organizationId;
+        const membership = await activeMembership(user.memberships);
+        const organizationId = membership.organizationId;
 
         if (!query || query.length < 2) {
             return { success: true, results: [] };
@@ -65,7 +67,7 @@ export async function globalSearch(query: string): Promise<{
             }),
             db.task.findMany({
                 where: {
-                    organizationId,
+                    ...taskAccessWhere({ userId: user.id, organizationId, orgRole: membership.role }),
                     title: {
                         contains: query,
                         mode: "insensitive",

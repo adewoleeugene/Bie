@@ -1,8 +1,19 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProjects, getProject, createProject, updateProject, deleteProject } from "@/actions/project";
+import {
+    getProjects,
+    getProject,
+    createProject,
+    updateProject,
+    deleteProject,
+    listProjectSharing,
+    removeProjectMember,
+    setProjectVisibility,
+    updateProjectMemberRole,
+} from "@/actions/project";
 import { CreateProjectInput, UpdateProjectInput, DeleteProjectInput } from "@/lib/validators/project";
+import { ProjectRole, ProjectVisibility } from "@prisma/client";
 import { toast } from "sonner";
 
 export function useProjects() {
@@ -76,6 +87,49 @@ export function useDeleteProject() {
         },
         onError: () => {
             toast.error("Failed to delete project");
+        },
+    });
+}
+
+export function useProjectSharing(projectId: string, enabled = true) {
+    return useQuery({
+        queryKey: ["project-sharing", projectId],
+        queryFn: () => listProjectSharing(projectId),
+        enabled: !!projectId && enabled,
+    });
+}
+
+export function useSetProjectVisibility(projectId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (visibility: ProjectVisibility) => setProjectVisibility(projectId, visibility),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project-sharing", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["projects"] });
+        },
+    });
+}
+
+export function useUpdateProjectMemberRole(projectId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ userId, role }: { userId: string; role: ProjectRole }) =>
+            updateProjectMemberRole(projectId, userId, role),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project-sharing", projectId] });
+        },
+    });
+}
+
+export function useRemoveProjectMember(projectId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => removeProjectMember(projectId, userId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project-sharing", projectId] });
         },
     });
 }

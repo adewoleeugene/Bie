@@ -366,7 +366,7 @@ export async function exportPersonalData(): Promise<
                 },
                 include: {
                     conversation: {
-                        select: { id: true, name: true, organizationId: true, isGroup: true },
+                        select: { id: true, name: true, organizationId: true, type: true },
                     },
                 },
                 orderBy: { createdAt: "desc" },

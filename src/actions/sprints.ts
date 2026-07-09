@@ -11,9 +11,17 @@ import {
     UpdateSprintInput,
     DeleteSprintInput
 } from "@/lib/validators/sprint";
-import { Sprint, SprintStatus, TaskStatus } from "@prisma/client";
+import { OrgRole, Sprint, SprintStatus, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
+import {
+    canEdit,
+    projectAccessWhere,
+    resolveProjectAccess,
+    taskAccessWhere,
+} from "@/lib/permissions";
+
+type SprintViewer = { userId: string; organizationId: string; role: OrgRole };
 
 async function getUserOrganization() {
     const session = await auth();
@@ -36,10 +44,38 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
+}
+
+async function assertProjectEdit(projectId: string, viewer: SprintViewer) {
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId: viewer.organizationId },
+        select: {
+            id: true,
+            visibility: true,
+            organizationId: true,
+            leadId: true,
+            members: { select: { userId: true, role: true } },
+        },
+    });
+
+    if (!project) throw new Error("Project not found");
+
+    const access = resolveProjectAccess(project, {
+        userId: viewer.userId,
+        organizationId: viewer.organizationId,
+        orgRole: viewer.role,
+    });
+
+    if (!canEdit(access)) throw new Error("Forbidden");
+
+    return project;
 }
 
 export async function createSprint(
@@ -47,7 +83,10 @@ export async function createSprint(
 ): Promise<ActionResult<Sprint>> {
     try {
         const validated = createSprintSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
+
+        await assertProjectEdit(validated.projectId, viewer);
 
         if (validated.status === "ACTIVE") {
             const hasActiveSprint = await db.sprint.findFirst({
@@ -91,7 +130,8 @@ export async function updateSprint(
 ): Promise<ActionResult<Sprint>> {
     try {
         const validated = updateSprintSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         const existingSprint = await db.sprint.findFirst({
             where: {
@@ -102,6 +142,11 @@ export async function updateSprint(
 
         if (!existingSprint) {
             return { success: false, error: "Sprint not found" };
+        }
+
+        await assertProjectEdit(existingSprint.projectId, viewer);
+        if (validated.projectId && validated.projectId !== existingSprint.projectId) {
+            await assertProjectEdit(validated.projectId, viewer);
         }
 
         if (validated.status === "ACTIVE" && existingSprint.status !== "ACTIVE") {
@@ -148,7 +193,8 @@ export async function deleteSprint(
 ): Promise<ActionResult> {
     try {
         const validated = deleteSprintSchema.parse(input);
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         const existingSprint = await db.sprint.findFirst({
             where: {
@@ -160,6 +206,8 @@ export async function deleteSprint(
         if (!existingSprint) {
             return { success: false, error: "Sprint not found" };
         }
+
+        await assertProjectEdit(existingSprint.projectId, viewer);
 
         await db.sprint.delete({
             where: { id: validated.id },
@@ -178,12 +226,13 @@ export async function deleteSprint(
 
 export async function getSprints(projectId?: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const sprints = await db.sprint.findMany({
             where: {
                 organizationId,
                 ...(projectId ? { projectId } : {}),
+                project: projectAccessWhere({ userId, organizationId, orgRole: role }),
             },
             include: {
                 project: {
@@ -212,15 +261,17 @@ export async function getSprints(projectId?: string) {
 
 export async function getSprint(id: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const sprint = await db.sprint.findFirst({
             where: {
                 id,
-                organizationId
+                organizationId,
+                project: projectAccessWhere({ userId, organizationId, orgRole: role }),
             },
             include: {
                 tasks: {
+                    where: taskAccessWhere({ userId, organizationId, orgRole: role }),
                     include: {
                         assignees: { include: { user: true } }
                     }
@@ -239,7 +290,8 @@ export async function completeSprint(
     input: { id: string; carryOver?: "next" | "backlog" | "leave" }
 ): Promise<ActionResult<Sprint>> {
     try {
-        const { organizationId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { organizationId } = viewer;
 
         const existingSprint = await db.sprint.findFirst({
             where: {
@@ -251,6 +303,8 @@ export async function completeSprint(
         if (!existingSprint) {
             return { success: false, error: "Sprint not found" };
         }
+
+        await assertProjectEdit(existingSprint.projectId, viewer);
 
         // Archive all DONE tasks in this sprint
         await db.task.updateMany({
