@@ -680,6 +680,43 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
     }
 }
 
+export async function getTask(taskId: string) {
+    try {
+        const viewer = await getUserOrganization();
+
+        const task = await db.task.findFirst({
+            where: {
+                id: taskId,
+                organizationId: viewer.organizationId,
+                ...taskAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            include: {
+                assignees: { include: { user: true } },
+                project: true,
+                sprint: true,
+                statusColumn: true,
+                parentTask: true,
+                subtasks: {
+                    include: {
+                        statusColumn: true,
+                        assignees: { include: { user: true } },
+                    },
+                    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+                },
+            },
+        });
+
+        return task;
+    } catch (error) {
+        console.error("Get task error:", error);
+        return null;
+    }
+}
+
 export async function getTaskStatusColumns(projectId?: string | null): Promise<ActionResult<TaskStatusColumn[]>> {
     try {
         const viewer = await getUserOrganization();
