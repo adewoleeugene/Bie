@@ -236,21 +236,21 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
 
     return (
-        <div className="bg-[#0f1116] px-4 pb-5 pt-1">
+        <div className="bg-background px-4 pb-5 pt-1">
             <div className="relative">
                 {trigger && visibleSuggestions.length > 0 && (
-                    <div className="absolute bottom-full left-0 z-10 mb-3 w-full max-w-md overflow-hidden rounded-lg border border-white/10 bg-[#1c202a] shadow-2xl shadow-black/40">
+                    <div className="absolute bottom-full left-0 z-10 mb-3 w-full max-w-md overflow-hidden rounded-lg border border-border bg-popover shadow-2xl shadow-black/40">
                         {visibleSuggestions.map((suggestion) => (
                             <button
                                 key={`${suggestion.type}-${suggestion.id}`}
                                 type="button"
-                                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-neutral-200 transition-colors hover:bg-white/[0.06]"
+                                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted"
                                 onMouseDown={(event) => {
                                     event.preventDefault();
                                     insertSuggestion(suggestion);
                                 }}
                             >
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#252a36] text-neutral-400">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
                                     {suggestion.type === "user" ? (
                                         <AtSign className="h-4 w-4" />
                                     ) : suggestion.type === "task" ? (
@@ -262,7 +262,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                                 <div className="min-w-0">
                                     <div className="truncate font-medium">{suggestion.label}</div>
                                     {suggestion.subtitle && (
-                                        <div className="truncate text-xs text-neutral-500">{suggestion.subtitle}</div>
+                                        <div className="truncate text-xs text-muted-foreground">{suggestion.subtitle}</div>
                                     )}
                                 </div>
                             </button>
@@ -275,14 +275,14 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                         {files.map((file, index) => (
                             <div
                                 key={`${file.name}-${file.size}-${index}`}
-                                className="flex max-w-[240px] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-neutral-300"
+                                className="flex max-w-[240px] items-center gap-2 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs text-foreground"
                             >
-                                <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                 <span className="truncate">{file.name}</span>
-                                <span className="shrink-0 text-neutral-500">{formatBytes(file.size)}</span>
+                                <span className="shrink-0 text-muted-foreground">{formatBytes(file.size)}</span>
                                 <button
                                     type="button"
-                                    className="text-neutral-500 transition-colors hover:text-bz-red"
+                                    className="text-muted-foreground transition-colors hover:text-bz-red"
                                     onClick={() => removeFile(index)}
                                     aria-label="Remove file"
                                 >
@@ -293,7 +293,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                     </div>
                 )}
 
-                <div className="flex items-end gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1a1d24] p-1.5 pl-2.5 transition-colors focus-within:border-bz-blue/40 focus-within:bg-[#1c2028]">
+                <div className="flex items-end gap-1.5 rounded-2xl border border-border bg-muted p-1.5 pl-2.5 transition-colors focus-within:border-bz-blue/40 focus-within:bg-secondary">
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -307,7 +307,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                         variant="ghost"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={sendMessage.isPending}
-                        className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-100"
+                        className="h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                         <Paperclip className="h-4 w-4" />
                         <span className="sr-only">Attach files</span>
@@ -323,10 +323,10 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                             onKeyDown={handleKeyDown}
                             onKeyUp={detectTrigger}
                             onMouseUp={detectTrigger}
-                            className="max-h-[140px] min-h-9 w-full overflow-y-auto whitespace-pre-wrap break-words px-1 py-2 text-[15px] leading-6 text-neutral-100 outline-none"
+                            className="max-h-[140px] min-h-9 w-full overflow-y-auto whitespace-pre-wrap break-words px-1 py-2 text-[15px] leading-6 text-foreground outline-none"
                         />
                         {isEmpty && (
-                            <span className="pointer-events-none absolute left-1 top-2 text-[15px] leading-6 text-neutral-600">
+                            <span className="pointer-events-none absolute left-1 top-2 text-[15px] leading-6 text-muted-foreground">
                                 Type a message...
                             </span>
                         )}
@@ -335,7 +335,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                         size="icon"
                         onClick={handleSend}
                         disabled={(isEmpty && files.length === 0) || sendMessage.isPending}
-                        className="h-9 w-9 shrink-0 rounded-lg bg-bz-blue text-white hover:bg-bz-blue/90 disabled:bg-white/[0.06] disabled:text-neutral-600"
+                        className="h-9 w-9 shrink-0 rounded-lg bg-bz-blue text-white hover:bg-bz-blue/90 disabled:bg-muted disabled:text-muted-foreground"
                     >
                         <Send className="h-4 w-4" />
                     </Button>
