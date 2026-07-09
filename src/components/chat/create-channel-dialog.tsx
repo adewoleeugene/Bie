@@ -96,7 +96,7 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-7 w-7">
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-100">
                     <Plus className="h-4 w-4" />
                     <span className="sr-only">Create channel</span>
                 </Button>

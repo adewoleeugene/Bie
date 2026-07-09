@@ -28,7 +28,7 @@ export function ConversationList({
     const joinPublicChannel = useJoinPublicChannel();
 
     const getDisplayName = (conv: ConversationWithPreview) => {
-        if (conv.type === ConversationType.CHANNEL) return conv.name ? `# ${conv.name}` : "# channel";
+        if (conv.type === ConversationType.CHANNEL) return conv.name ? conv.name : "channel";
         if (conv.name) return conv.name;
         const otherMembers = conv.members.filter((m) => m.user.id !== session?.user?.id);
         return otherMembers.map((m) => m.user.name).join(", ") || "Chat";
@@ -52,53 +52,61 @@ export function ConversationList({
             <button
                 key={conv.id}
                 className={cn(
-                    "w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
-                    "hover:bg-neutral-100 dark:hover:bg-neutral-800",
-                    selectedId === conv.id && "bg-neutral-100 dark:bg-neutral-800"
+                    "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                    "text-neutral-400 hover:bg-white/[0.055] hover:text-neutral-100",
+                    selectedId === conv.id && "bg-white/[0.08] text-white"
                 )}
                 onClick={() => onSelect(conv.id)}
             >
+                {selectedId === conv.id && (
+                    <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-bz-blue" />
+                )}
                 {isChannel ? (
-                    <div className="h-9 w-9 shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                    <div className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#20232d] transition-colors",
+                        selectedId === conv.id && "bg-bz-blue/15 text-bz-blue"
+                    )}>
                         {conv.isPrivate ? (
-                            <Lock className="h-4 w-4 text-neutral-500" />
+                            <Lock className="h-4 w-4" />
                         ) : (
-                            <Hash className="h-4 w-4 text-neutral-500" />
+                            <Hash className="h-4 w-4" />
                         )}
                     </div>
                 ) : conv.type === ConversationType.GROUP ? (
-                    <div className="h-9 w-9 shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                        <MessageCircle className="h-4 w-4 text-neutral-500" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#20232d]">
+                        <MessageCircle className="h-4 w-4" />
                     </div>
                 ) : (
-                    <Avatar className="h-9 w-9 shrink-0">
+                    <Avatar className="h-9 w-9 shrink-0 ring-1 ring-white/10">
                         <AvatarImage src={avatar?.image || undefined} />
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="bg-[#242834] text-xs text-neutral-200">
                             {displayName.charAt(0).toUpperCase()}
                         </AvatarFallback>
                     </Avatar>
                 )}
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium truncate">{displayName}</span>
+                        <span className="truncate text-sm font-medium">
+                            {isChannel ? `# ${displayName}` : displayName}
+                        </span>
                         {conv.lastMessage && (
-                            <span className="text-[10px] text-neutral-400 shrink-0 ml-2">
+                            <span className="ml-2 shrink-0 text-[10px] text-neutral-600 group-hover:text-neutral-500">
                                 {formatDistanceToNow(new Date(conv.lastMessage.createdAt), { addSuffix: false })}
                             </span>
                         )}
                     </div>
                     {conv.lastMessage ? (
-                        <p className="text-xs text-neutral-500 truncate mt-0.5">
+                        <p className="mt-0.5 truncate text-xs text-neutral-600 group-hover:text-neutral-500">
                             {conv.lastMessage.sender.name}: {conv.lastMessage.body}
                         </p>
                     ) : (
-                        <p className="text-xs text-neutral-500 truncate mt-0.5">
+                        <p className="mt-0.5 truncate text-xs text-neutral-600 group-hover:text-neutral-500">
                             {isChannel ? conv.topic || "No messages yet" : "No messages yet"}
                         </p>
                     )}
                 </div>
                 {conv.unreadCount > 0 && (
-                    <Badge className="bg-blue-500 text-white text-[10px] h-5 min-w-[20px] flex items-center justify-center">
+                    <Badge className="flex h-5 min-w-[20px] items-center justify-center rounded-full border-0 bg-bz-blue px-1.5 text-[10px] text-white">
                         {conv.unreadCount}
                     </Badge>
                 )}
@@ -107,18 +115,18 @@ export function ConversationList({
     };
 
     return (
-        <div className="space-y-4 p-2">
+        <div className="space-y-5">
             {conversations.length === 0 && browsableChannels.length === 0 ? (
-                <div className="text-center py-8 text-neutral-500 text-sm">
+                <div className="px-3 py-8 text-center text-sm text-neutral-500">
                     No conversations yet
                 </div>
             ) : (
                 <>
                     <div>
-                        <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                        <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-600">
                             Channels
                         </div>
-                        <div className="space-y-0.5">
+                        <div className="space-y-1">
                             {channels.length > 0 ? channels.map(renderConversation) : (
                                 <p className="px-3 py-2 text-xs text-neutral-500">No channels yet</p>
                             )}
@@ -126,17 +134,17 @@ export function ConversationList({
                     </div>
                     {browsableChannels.length > 0 && (
                         <div>
-                            <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-600">
                                 Browse channels
                             </div>
-                            <div className="space-y-0.5">
+                            <div className="space-y-1">
                                 {browsableChannels.map((channel) => (
                                     <div
                                         key={channel.id}
-                                        className="flex items-center gap-3 rounded-md px-3 py-2.5"
+                                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-neutral-400 transition-colors hover:bg-white/[0.055] hover:text-neutral-100"
                                     >
-                                        <div className="h-9 w-9 shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                            <Hash className="h-4 w-4 text-neutral-500" />
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#20232d]">
+                                            <Hash className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center justify-between gap-2">
@@ -144,14 +152,14 @@ export function ConversationList({
                                                     # {channel.name ?? "channel"}
                                                 </span>
                                             </div>
-                                            <p className="mt-0.5 truncate text-xs text-neutral-500">
+                                            <p className="mt-0.5 truncate text-xs text-neutral-600">
                                                 {channel.topic || `${channel.memberCount} members`}
                                             </p>
                                         </div>
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="h-7 shrink-0 px-2 text-xs"
+                                            className="h-7 shrink-0 border-white/10 bg-white/[0.03] px-2 text-xs hover:bg-white/[0.08]"
                                             disabled={joinPublicChannel.isPending}
                                             onClick={async () => {
                                                 const result = await joinPublicChannel.mutateAsync(channel.id);
@@ -166,10 +174,10 @@ export function ConversationList({
                         </div>
                     )}
                     <div>
-                        <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                        <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-600">
                             Messages
                         </div>
-                        <div className="space-y-0.5">
+                        <div className="space-y-1">
                             {directMessages.length > 0 ? directMessages.map(renderConversation) : (
                                 <p className="px-3 py-2 text-xs text-neutral-500">No direct messages yet</p>
                             )}

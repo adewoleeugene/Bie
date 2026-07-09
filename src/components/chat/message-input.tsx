@@ -1,11 +1,10 @@
 "use client";
 
-import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentParent } from "@prisma/client";
 import { AtSign, FileText, FolderKanban, Hash, Paperclip, Send, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { uploadAttachment } from "@/actions/attachments";
 import { useChatReferenceSearch, usePublishTypingStatus, useSendMessage } from "@/hooks/use-chat";
 import type { ChatReferenceSuggestion } from "@/actions/chat";
@@ -16,35 +15,57 @@ interface MessageInputProps {
 
 type TriggerKind = "user" | "task" | "project";
 
-type TriggerState = {
-    kind: TriggerKind;
-    query: string;
-    start: number;
-    end: number;
-} | null;
+const TRIGGER_RE = /(^|\s)([@#+])([^\s@#+[\]]{0,40})$/;
 
-function detectTrigger(value: string, cursor: number): TriggerState {
-    const beforeCursor = value.slice(0, cursor);
-    const match = beforeCursor.match(/(^|\s)([@#+])([^\s@#+\[\]]{0,40})$/);
-    if (!match || match.index === undefined) return null;
-
-    const marker = match[2];
-    const query = match[3] ?? "";
-    const markerOffset = match[1] ? 1 : 0;
-    const start = match.index + markerOffset;
-
-    return {
-        kind: marker === "@" ? "user" : marker === "#" ? "task" : "project",
-        query,
-        start,
-        end: cursor,
-    };
+function kindForMarker(marker: string): TriggerKind {
+    return marker === "@" ? "user" : marker === "#" ? "task" : "project";
 }
 
-function tokenFor(suggestion: ChatReferenceSuggestion): string {
-    if (suggestion.type === "user") return `@[${suggestion.id}]`;
-    if (suggestion.type === "task") return `#[${suggestion.id}]`;
-    return `+[${suggestion.id}]`;
+function markerForKind(kind: TriggerKind): string {
+    return kind === "user" ? "@" : kind === "task" ? "#" : "+";
+}
+
+function tokenFor(kind: TriggerKind, id: string): string {
+    return `${markerForKind(kind)}[${id}]`;
+}
+
+// Serialize the contentEditable editor back to a token string: chip spans emit
+// their stored `@[id]`/`#[id]`/`+[id]` token; text and line breaks pass through,
+// so the backend parses references exactly as before.
+function serializeNode(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+    if (node instanceof HTMLElement) {
+        if (node.dataset.token) return node.dataset.token;
+        if (node.tagName === "BR") return "\n";
+        let inner = "";
+        node.childNodes.forEach((child) => {
+            inner += serializeNode(child);
+        });
+        if ((node.tagName === "DIV" || node.tagName === "P") && inner && !inner.startsWith("\n")) {
+            return `\n${inner}`;
+        }
+        return inner;
+    }
+    return "";
+}
+
+function serializeEditor(root: HTMLElement): string {
+    let out = "";
+    root.childNodes.forEach((node) => {
+        out += serializeNode(node);
+    });
+    return out;
+}
+
+function buildChip(suggestion: ChatReferenceSuggestion): HTMLSpanElement {
+    const kind = suggestion.type as TriggerKind;
+    const chip = document.createElement("span");
+    chip.dataset.token = tokenFor(kind, suggestion.id);
+    chip.contentEditable = "false";
+    chip.className =
+        "mx-0.5 inline-flex items-center rounded bg-bz-blue/15 px-1.5 py-0.5 align-baseline text-[13px] font-medium text-bz-blue";
+    chip.textContent = `${markerForKind(kind)}${suggestion.label}`;
+    return chip;
 }
 
 function formatBytes(bytes: number) {
@@ -54,20 +75,22 @@ function formatBytes(bytes: number) {
 }
 
 export function MessageInput({ conversationId }: MessageInputProps) {
-    const [body, setBody] = useState("");
-    const [files, setFiles] = useState<File[]>([]);
-    const [trigger, setTrigger] = useState<TriggerState>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const typingTimerRef = useRef<number | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
+    const [isEmpty, setIsEmpty] = useState(true);
+    const [trigger, setTrigger] = useState<{ kind: TriggerKind; query: string } | null>(null);
     const queryClient = useQueryClient();
     const sendMessage = useSendMessage();
     const publishTyping = usePublishTypingStatus();
-    const typingTimerRef = useRef<number | null>(null);
+
     const { data: suggestions } = useChatReferenceSearch(
         trigger?.kind ?? "user",
         trigger?.query ?? "",
         Boolean(trigger),
     );
+    const visibleSuggestions = (suggestions || []).slice(0, 6);
 
     useEffect(() => {
         return () => {
@@ -75,19 +98,36 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         };
     }, []);
 
-    const visibleSuggestions = useMemo(
-        () => (suggestions || []).slice(0, 6),
-        [suggestions],
-    );
+    const refreshEmpty = useCallback(() => {
+        const editor = editorRef.current;
+        setIsEmpty(!editor || serializeEditor(editor).trim().length === 0);
+    }, []);
 
-    const refreshTrigger = (value: string) => {
-        const cursor = textareaRef.current?.selectionStart ?? value.length;
-        setTrigger(detectTrigger(value, cursor));
-    };
+    const detectTrigger = useCallback(() => {
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        if (!editor || !selection || selection.rangeCount === 0 || !selection.isCollapsed) {
+            setTrigger(null);
+            return;
+        }
+        const range = selection.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE || !editor.contains(node)) {
+            setTrigger(null);
+            return;
+        }
+        const textBefore = (node.textContent ?? "").slice(0, range.startOffset);
+        const match = textBefore.match(TRIGGER_RE);
+        if (!match) {
+            setTrigger(null);
+            return;
+        }
+        setTrigger({ kind: kindForMarker(match[2]), query: match[3] ?? "" });
+    }, []);
 
-    const handleBodyChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-        setBody(event.target.value);
-        refreshTrigger(event.target.value);
+    const handleInput = () => {
+        refreshEmpty();
+        detectTrigger();
         publishTyping.mutate({ conversationId, isTyping: true });
         if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
         typingTimerRef.current = window.setTimeout(() => {
@@ -96,18 +136,39 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
 
     const insertSuggestion = (suggestion: ChatReferenceSuggestion) => {
-        if (!trigger) return;
+        const editor = editorRef.current;
+        const selection = window.getSelection();
+        if (!editor || !selection || selection.rangeCount === 0) return;
 
-        const token = tokenFor(suggestion);
-        const next = `${body.slice(0, trigger.start)}${token} ${body.slice(trigger.end)}`;
-        const nextCursor = trigger.start + token.length + 1;
+        const range = selection.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE) return;
 
-        setBody(next);
+        const textNode = node as Text;
+        const textBefore = (textNode.textContent ?? "").slice(0, range.startOffset);
+        const match = textBefore.match(TRIGGER_RE);
+        if (!match) return;
+
+        const markerAndQuery = match[2].length + (match[3]?.length ?? 0);
+        const replaceRange = document.createRange();
+        replaceRange.setStart(textNode, range.startOffset - markerAndQuery);
+        replaceRange.setEnd(textNode, range.startOffset);
+        replaceRange.deleteContents();
+
+        const chip = buildChip(suggestion);
+        const trailingSpace = document.createTextNode(" ");
+        replaceRange.insertNode(trailingSpace);
+        replaceRange.insertNode(chip);
+
+        const caret = document.createRange();
+        caret.setStartAfter(trailingSpace);
+        caret.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caret);
+
         setTrigger(null);
-        requestAnimationFrame(() => {
-            textareaRef.current?.focus();
-            textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
-        });
+        refreshEmpty();
+        editor.focus();
     };
 
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -134,7 +195,9 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
 
     const handleSend = async () => {
-        const trimmed = body.trim();
+        const editor = editorRef.current;
+        const raw = editor ? serializeEditor(editor) : "";
+        const trimmed = raw.trim();
         if (!trimmed && files.length === 0) return;
 
         const pendingFiles = files;
@@ -142,9 +205,10 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
         publishTyping.mutate({ conversationId, isTyping: false });
 
-        setBody("");
+        if (editor) editor.innerHTML = "";
         setFiles([]);
         setTrigger(null);
+        setIsEmpty(true);
 
         const result = await sendMessage.mutateAsync({
             conversationId,
@@ -155,10 +219,10 @@ export function MessageInput({ conversationId }: MessageInputProps) {
             await uploadFiles(result.data.id, pendingFiles);
         }
 
-        textareaRef.current?.focus();
+        editor?.focus();
     };
 
-    const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === "Escape" && trigger) {
             event.preventDefault();
             setTrigger(null);
@@ -172,27 +236,27 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     };
 
     return (
-        <div className="border-t p-4">
+        <div className="border-t border-white/10 bg-[#101116] px-5 py-4">
             <div className="relative">
                 {trigger && visibleSuggestions.length > 0 && (
-                    <div className="absolute bottom-full left-0 z-10 mb-2 w-full max-w-md overflow-hidden rounded-md border bg-white shadow-lg dark:bg-neutral-950">
+                    <div className="absolute bottom-full left-0 z-10 mb-3 w-full max-w-md overflow-hidden rounded-lg border border-white/10 bg-[#1c202a] shadow-2xl shadow-black/40">
                         {visibleSuggestions.map((suggestion) => (
                             <button
                                 key={`${suggestion.type}-${suggestion.id}`}
                                 type="button"
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-neutral-200 transition-colors hover:bg-white/[0.06]"
                                 onMouseDown={(event) => {
                                     event.preventDefault();
                                     insertSuggestion(suggestion);
                                 }}
                             >
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-900">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#252a36] text-neutral-400">
                                     {suggestion.type === "user" ? (
-                                        <AtSign className="h-4 w-4 text-neutral-500" />
+                                        <AtSign className="h-4 w-4" />
                                     ) : suggestion.type === "task" ? (
-                                        <Hash className="h-4 w-4 text-neutral-500" />
+                                        <Hash className="h-4 w-4" />
                                     ) : (
-                                        <FolderKanban className="h-4 w-4 text-neutral-500" />
+                                        <FolderKanban className="h-4 w-4" />
                                     )}
                                 </div>
                                 <div className="min-w-0">
@@ -207,18 +271,18 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                 )}
 
                 {files.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-2">
+                    <div className="mb-3 flex flex-wrap gap-2">
                         {files.map((file, index) => (
                             <div
                                 key={`${file.name}-${file.size}-${index}`}
-                                className="flex max-w-[220px] items-center gap-2 rounded-md border border-neutral-200 px-2 py-1 text-xs dark:border-neutral-800"
+                                className="flex max-w-[240px] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-neutral-300"
                             >
                                 <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
                                 <span className="truncate">{file.name}</span>
                                 <span className="shrink-0 text-neutral-500">{formatBytes(file.size)}</span>
                                 <button
                                     type="button"
-                                    className="text-neutral-400 hover:text-red-500"
+                                    className="text-neutral-500 transition-colors hover:text-bz-red"
                                     onClick={() => removeFile(index)}
                                     aria-label="Remove file"
                                 >
@@ -229,7 +293,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                     </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-[#1c202a] p-2 shadow-inner shadow-black/20 focus-within:border-bz-blue/50 focus-within:ring-2 focus-within:ring-bz-blue/10">
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -240,30 +304,38 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                     <Button
                         type="button"
                         size="icon"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={sendMessage.isPending}
-                        className="shrink-0"
+                        className="h-9 w-9 shrink-0 rounded-lg text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-100"
                     >
                         <Paperclip className="h-4 w-4" />
                         <span className="sr-only">Attach files</span>
                     </Button>
-                    <Textarea
-                        ref={textareaRef}
-                        value={body}
-                        onChange={handleBodyChange}
-                        onKeyDown={handleKeyDown}
-                        onClick={() => refreshTrigger(body)}
-                        onKeyUp={() => refreshTrigger(body)}
-                        placeholder="Type a message..."
-                        rows={1}
-                        className="max-h-[120px] min-h-[40px] resize-none"
-                    />
+                    <div className="relative flex-1">
+                        <div
+                            ref={editorRef}
+                            role="textbox"
+                            aria-multiline="true"
+                            contentEditable
+                            suppressContentEditableWarning
+                            onInput={handleInput}
+                            onKeyDown={handleKeyDown}
+                            onKeyUp={detectTrigger}
+                            onMouseUp={detectTrigger}
+                            className="max-h-[140px] min-h-9 w-full overflow-y-auto whitespace-pre-wrap break-words px-1 py-2 text-[15px] leading-6 text-neutral-100 outline-none"
+                        />
+                        {isEmpty && (
+                            <span className="pointer-events-none absolute left-1 top-2 text-[15px] leading-6 text-neutral-600">
+                                Type a message...
+                            </span>
+                        )}
+                    </div>
                     <Button
                         size="icon"
                         onClick={handleSend}
-                        disabled={(!body.trim() && files.length === 0) || sendMessage.isPending}
-                        className="shrink-0"
+                        disabled={(isEmpty && files.length === 0) || sendMessage.isPending}
+                        className="h-9 w-9 shrink-0 rounded-lg bg-bz-blue text-white hover:bg-bz-blue/90 disabled:bg-white/[0.06] disabled:text-neutral-600"
                     >
                         <Send className="h-4 w-4" />
                     </Button>

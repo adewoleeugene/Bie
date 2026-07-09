@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { Hash, MessageSquare } from "lucide-react";
 import { ConversationType } from "@prisma/client";
 import { useBrowsablePublicChannels, useConversations } from "@/hooks/use-chat";
 import { useSession } from "next-auth/react";
@@ -34,24 +34,33 @@ export function ChatLayout() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-64px)]">
+        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[#0f1015] text-neutral-100">
             {/* Sidebar */}
-            <div className="w-[300px] border-r flex flex-col shrink-0">
-                <div className="px-4 py-3 border-b flex items-center justify-between">
-                    <h2 className="font-semibold flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Chat
-                    </h2>
-                    <div className="flex items-center gap-1">
-                        <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
-                        <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
+            <aside className="flex w-[312px] shrink-0 flex-col border-r border-white/10 bg-[#171922]">
+                <div className="border-b border-white/10 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#242834] text-bz-blue">
+                                    <MessageSquare className="h-4 w-4" />
+                                </span>
+                                <span className="truncate">Team Chat</span>
+                            </div>
+                            <p className="mt-1 truncate pl-10 text-xs text-neutral-500">
+                                Channels and direct messages
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
+                            <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
+                        </div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto px-2 py-3">
                     {isLoading ? (
-                        <div className="p-4 space-y-3">
+                        <div className="space-y-2 p-2">
                             {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-14 rounded-lg bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+                                <div key={i} className="h-14 animate-pulse rounded-lg bg-white/5" />
                             ))}
                         </div>
                     ) : (
@@ -63,10 +72,10 @@ export function ChatLayout() {
                         />
                     )}
                 </div>
-            </div>
+            </aside>
 
             {/* Main Area */}
-            <div className="flex-1 flex flex-col">
+            <main className="flex min-w-0 flex-1 flex-col bg-[#101116]">
                 {selectedId ? (
                     <MessageThread
                         conversationId={selectedId}
@@ -78,19 +87,19 @@ export function ChatLayout() {
                         onConversationArchived={() => setSelectedId(null)}
                     />
                 ) : (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center">
-                            <MessageSquare className="h-16 w-16 mx-auto text-neutral-300 dark:text-neutral-700 mb-4" />
-                            <h3 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                Select a conversation
-                            </h3>
-                            <p className="text-sm text-neutral-500 mt-1">
-                                Or start a new one with your team.
+                    <div className="flex flex-1 items-center justify-center p-8">
+                        <div className="max-w-sm text-center">
+                            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#1c202a] text-bz-blue shadow-2xl shadow-black/30">
+                                <Hash className="h-7 w-7" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-white">Choose a room</h3>
+                            <p className="mt-2 text-sm leading-6 text-neutral-500">
+                                Pick a channel or direct message to jump back into the conversation.
                             </p>
                         </div>
                     </div>
                 )}
-            </div>
+            </main>
         </div>
     );
 }

@@ -16,10 +16,21 @@ import { useMembers } from "@/hooks/use-members";
 import { useCreateConversation } from "@/hooks/use-chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession } from "next-auth/react";
+import { OrgRole, ProjectRole } from "@prisma/client";
 
 interface NewConversationDialogProps {
     onCreated: (conversationId: string) => void;
 }
+
+type ConversationMember = {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+    role: OrgRole;
+    workspaceName: string;
+    projects: { id: string; name: string; role: ProjectRole }[];
+};
 
 export function NewConversationDialog({ onCreated }: NewConversationDialogProps) {
     const [open, setOpen] = useState(false);
@@ -31,8 +42,8 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
     const { data: session } = useSession();
     const createConversation = useCreateConversation();
 
-    const filteredMembers = (members || []).filter(
-        (m: any) =>
+    const filteredMembers = ((members || []) as ConversationMember[]).filter(
+        (m) =>
             m.id !== session?.user?.id &&
             m.name?.toLowerCase().includes(search.toLowerCase())
     );
@@ -67,7 +78,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1.5">
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 border-white/10 bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white">
                     <Plus className="h-3.5 w-3.5" />
                     New
                 </Button>
@@ -92,7 +103,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
                     />
 
                     <div className="max-h-[300px] overflow-y-auto space-y-1">
-                        {filteredMembers.map((member: any) => (
+                        {filteredMembers.map((member) => (
                             <button
                                 key={member.id}
                                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
