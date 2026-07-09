@@ -40,9 +40,9 @@ export function MessageContent({ body, references }: MessageContentProps) {
                         return (
                             <span
                                 key={ref.id}
-                                className="mx-0.5 inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-blue-700 dark:bg-blue-950 dark:text-blue-200"
+                                className="mx-0.5 inline-flex items-center gap-1 rounded-md bg-white/15 px-1.5 py-0.5 align-middle font-medium text-current"
                             >
-                                <UserRound className="h-3 w-3" />
+                                <UserRound className="h-3 w-3 opacity-80" />
                                 {ref.user.name}
                             </span>
                         );
@@ -55,10 +55,10 @@ export function MessageContent({ body, references }: MessageContentProps) {
                                 href={ref.task.url}
                                 className="mx-0.5 inline-flex max-w-full align-middle"
                             >
-                                <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900">
-                                    <CircleDot className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                                <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/15 px-2 py-0.5 text-current transition-colors hover:bg-white/25">
+                                    <CircleDot className="h-3.5 w-3.5 shrink-0 opacity-70" />
                                     <span className="truncate font-medium">{ref.task.title}</span>
-                                    <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
+                                    <Badge variant="outline" className="hidden shrink-0 border-current/30 text-current sm:inline-flex">
                                         {ref.task.statusColumnName ?? statusLabel(ref.task.status)}
                                     </Badge>
                                 </span>
@@ -73,8 +73,8 @@ export function MessageContent({ body, references }: MessageContentProps) {
                                 href={ref.project.url}
                                 className="mx-0.5 inline-flex max-w-full align-middle"
                             >
-                                <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900">
-                                    <FolderKanban className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                                <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/15 px-2 py-0.5 text-current transition-colors hover:bg-white/25">
+                                    <FolderKanban className="h-3.5 w-3.5 shrink-0 opacity-70" />
                                     <span className="truncate font-medium">{ref.project.name}</span>
                                 </span>
                             </a>
@@ -93,26 +93,26 @@ export function MessageContent({ body, references }: MessageContentProps) {
                         <a
                             key={`card-${ref.id}`}
                             href={task.url}
-                            className="block max-w-xl rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                            className="block max-w-xl rounded-lg border border-current/15 bg-white/10 p-3 text-sm text-current transition-colors hover:bg-white/[0.16]"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-neutral-500" />
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 opacity-70" />
                                         <span className="font-medium truncate">{task.title}</span>
                                     </div>
-                                    <div className="mt-1 text-xs text-neutral-500">
+                                    <div className="mt-1 text-xs opacity-70">
                                         {task.projectName ?? "No project"} · {task.priority}
                                     </div>
                                 </div>
-                                <Badge variant="outline" className="shrink-0">
+                                <Badge variant="outline" className="shrink-0 border-current/30 text-current">
                                     {task.statusColumnName ?? statusLabel(task.status)}
                                 </Badge>
                             </div>
                             {task.assignees.length > 0 && (
                                 <div className="mt-3 flex -space-x-2">
                                     {task.assignees.slice(0, 4).map((user) => (
-                                        <Avatar key={user.id} className="h-6 w-6 border-2 border-neutral-50 dark:border-neutral-900">
+                                        <Avatar key={user.id} className="h-6 w-6 border-2 border-white/10">
                                             <AvatarImage src={user.image || undefined} />
                                             <AvatarFallback className="text-[10px]">
                                                 {user.name.charAt(0).toUpperCase()}

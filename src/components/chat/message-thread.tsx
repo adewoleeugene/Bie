@@ -274,7 +274,7 @@ export function MessageThread({
                                                     isDeleted
                                                         ? "bg-muted/50 italic text-muted-foreground"
                                                         : isMe
-                                                            ? "rounded-br-md bg-bz-blue text-white"
+                                                            ? "rounded-br-md bg-blue-600 text-white"
                                                             : "rounded-bl-md bg-muted text-foreground",
                                                 )}
                                             >
