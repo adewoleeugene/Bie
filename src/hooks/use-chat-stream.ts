@@ -10,7 +10,8 @@ type ChatRealtimeEvent =
     | { conversationId: string; type: "message.deleted"; messageId: string; deletedAt: string }
     | { conversationId: string; type: "typing"; userId: string; name: string; isTyping: boolean }
     | { conversationId: string; type: "presence"; userId: string; name: string; status: "online" | "offline" }
-    | { conversationId: string; type: "read"; userId: string; readAt: string };
+    | { conversationId: string; type: "read"; userId: string; readAt: string }
+    | { conversationId: string; type: "membership"; action: "added" | "removed"; userId: string };
 
 type WireMessage = Omit<MessageWithSender, "createdAt" | "updatedAt" | "deletedAt"> & {
     createdAt: string;
@@ -77,6 +78,15 @@ export function useChatStream(conversationId: string | null) {
                 return;
             }
 
+            if (event.type === "membership") {
+                // Someone was added to / removed from this conversation. Refresh the
+                // sidebar (member lists, unread) and the thread — a removed viewer's
+                // messages will clear since they no longer have access.
+                invalidateSidebar();
+                queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+                return;
+            }
+
             if (event.type === "typing") {
                 window.clearTimeout(timers.get(event.userId));
                 if (event.isTyping) {
@@ -113,6 +123,7 @@ export function useChatStream(conversationId: string | null) {
         es.addEventListener("typing", handleSse);
         es.addEventListener("presence", handleSse);
         es.addEventListener("read", handleSse);
+        es.addEventListener("membership", handleSse);
         es.addEventListener("message", (event: MessageEvent) => {
             try {
                 const incoming = JSON.parse(event.data) as WireMessage;

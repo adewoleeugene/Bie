@@ -791,6 +791,17 @@ export async function addChannelMembers(
             ),
         );
 
+        await Promise.all(
+            allowedMembers.map((member) =>
+                publishChatEvent({
+                    conversationId,
+                    type: "membership",
+                    action: "added",
+                    userId: member.userId,
+                }).catch((error) => console.error("publishChatEvent failed", error)),
+            ),
+        );
+
         revalidatePath("/chat");
         return { success: true, data: undefined };
     } catch (error) {
@@ -814,6 +825,13 @@ export async function removeChannelMember(
                 },
             },
         });
+
+        publishChatEvent({
+            conversationId,
+            type: "membership",
+            action: "removed",
+            userId: memberId,
+        }).catch((error) => console.error("publishChatEvent failed", error));
 
         revalidatePath("/chat");
         return { success: true, data: undefined };
