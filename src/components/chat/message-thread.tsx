@@ -241,34 +241,32 @@ export function MessageThread({
                                     ) : (
                                         <div className="flex items-center gap-1">
                                             {isMe && !isDeleted && (
-                                                <div className="hidden group-hover:block">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">Message actions</span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem
-                                                                onClick={() => {
-                                                                    setEditingId(msg.id);
-                                                                    setEditBody(msg.body);
-                                                                }}
-                                                            >
-                                                                <Edit3 className="h-4 w-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                variant="destructive"
-                                                                onClick={() => deleteMessage.mutate({ conversationId, messageId: msg.id })}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                                Delete
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Message actions</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                            onClick={() => {
+                                                                setEditingId(msg.id);
+                                                                setEditBody(msg.body);
+                                                            }}
+                                                        >
+                                                            <Edit3 className="h-4 w-4" />
+                                                            Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            variant="destructive"
+                                                            onClick={() => deleteMessage.mutate({ conversationId, messageId: msg.id })}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             )}
                                             <div
                                                 className={cn(
