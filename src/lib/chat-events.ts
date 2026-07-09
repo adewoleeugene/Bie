@@ -1,5 +1,5 @@
 import { Client, Pool } from "pg";
-import { MessageRefType, TaskPriority, TaskStatus } from "@prisma/client";
+import { MessageRefType, ProjectStatus, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Cross-instance pub/sub for chat using Postgres LISTEN/NOTIFY.
 // Channel: "chat_messages". Payload: JSON { conversationId, type, ... }.
@@ -29,6 +29,12 @@ export type ChatRealtimeMessage = {
             statusColumnName: string | null;
             statusColumnColor: string | null;
             assignees: { id: string; name: string; image: string | null }[];
+            url: string;
+        } | null;
+        project?: {
+            id: string;
+            name: string;
+            status: ProjectStatus;
             url: string;
         } | null;
     }[];

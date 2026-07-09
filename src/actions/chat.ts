@@ -6,8 +6,8 @@ import { ActionResult } from "@/types";
 import { revalidatePath } from "next/cache";
 import { publishChatEvent } from "@/lib/chat-events";
 import { activeMembership } from "@/lib/user-organization";
-import { isOrgAdmin, resolveChannelAccess, taskAccessWhere } from "@/lib/permissions";
-import { ConversationType, MessageRefType, NotificationType, OrgRole, TaskPriority, TaskStatus } from "@prisma/client";
+import { isOrgAdmin, projectAccessWhere, resolveChannelAccess, taskAccessWhere } from "@/lib/permissions";
+import { ConversationType, MessageRefType, NotificationType, OrgRole, ProjectStatus, TaskPriority, TaskStatus } from "@prisma/client";
 import { joinPublicChannelsForMember } from "@/lib/chat-channels";
 import { sendNotifications } from "@/lib/notifications";
 
@@ -100,11 +100,17 @@ async function assertOrgMembers(organizationId: string, userIds: string[]) {
 function parseMessageReferences(body: string) {
     const userIds = Array.from(body.matchAll(/@\[([^\]]+)\]/g), (match) => match[1]);
     const taskIds = Array.from(body.matchAll(/#\[([^\]]+)\]/g), (match) => match[1]);
+    const projectIds = Array.from(body.matchAll(/\+\[([^\]]+)\]/g), (match) => match[1]);
 
     return {
         userIds: Array.from(new Set(userIds)),
         taskIds: Array.from(new Set(taskIds)),
+        projectIds: Array.from(new Set(projectIds)),
     };
+}
+
+function projectUrl(projectId: string) {
+    return `/projects/${projectId}`;
 }
 
 function taskUrl(task: { id: string; projectId: string | null }) {
@@ -348,10 +354,16 @@ export interface MessageReferencePreview {
         assignees: { id: string; name: string; image: string | null }[];
         url: string;
     } | null;
+    project?: {
+        id: string;
+        name: string;
+        status: ProjectStatus;
+        url: string;
+    } | null;
 }
 
 export interface ChatReferenceSuggestion {
-    type: "user" | "task";
+    type: "user" | "task" | "project";
     id: string;
     label: string;
     subtitle?: string;
@@ -373,15 +385,17 @@ async function hydrateMessageReferences(
 ): Promise<MessageWithSender[]> {
     const userIds = new Set<string>();
     const taskIds = new Set<string>();
+    const projectIds = new Set<string>();
 
     for (const message of messages) {
         for (const ref of message.references) {
             if (ref.targetType === MessageRefType.USER) userIds.add(ref.targetId);
             if (ref.targetType === MessageRefType.TASK) taskIds.add(ref.targetId);
+            if (ref.targetType === MessageRefType.PROJECT) projectIds.add(ref.targetId);
         }
     }
 
-    const [users, tasks] = await Promise.all([
+    const [users, tasks, projects] = await Promise.all([
         userIds.size > 0
             ? db.user.findMany({
                 where: { id: { in: Array.from(userIds) } },
@@ -414,15 +428,30 @@ async function hydrateMessageReferences(
                 },
             })
             : [],
+        projectIds.size > 0
+            ? db.project.findMany({
+                where: {
+                    id: { in: Array.from(projectIds) },
+                    ...projectAccessWhere({
+                        userId: viewer.userId,
+                        organizationId: viewer.organizationId,
+                        orgRole: viewer.role,
+                    }),
+                },
+                select: { id: true, name: true, status: true },
+            })
+            : [],
     ]);
 
     const usersById = new Map(users.map((user) => [user.id, user]));
     const tasksById = new Map(tasks.map((task) => [task.id, task]));
+    const projectsById = new Map(projects.map((project) => [project.id, project]));
 
     return messages.map((message) => ({
         ...message,
         references: message.references.map((ref) => {
             const task = ref.targetType === MessageRefType.TASK ? tasksById.get(ref.targetId) : null;
+            const project = ref.targetType === MessageRefType.PROJECT ? projectsById.get(ref.targetId) : null;
 
             return {
                 id: ref.id,
@@ -443,6 +472,14 @@ async function hydrateMessageReferences(
                         url: taskUrl(task),
                     }
                     : null,
+                project: project
+                    ? {
+                        id: project.id,
+                        name: project.name,
+                        status: project.status,
+                        url: projectUrl(project.id),
+                    }
+                    : null,
             };
         }),
     }));
@@ -451,7 +488,7 @@ async function hydrateMessageReferences(
 // ─── Chat Reference Search ───────────────────────────────
 
 export async function searchChatReferences(
-    kind: "user" | "task",
+    kind: "user" | "task" | "project",
     query: string,
 ): Promise<ChatReferenceSuggestion[]> {
     try {
@@ -480,6 +517,27 @@ export async function searchChatReferences(
                 label: member.user.name,
                 subtitle: member.user.email,
                 image: member.user.image,
+            }));
+        }
+
+        if (kind === "project") {
+            const projects = await db.project.findMany({
+                where: {
+                    ...projectAccessWhere({ userId, organizationId, orgRole: role }),
+                    name: trimmed
+                        ? { contains: trimmed, mode: "insensitive" }
+                        : undefined,
+                },
+                take: 8,
+                select: { id: true, name: true, status: true },
+                orderBy: { updatedAt: "desc" },
+            });
+
+            return projects.map((project) => ({
+                type: "project",
+                id: project.id,
+                label: project.name,
+                subtitle: `Project · ${project.status}`,
             }));
         }
 
@@ -798,7 +856,7 @@ export async function sendMessage(input: {
 
         const parsedRefs = parseMessageReferences(body);
 
-        const [validMentionedUsers, validTasks] = await Promise.all([
+        const [validMentionedUsers, validTasks, validProjects] = await Promise.all([
             parsedRefs.userIds.length > 0
                 ? db.organizationMember.findMany({
                     where: {
@@ -822,6 +880,15 @@ export async function sendMessage(input: {
                     },
                 })
                 : [],
+            parsedRefs.projectIds.length > 0
+                ? db.project.findMany({
+                    where: {
+                        ...projectAccessWhere({ userId, organizationId, orgRole: role }),
+                        id: { in: parsedRefs.projectIds },
+                    },
+                    select: { id: true },
+                })
+                : [],
         ]);
 
         const message = await db.message.create({
@@ -838,6 +905,10 @@ export async function sendMessage(input: {
                         ...validTasks.map((task) => ({
                             targetType: MessageRefType.TASK,
                             targetId: task.id,
+                        })),
+                        ...validProjects.map((project) => ({
+                            targetType: MessageRefType.PROJECT,
+                            targetId: project.id,
                         })),
                     ],
                 },
@@ -945,7 +1016,7 @@ export async function updateMessage(input: {
         }
 
         const parsedRefs = parseMessageReferences(body);
-        const [validMentionedUsers, validTasks] = await Promise.all([
+        const [validMentionedUsers, validTasks, validProjects] = await Promise.all([
             parsedRefs.userIds.length > 0
                 ? db.organizationMember.findMany({
                     where: {
@@ -969,6 +1040,15 @@ export async function updateMessage(input: {
                     },
                 })
                 : [],
+            parsedRefs.projectIds.length > 0
+                ? db.project.findMany({
+                    where: {
+                        ...projectAccessWhere({ userId, organizationId, orgRole: role }),
+                        id: { in: parsedRefs.projectIds },
+                    },
+                    select: { id: true },
+                })
+                : [],
         ]);
 
         const updated = await db.$transaction(async (tx) => {
@@ -986,6 +1066,10 @@ export async function updateMessage(input: {
                             ...validTasks.map((task) => ({
                                 targetType: MessageRefType.TASK,
                                 targetId: task.id,
+                            })),
+                            ...validProjects.map((project) => ({
+                                targetType: MessageRefType.PROJECT,
+                                targetId: project.id,
                             })),
                         ],
                     },

@@ -115,6 +115,7 @@ enum MessageRefType {
   USER
   TASK
   WIKI_PAGE
+  PROJECT
 }
 
 enum AccessRequestStatus {
