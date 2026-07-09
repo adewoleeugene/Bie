@@ -1,7 +1,6 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { switchWorkspace } from "@/actions/workspace";
 import {
     DropdownMenu,
@@ -40,7 +39,6 @@ export function WorkspaceSwitcher({
     currentWorkspaceId,
     currentWorkspaceName,
 }: WorkspaceSwitcherProps) {
-    const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
     const currentName = currentWorkspaceName ?? workspaces.find((w) => w.id === currentWorkspaceId)?.name ?? "Workspace";
@@ -60,8 +58,10 @@ export function WorkspaceSwitcher({
         startTransition(async () => {
             const result = await switchWorkspace(id);
             if (result.success) {
-                router.push("/dashboard");
-                router.refresh();
+                // Hard navigation forces a fresh request that carries the newly-set
+                // cookie. A soft router.refresh() doesn't reliably re-render with it
+                // in every browser (e.g. Brave's stricter cache handling).
+                window.location.assign("/dashboard");
             } else {
                 toast.error(result.error || "Couldn't switch workspace");
             }
@@ -73,8 +73,7 @@ export function WorkspaceSwitcher({
         startTransition(async () => {
             const result = await switchWorkspace(project.organizationId);
             if (result.success) {
-                router.push(`/projects/${project.id}`);
-                router.refresh();
+                window.location.assign(`/projects/${project.id}`);
             } else {
                 toast.error(result.error || "Couldn't open project");
             }
