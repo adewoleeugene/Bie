@@ -135,6 +135,52 @@ async function filterConversationMemberRecipients(
     return memberships.map((membership) => membership.userId);
 }
 
+// When a project is tagged, surface the chat to the project team. For a public
+// channel we add the (non-guest) project members so the conversation shows up in
+// their list and the notification opens. For private channels / DMs we do NOT
+// pull outsiders in (that would leak the conversation's history) — we only
+// notify project members already in it. Returns the userIds to notify.
+async function resolveProjectTagRecipients(params: {
+    conversation: { id: string; type: ConversationType; isPrivate: boolean };
+    projectIds: string[];
+    senderId: string;
+    organizationId: string;
+}): Promise<string[]> {
+    const { conversation, projectIds, senderId, organizationId } = params;
+    if (projectIds.length === 0) return [];
+
+    const projectMembers = await db.projectMember.findMany({
+        where: { projectId: { in: projectIds } },
+        select: { userId: true },
+    });
+    const candidateIds = Array.from(new Set(projectMembers.map((member) => member.userId)))
+        .filter((id) => id !== senderId);
+    if (candidateIds.length === 0) return [];
+
+    // Guests can't be channel members — keep only non-guest org members.
+    const eligible = await db.organizationMember.findMany({
+        where: { organizationId, userId: { in: candidateIds }, role: { not: OrgRole.GUEST } },
+        select: { userId: true },
+    });
+    const eligibleIds = eligible.map((member) => member.userId);
+    if (eligibleIds.length === 0) return [];
+
+    if (conversation.type === ConversationType.CHANNEL && !conversation.isPrivate) {
+        await db.$transaction(
+            eligibleIds.map((userId) =>
+                db.conversationMember.upsert({
+                    where: { conversationId_userId: { conversationId: conversation.id, userId } },
+                    update: {},
+                    create: { conversationId: conversation.id, userId },
+                }),
+            ),
+        );
+        return eligibleIds;
+    }
+
+    return filterConversationMemberRecipients(conversation.id, eligibleIds);
+}
+
 // ─── Types ───────────────────────────────────────────────
 
 export interface ConversationWithPreview {
@@ -847,7 +893,7 @@ export async function sendMessage(input: {
     body: string;
 }): Promise<ActionResult<{ id: string }>> {
     try {
-        const { userId, organizationId, role } = await assertConversationAccess(input.conversationId, "post");
+        const { userId, organizationId, role, conversation } = await assertConversationAccess(input.conversationId, "post");
         const body = input.body.trim();
 
         if (!body) {
@@ -923,10 +969,19 @@ export async function sendMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const notificationRecipients = await filterConversationMemberRecipients(
-            input.conversationId,
-            [...mentionedUserIds, ...taskRecipientIds],
-        );
+        const projectRecipients = await resolveProjectTagRecipients({
+            conversation: { id: conversation.id, type: conversation.type, isPrivate: conversation.isPrivate },
+            projectIds: validProjects.map((project) => project.id),
+            senderId: userId,
+            organizationId,
+        });
+        const notificationRecipients = Array.from(new Set([
+            ...(await filterConversationMemberRecipients(
+                input.conversationId,
+                [...mentionedUserIds, ...taskRecipientIds],
+            )),
+            ...projectRecipients,
+        ]));
 
         if (notificationRecipients.length > 0) {
             sendNotifications({
@@ -1008,7 +1063,11 @@ export async function updateMessage(input: {
                     members: { some: { userId } },
                 },
             },
-            select: { id: true, conversationId: true },
+            select: {
+                id: true,
+                conversationId: true,
+                conversation: { select: { id: true, type: true, isPrivate: true } },
+            },
         });
 
         if (!existing) {
@@ -1085,10 +1144,19 @@ export async function updateMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const notificationRecipients = await filterConversationMemberRecipients(
-            existing.conversationId,
-            [...mentionedUserIds, ...taskRecipientIds],
-        );
+        const projectRecipients = await resolveProjectTagRecipients({
+            conversation: existing.conversation,
+            projectIds: validProjects.map((project) => project.id),
+            senderId: userId,
+            organizationId,
+        });
+        const notificationRecipients = Array.from(new Set([
+            ...(await filterConversationMemberRecipients(
+                existing.conversationId,
+                [...mentionedUserIds, ...taskRecipientIds],
+            )),
+            ...projectRecipients,
+        ]));
 
         if (notificationRecipients.length > 0) {
             sendNotifications({
