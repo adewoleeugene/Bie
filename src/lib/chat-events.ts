@@ -46,7 +46,8 @@ export type ChatEventPayload =
     | { conversationId: string; type: "message.deleted"; messageId: string; deletedAt: string }
     | { conversationId: string; type: "typing"; userId: string; name: string; isTyping: boolean }
     | { conversationId: string; type: "presence"; userId: string; name: string; status: "online" | "offline" }
-    | { conversationId: string; type: "read"; userId: string; readAt: string };
+    | { conversationId: string; type: "read"; userId: string; readAt: string }
+    | { conversationId: string; type: "membership"; action: "added" | "removed"; userId: string };
 
 const CHANNEL = "chat_messages";
 
