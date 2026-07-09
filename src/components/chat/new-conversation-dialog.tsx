@@ -9,9 +9,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { useCreateConversation } from "@/hooks/use-chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,6 +17,8 @@ import { useSession } from "next-auth/react";
 import { OrgRole, ProjectRole } from "@prisma/client";
 
 interface NewConversationDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     onCreated: (conversationId: string) => void;
 }
 
@@ -32,8 +32,7 @@ type ConversationMember = {
     projects: { id: string; name: string; role: ProjectRole }[];
 };
 
-export function NewConversationDialog({ onCreated }: NewConversationDialogProps) {
-    const [open, setOpen] = useState(false);
+export function NewConversationDialog({ open, onOpenChange, onCreated }: NewConversationDialogProps) {
     const [name, setName] = useState("");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState("");
@@ -68,27 +67,20 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
 
         if (result.success && result.data) {
             onCreated(result.data.id);
-            setOpen(false);
-            setName("");
-            setSelectedIds(new Set());
-            setSearch("");
+            onOpenChange(false);
         }
     };
 
+    const isGroup = selectedIds.size > 1;
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 gap-1.5 border-white/10 bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white">
-                    <Plus className="h-3.5 w-3.5" />
-                    New
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>New Conversation</DialogTitle>
+                    <DialogTitle>{isGroup ? "New group message" : "New message"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
-                    {selectedIds.size > 1 && (
+                    {isGroup && (
                         <Input
                             placeholder="Group name (optional)"
                             value={name}
@@ -97,16 +89,17 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
                     )}
 
                     <Input
-                        placeholder="Search members..."
+                        placeholder="Search people..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        autoFocus
                     />
 
-                    <div className="max-h-[300px] overflow-y-auto space-y-1">
+                    <div className="max-h-[300px] space-y-1 overflow-y-auto">
                         {filteredMembers.map((member) => (
                             <button
                                 key={member.id}
-                                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted"
                                 onClick={() => toggleMember(member.id)}
                             >
                                 <Checkbox checked={selectedIds.has(member.id)} />
@@ -120,7 +113,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
                             </button>
                         ))}
                         {filteredMembers.length === 0 && (
-                            <p className="text-sm text-neutral-500 text-center py-4">No members found</p>
+                            <p className="py-4 text-center text-sm text-muted-foreground">No people found</p>
                         )}
                     </div>
 
@@ -131,7 +124,9 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
                     >
                         {createConversation.isPending
                             ? "Creating..."
-                            : `Start Chat${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+                            : isGroup
+                                ? `Start group (${selectedIds.size})`
+                                : "Start message"}
                     </Button>
                 </div>
             </DialogContent>
