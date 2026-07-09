@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ConversationType, OrgRole } from "@prisma/client";
-import { Archive, Settings, UserMinus, UserPlus } from "lucide-react";
+import { Archive, UserMinus, UserPlus } from "lucide-react";
 import { useSession } from "next-auth/react";
 import type { ConversationWithPreview } from "@/actions/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -55,7 +55,7 @@ export function ChannelSettingsDialog({ conversation, onArchived }: ChannelSetti
 
     const existingMemberIds = new Set(conversation.members.map((member) => member.userId));
     const availableMembers = chatMembers.filter(
-        (member) => member.role !== OrgRole.GUEST && !existingMemberIds.has(member.id),
+        (member) => !existingMemberIds.has(member.id),
     );
 
     const toggleMember = (userId: string) => {
@@ -95,9 +95,9 @@ export function ChannelSettingsDialog({ conversation, onArchived }: ChannelSetti
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Settings className="h-4 w-4" />
-                    <span className="sr-only">Channel settings</span>
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                    <UserPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Members</span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-xl">
