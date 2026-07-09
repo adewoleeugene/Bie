@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     getTasks,
+    getTask,
     createTask,
     updateTask,
     deleteTask,
@@ -29,6 +30,14 @@ export function useTasks(projectId?: string | null, options?: { sprintId?: strin
     return useQuery({
         queryKey: ["tasks", projectId, options?.sprintId],
         queryFn: () => getTasks(projectId, options),
+    });
+}
+
+export function useTask(taskId: string) {
+    return useQuery({
+        queryKey: ["task", taskId],
+        queryFn: () => getTask(taskId),
+        enabled: !!taskId,
     });
 }
 
@@ -134,6 +143,7 @@ export function useUpdateTask() {
         onSuccess: (result) => {
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                queryClient.invalidateQueries({ queryKey: ["task"] });
                 // Silent success — inline edits (assignee toggle, status, dates)
                 // fire this hook constantly; toasting on every one is noisy.
             } else {
@@ -158,6 +168,7 @@ export function useDeleteTask() {
         onSuccess: (result) => {
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                queryClient.invalidateQueries({ queryKey: ["task"] });
                 toast.success("Task deleted successfully");
             } else {
                 toast.error(result.error);

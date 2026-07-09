@@ -659,6 +659,12 @@ export function AssistantChat() {
         }
     }
 
+    // Hide the floating assistant on the chat page — its bottom-right button
+    // overlaps the message composer's send button.
+    if (pathname?.startsWith("/chat")) {
+        return null;
+    }
+
     if (!isOpen) {
         return (
             <Button

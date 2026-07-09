@@ -15,9 +15,17 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Filter, X, Plus, Calendar, UserCircle, Flag, CircleDot } from "lucide-react";
+import { Filter, X, Plus, Calendar, UserCircle, Flag, CircleDot, Check } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 
 export interface TaskFilters {
@@ -155,33 +163,40 @@ export function TaskFiltersBar({ filters, onFiltersChange }: TaskFiltersBarProps
                         <div className="flex items-center gap-2 mb-2">
                             <UserCircle className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-xs font-medium">Assignee</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                            {members?.map((member: any) => {
-                                const isActive = filters.assigneeIds.includes(member.id);
-                                return (
-                                    <button
-                                        key={member.id}
-                                        onClick={() => toggleArrayFilter("assigneeIds", member.id)}
-                                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${isActive
-                                                ? "border-primary bg-primary/10 text-primary font-medium"
-                                                : "border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                                            }`}
-                                    >
-                                        <Avatar className="h-4 w-4">
-                                            <AvatarImage src={member.image || undefined} />
-                                            <AvatarFallback className="text-[8px]">
-                                                {member.name?.substring(0, 2).toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        {member.name}
-                                    </button>
-                                );
-                            })}
-                            {!members?.length && (
-                                <p className="text-[11px] text-muted-foreground">No members</p>
+                            {filters.assigneeIds.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground">
+                                    {filters.assigneeIds.length} selected
+                                </span>
                             )}
                         </div>
+                        <Command className="rounded-md border">
+                            <CommandInput placeholder="Search members..." className="h-8 text-xs" />
+                            <CommandList className="max-h-[160px]">
+                                <CommandEmpty>No member found.</CommandEmpty>
+                                <CommandGroup>
+                                    {members?.map((member: any) => {
+                                        const isActive = filters.assigneeIds.includes(member.id);
+                                        return (
+                                            <CommandItem
+                                                key={member.id}
+                                                value={member.name ?? member.id}
+                                                onSelect={() => toggleArrayFilter("assigneeIds", member.id)}
+                                                className="gap-2 text-xs"
+                                            >
+                                                <Avatar className="h-5 w-5">
+                                                    <AvatarImage src={member.image || undefined} />
+                                                    <AvatarFallback className="text-[9px]">
+                                                        {member.name?.substring(0, 2).toUpperCase()}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <span className="flex-1 truncate">{member.name}</span>
+                                                {isActive && <Check className="h-4 w-4 text-primary" />}
+                                            </CommandItem>
+                                        );
+                                    })}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
                     </div>
 
                     {/* Date Range Filter */}
