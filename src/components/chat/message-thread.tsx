@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Edit3, Hash, Lock, MoreHorizontal, Trash2, X } from "lucide-react";
+import { Check, Edit3, Hash, Lock, MessageSquare, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,8 +74,8 @@ export function MessageThread({
 
     if (isLoading) {
         return (
-            <div className="flex-1 flex items-center justify-center">
-                <div className="animate-pulse text-neutral-500">Loading messages...</div>
+            <div className="flex flex-1 items-center justify-center bg-[#101116]">
+                <div className="animate-pulse text-sm text-neutral-500">Loading messages...</div>
             </div>
         );
     }
@@ -104,22 +104,22 @@ export function MessageThread({
     };
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex h-full min-w-0 flex-col bg-[#101116]">
             {/* Header */}
-            <div className="border-b px-6 py-3 flex items-center gap-3 shrink-0">
+            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#101116]/95 px-5 py-3">
                 {isChannel && (
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1c202a] text-neutral-400">
                         {isPrivateChannel ? (
-                            <Lock className="h-4 w-4 text-neutral-500" />
+                            <Lock className="h-4 w-4" />
                         ) : (
-                            <Hash className="h-4 w-4 text-neutral-500" />
+                            <Hash className="h-4 w-4" />
                         )}
                     </div>
                 )}
                 <div className="min-w-0 flex-1">
-                    <h2 className="font-semibold truncate">{conversationName}</h2>
+                    <h2 className="truncate text-sm font-semibold text-white">{conversationName}</h2>
                     {isChannel && conversationTopic && (
-                        <p className="text-xs text-neutral-500 truncate">{conversationTopic}</p>
+                        <p className="mt-0.5 truncate text-xs text-neutral-500">{conversationTopic}</p>
                     )}
                 </div>
                 {conversation && (
@@ -131,10 +131,16 @@ export function MessageThread({
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-1">
+            <div className="flex-1 space-y-0 overflow-y-auto py-4">
                 {(!allMessages || allMessages.length === 0) ? (
-                    <div className="flex items-center justify-center h-full text-neutral-500 text-sm">
-                        No messages yet. Start the conversation!
+                    <div className="flex h-full items-center justify-center px-8 text-center">
+                        <div>
+                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#1c202a] text-neutral-400">
+                                {isChannel ? <Hash className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
+                            </div>
+                            <h3 className="text-base font-semibold text-white">This is the start of {conversationName}</h3>
+                            <p className="mt-2 text-sm text-neutral-500">Send the first message and get the thread moving.</p>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -145,6 +151,7 @@ export function MessageThread({
                                 size="sm"
                                 onClick={loadOlder}
                                 disabled={loadingOlder}
+                                className="border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.08]"
                             >
                                 {loadingOlder ? "Loading..." : "Load older"}
                             </Button>
@@ -162,22 +169,40 @@ export function MessageThread({
                         const isEdited = !isDeleted && new Date(msg.updatedAt).getTime() > new Date(msg.createdAt).getTime() + 1000;
 
                         return (
-                            <div key={msg.id} className={cn("group", showHeader && "mt-4")}>
+                            <div
+                                key={msg.id}
+                                className={cn(
+                                    "group relative px-5 py-0.5 transition-colors hover:bg-white/[0.035]",
+                                    showHeader && "mt-4 pt-2"
+                                )}
+                            >
                                 {showHeader && (
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Avatar className="h-6 w-6">
+                                    <div className="mb-1 flex items-center gap-2">
+                                        <Avatar className="h-10 w-10 ring-1 ring-white/10">
                                             <AvatarImage src={msg.sender.image || undefined} />
-                                            <AvatarFallback className="text-[10px]">
+                                            <AvatarFallback className="bg-[#242834] text-xs text-neutral-200">
                                                 {msg.sender.name?.charAt(0).toUpperCase()}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <span className="text-sm font-medium">{msg.sender.name}</span>
-                                        <span className="text-[11px] text-neutral-400">
+                                        <span className="text-sm font-semibold text-neutral-100">{msg.sender.name}</span>
+                                        <span className="text-[11px] text-neutral-600">
                                             {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                                         </span>
                                     </div>
                                 )}
-                                <div className={cn("relative pl-8 text-sm", isMe ? "text-neutral-900 dark:text-neutral-100" : "text-neutral-800 dark:text-neutral-200")}>
+                                <div className={cn(
+                                    "relative min-h-6 text-[15px] leading-6",
+                                    showHeader ? "pl-12" : "pl-12",
+                                    isMe ? "text-neutral-100" : "text-neutral-200"
+                                )}>
+                                    {!showHeader && (
+                                        <span className="absolute left-0 top-0 hidden w-10 text-right text-[10px] text-neutral-700 group-hover:block">
+                                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                                                hour: "numeric",
+                                                minute: "2-digit",
+                                            })}
+                                        </span>
+                                    )}
                                     {isDeleted ? (
                                         <p className="italic text-neutral-400">Message deleted</p>
                                     ) : editingId === msg.id ? (
@@ -185,7 +210,7 @@ export function MessageThread({
                                             <Textarea
                                                 value={editBody}
                                                 onChange={(event) => setEditBody(event.target.value)}
-                                                className="min-h-20 resize-none text-sm"
+                                                className="min-h-20 resize-none border-white/10 bg-[#1c202a] text-sm"
                                             />
                                             <div className="flex items-center gap-2">
                                                 <Button
@@ -207,7 +232,7 @@ export function MessageThread({
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 gap-1.5"
+                                                    className="h-8 gap-1.5 border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
                                                     onClick={() => setEditingId(null)}
                                                 >
                                                     <X className="h-3.5 w-3.5" />
@@ -219,16 +244,16 @@ export function MessageThread({
                                         <>
                                             <MessageContent body={msg.body} references={msg.references} />
                                             {isEdited && (
-                                                <span className="text-[11px] text-neutral-400">edited</span>
+                                                <span className="ml-1 text-[11px] text-neutral-600">edited</span>
                                             )}
                                             <MessageAttachments messageId={msg.id} />
                                         </>
                                     )}
                                     {isMe && !isDeleted && editingId !== msg.id && (
-                                        <div className="absolute right-0 top-0 hidden group-hover:block">
+                                        <div className="absolute right-1 top-0 hidden rounded-lg border border-white/10 bg-[#1c202a] shadow-xl shadow-black/30 group-hover:block">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-white/[0.08]">
                                                         <MoreHorizontal className="h-4 w-4" />
                                                         <span className="sr-only">Message actions</span>
                                                     </Button>
@@ -261,7 +286,7 @@ export function MessageThread({
                     </>
                 )}
                 {visibleTypingUsers.length > 0 && (
-                    <div className="pl-8 pt-2 text-xs italic text-neutral-500">
+                    <div className="px-5 pl-[68px] pt-2 text-xs italic text-neutral-500">
                         {visibleTypingUsers.map((user) => user.name).join(", ")}
                         {visibleTypingUsers.length === 1 ? " is" : " are"} typing...
                     </div>
