@@ -11,10 +11,15 @@ import {
     UpdateProjectInput,
     DeleteProjectInput,
 } from "@/lib/validators/project";
-import { Project } from "@prisma/client";
+import { Project, ProjectRole, ProjectVisibility } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ensurePersonalWorkspace, selectCurrentMembership } from "@/lib/workspaces";
 import { activeMembership } from "@/lib/user-organization";
+import {
+    canManageProject,
+    projectAccessWhere,
+    resolveProjectAccess,
+} from "@/lib/permissions";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -64,11 +69,13 @@ export async function createProject(
 ): Promise<ActionResult<Project>> {
     try {
         const validated = createProjectSchema.parse(input);
-        const { organizationId, role } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         if (role === "GUEST") {
             return { success: false, error: "Guests cannot create projects" };
         }
+
+        const ownerIds = Array.from(new Set([userId, validated.leadId].filter(Boolean) as string[]));
 
         const project = await db.project.create({
             data: {
@@ -80,6 +87,12 @@ export async function createProject(
                 leadId: validated.leadId || null,
                 squads: {
                     connect: validated.squadIds?.map((id) => ({ id })) || [],
+                },
+                members: {
+                    create: ownerIds.map((id) => ({
+                        userId: id,
+                        role: ProjectRole.OWNER,
+                    })),
                 },
             },
             include: {
@@ -107,21 +120,25 @@ export async function updateProject(
 ): Promise<ActionResult<Project>> {
     try {
         const validated = updateProjectSchema.parse(input);
-        const { organizationId, role } = await getUserOrganization();
-
-        if (role === "GUEST") {
-            return { success: false, error: "Guests cannot update projects" };
-        }
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const existingProject = await db.project.findFirst({
             where: {
                 id: validated.id,
                 organizationId,
             },
+            include: {
+                members: { select: { userId: true, role: true } },
+            },
         });
 
         if (!existingProject) {
             return { success: false, error: "Project not found" };
+        }
+
+        const access = resolveProjectAccess(existingProject, { userId, organizationId, orgRole: role });
+        if (!canManageProject(access)) {
+            return { success: false, error: "Forbidden" };
         }
 
         const project = await db.project.update({
@@ -162,21 +179,25 @@ export async function deleteProject(
 ): Promise<ActionResult> {
     try {
         const validated = deleteProjectSchema.parse(input);
-        const { organizationId, role } = await getUserOrganization();
-
-        if (role === "GUEST") {
-            return { success: false, error: "Guests cannot delete projects" };
-        }
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const existingProject = await db.project.findFirst({
             where: {
                 id: validated.id,
                 organizationId,
             },
+            include: {
+                members: { select: { userId: true, role: true } },
+            },
         });
 
         if (!existingProject) {
             return { success: false, error: "Project not found" };
+        }
+
+        const access = resolveProjectAccess(existingProject, { userId, organizationId, orgRole: role });
+        if (!canManageProject(access)) {
+            return { success: false, error: "Forbidden" };
         }
 
         await db.project.delete({
@@ -199,16 +220,7 @@ export async function getProjects() {
         const { userId, organizationId, role } = await getUserOrganization();
 
         const projects = await db.project.findMany({
-            where: {
-                organizationId,
-                ...(role === "GUEST"
-                    ? {
-                          members: {
-                              some: { userId },
-                          },
-                      }
-                    : {}),
-            },
+            where: projectAccessWhere({ userId, organizationId, orgRole: role }),
             include: {
                 lead: {
                     select: { id: true, name: true, image: true }
@@ -244,14 +256,7 @@ export async function getProject(id: string) {
         const project = await db.project.findFirst({
             where: {
                 id,
-                organizationId,
-                ...(role === "GUEST"
-                    ? {
-                          members: {
-                              some: { userId },
-                          },
-                      }
-                    : {}),
+                ...projectAccessWhere({ userId, organizationId, orgRole: role }),
             },
             include: {
                 lead: {
@@ -277,6 +282,12 @@ export async function getProject(id: string) {
                 },
                 _count: {
                     select: { tasks: true },
+                },
+                members: {
+                    include: {
+                        user: { select: { id: true, name: true, image: true, email: true } },
+                    },
+                    orderBy: { joinedAt: "asc" },
                 },
             },
         });
@@ -317,6 +328,7 @@ export async function getProject(id: string) {
 
         return {
             ...project,
+            accessLevel: resolveProjectAccess(project, { userId, organizationId, orgRole: role }),
             taskStats,
             recentActivity,
             activeSprint: project.sprints[0] || null,
@@ -324,5 +336,124 @@ export async function getProject(id: string) {
     } catch (error) {
         console.error("Get project error:", error);
         return null;
+    }
+}
+
+async function getManageableProject(projectId: string) {
+    const { userId, organizationId, role } = await getUserOrganization();
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId },
+        include: {
+            members: {
+                include: {
+                    user: { select: { id: true, name: true, email: true, image: true } },
+                },
+                orderBy: { joinedAt: "asc" },
+            },
+        },
+    });
+
+    if (!project) throw new Error("Project not found");
+
+    const access = resolveProjectAccess(project, { userId, organizationId, orgRole: role });
+    if (!canManageProject(access)) throw new Error("Forbidden");
+
+    return { project, userId, organizationId, role };
+}
+
+export async function listProjectSharing(projectId: string) {
+    try {
+        const { project, userId, organizationId, role } = await getManageableProject(projectId);
+        return {
+            success: true,
+            data: {
+                visibility: project.visibility,
+                members: project.members,
+                accessLevel: resolveProjectAccess(project, { userId, organizationId, orgRole: role }),
+            },
+        };
+    } catch (error) {
+        console.error("List project sharing error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to load sharing" };
+    }
+}
+
+export async function setProjectVisibility(
+    projectId: string,
+    visibility: ProjectVisibility,
+): Promise<ActionResult> {
+    try {
+        await getManageableProject(projectId);
+
+        await db.project.update({
+            where: { id: projectId },
+            data: { visibility },
+        });
+
+        revalidatePath("/projects");
+        revalidatePath(`/projects/${projectId}`);
+        return { success: true, data: undefined };
+    } catch (error) {
+        console.error("Set project visibility error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to update visibility" };
+    }
+}
+
+export async function updateProjectMemberRole(
+    projectId: string,
+    targetUserId: string,
+    role: ProjectRole,
+): Promise<ActionResult> {
+    try {
+        const { project } = await getManageableProject(projectId);
+        const target = project.members.find((member) => member.userId === targetUserId);
+        if (!target) return { success: false, error: "Project member not found" };
+
+        await db.projectMember.update({
+            where: {
+                projectId_userId: {
+                    projectId,
+                    userId: targetUserId,
+                },
+            },
+            data: { role },
+        });
+
+        revalidatePath(`/projects/${projectId}`);
+        return { success: true, data: undefined };
+    } catch (error) {
+        console.error("Update project member role error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to update member" };
+    }
+}
+
+export async function removeProjectMember(
+    projectId: string,
+    targetUserId: string,
+): Promise<ActionResult> {
+    try {
+        const { project } = await getManageableProject(projectId);
+        const target = project.members.find((member) => member.userId === targetUserId);
+        if (!target) return { success: false, error: "Project member not found" };
+
+        const ownerCount = project.members.filter((member) => member.role === ProjectRole.OWNER).length;
+        if (target.role === ProjectRole.OWNER && ownerCount <= 1) {
+            return { success: false, error: "A project must keep at least one owner" };
+        }
+
+        await db.projectMember.delete({
+            where: {
+                projectId_userId: {
+                    projectId,
+                    userId: targetUserId,
+                },
+            },
+        });
+
+        revalidatePath(`/projects/${projectId}`);
+        return { success: true, data: undefined };
+    } catch (error) {
+        console.error("Remove project member error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to remove member" };
     }
 }

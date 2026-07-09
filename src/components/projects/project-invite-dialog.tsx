@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ProjectRole } from "@prisma/client";
+import { useEffect, useState } from "react";
+import { ProjectRole, ProjectVisibility } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Copy, Link2, UserPlus } from "lucide-react";
+import { Copy, Link2, Trash2, UserPlus } from "lucide-react";
 import { useInviteProjectMember, useCreateProjectInviteLink } from "@/hooks/use-members";
+import {
+    useProjectSharing,
+    useRemoveProjectMember,
+    useSetProjectVisibility,
+    useUpdateProjectMemberRole,
+} from "@/hooks/use-projects";
 import { toast } from "sonner";
 
 const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
@@ -43,12 +49,17 @@ const LINK_EXPIRY_OPTIONS: { label: string; value: string; minutes: number | nul
 ];
 
 export function ProjectInviteDialog({ projectId }: { projectId: string }) {
+    const [open, setOpen] = useState(false);
     const inviteMember = useInviteProjectMember(projectId);
     const createLink = useCreateProjectInviteLink(projectId);
+    const { data: sharing } = useProjectSharing(projectId, open);
+    const setVisibility = useSetProjectVisibility(projectId);
+    const updateRole = useUpdateProjectMemberRole(projectId);
+    const removeMember = useRemoveProjectMember(projectId);
 
-    const [open, setOpen] = useState(false);
     const [email, setEmail] = useState("");
     const [role, setRole] = useState<ProjectRole>(ProjectRole.EDITOR);
+    const [visibility, setVisibilityValue] = useState<ProjectVisibility>(ProjectVisibility.ORG_VISIBLE);
     const [personalLink, setPersonalLink] = useState("");
     const [shareLink, setShareLink] = useState("");
     const [linkExpiry, setLinkExpiry] = useState<string>("1440");
@@ -60,6 +71,12 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
         setShareLink("");
         setLinkExpiry("1440");
     };
+
+    useEffect(() => {
+        if (sharing?.success && sharing.data) {
+            setVisibilityValue(sharing.data.visibility);
+        }
+    }, [sharing]);
 
     const handleInvite = async () => {
         if (!email.trim()) return;
@@ -90,11 +107,41 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
         }
     };
 
+    const handleVisibilityChange = async (value: ProjectVisibility) => {
+        setVisibilityValue(value);
+        const result = await setVisibility.mutateAsync(value);
+        if (result.success) {
+            toast.success("Project visibility updated");
+        } else {
+            toast.error(result.error || "Failed to update visibility");
+        }
+    };
+
+    const handleRoleChange = async (userId: string, nextRole: ProjectRole) => {
+        const result = await updateRole.mutateAsync({ userId, role: nextRole });
+        if (result.success) {
+            toast.success("Access updated");
+        } else {
+            toast.error(result.error || "Failed to update access");
+        }
+    };
+
+    const handleRemoveMember = async (userId: string) => {
+        const result = await removeMember.mutateAsync(userId);
+        if (result.success) {
+            toast.success("Removed from project");
+        } else {
+            toast.error(result.error || "Failed to remove member");
+        }
+    };
+
     const handleCopy = async (value: string, label: string) => {
         if (!value) return;
         await navigator.clipboard.writeText(value);
         toast.success(`${label} copied`);
     };
+
+    const sharingData = sharing?.success ? sharing.data : undefined;
 
     return (
         <Dialog
@@ -110,14 +157,76 @@ export function ProjectInviteDialog({ projectId }: { projectId: string }) {
                     Invite
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Invite to project</DialogTitle>
+                    <DialogTitle>Share project</DialogTitle>
                     <DialogDescription>
-                        Give someone access to just this project, by email or a shareable link.
+                        Control who can see this project and what they can do.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                        <Label>Visibility</Label>
+                        <Select
+                            value={visibility}
+                            onValueChange={(v) => handleVisibilityChange(v as ProjectVisibility)}
+                            disabled={setVisibility.isPending}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ProjectVisibility.ORG_VISIBLE}>
+                                    Org-visible
+                                </SelectItem>
+                                <SelectItem value={ProjectVisibility.PRIVATE}>
+                                    Private
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {sharingData && sharingData.members.length > 0 && (
+                        <div className="space-y-2">
+                            <Label>People with access</Label>
+                            <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-2">
+                                {sharingData.members.map((member) => (
+                                    <div key={member.userId} className="flex items-center gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium">{member.user.name}</p>
+                                            <p className="truncate text-xs text-muted-foreground">{member.user.email}</p>
+                                        </div>
+                                        <Select
+                                            value={member.role}
+                                            onValueChange={(v) => handleRoleChange(member.userId, v as ProjectRole)}
+                                            disabled={updateRole.isPending}
+                                        >
+                                            <SelectTrigger className="w-28">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value={ProjectRole.VIEWER}>Viewer</SelectItem>
+                                                <SelectItem value={ProjectRole.EDITOR}>Editor</SelectItem>
+                                                <SelectItem value={ProjectRole.ADMIN}>Full</SelectItem>
+                                                <SelectItem value={ProjectRole.OWNER}>Owner</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleRemoveMember(member.userId)}
+                                            disabled={removeMember.isPending}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Remove member</span>
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <Label>Role</Label>
                         <Select

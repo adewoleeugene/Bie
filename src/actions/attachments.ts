@@ -46,6 +46,27 @@ async function getUserOrganization() {
     };
 }
 
+async function canAccessAttachmentParent(
+    parentType: AttachmentParent,
+    parentId: string,
+    viewer: { userId: string; organizationId: string },
+) {
+    if (parentType !== AttachmentParent.MESSAGE) return true;
+
+    const message = await db.message.findFirst({
+        where: {
+            id: parentId,
+            conversation: {
+                organizationId: viewer.organizationId,
+                members: { some: { userId: viewer.userId } },
+            },
+        },
+        select: { id: true },
+    });
+
+    return Boolean(message);
+}
+
 export async function uploadAttachment(formData: FormData) {
     try {
         const { userId, organizationId } = await getUserOrganization();
@@ -64,6 +85,11 @@ export async function uploadAttachment(formData: FormData) {
             return { success: false, error: "Invalid parent type" };
         }
         const parentType = parentTypeRaw as AttachmentParent;
+
+        const canAccessParent = await canAccessAttachmentParent(parentType, parentId, { userId, organizationId });
+        if (!canAccessParent) {
+            return { success: false, error: "Parent not found" };
+        }
 
         if (file.size > MAX_BYTES) {
             return { success: false, error: "File exceeds 25 MB limit" };
@@ -131,7 +157,10 @@ export async function uploadEditorFile(formData: FormData): Promise<string> {
 
 export async function listAttachments(parentType: AttachmentParent, parentId: string) {
     try {
-        const { organizationId } = await getUserOrganization();
+        const { userId, organizationId } = await getUserOrganization();
+
+        const canAccessParent = await canAccessAttachmentParent(parentType, parentId, { userId, organizationId });
+        if (!canAccessParent) return [];
 
         return db.attachment.findMany({
             where: {

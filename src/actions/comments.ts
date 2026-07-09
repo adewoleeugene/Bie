@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { sendNotifications } from "@/lib/notifications";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -28,15 +29,32 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
 }
 
 export async function getComments(taskId: string) {
     try {
-        await getUserOrganization(); // check auth
+        const viewer = await getUserOrganization();
+
+        const task = await db.task.findFirst({
+            where: {
+                id: taskId,
+                ...taskAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            select: { id: true },
+        });
+
+        if (!task) return [];
 
         const comments = await db.comment.findMany({
             where: {
@@ -65,7 +83,24 @@ export async function getComments(taskId: string) {
 
 export async function createComment(taskId: string, body: string) {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+
+        const accessibleTask = await db.task.findFirst({
+            where: {
+                id: taskId,
+                ...taskAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            select: { id: true },
+        });
+
+        if (!accessibleTask) {
+            return { success: false, error: "Forbidden" };
+        }
 
         const comment = await db.comment.create({
             data: {

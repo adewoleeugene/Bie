@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
             const unsubscribe = await subscribe(conversationId, (payload) => {
                 safeEnqueue(
-                    encoder.encode(`event: message\ndata: ${JSON.stringify(payload.message)}\n\n`)
+                    encoder.encode(`event: ${payload.type}\ndata: ${JSON.stringify(payload)}\n\n`)
                 );
             });
 

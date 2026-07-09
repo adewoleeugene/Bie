@@ -105,6 +105,18 @@ enum NotificationType {
   ACCESS_GRANTED
 }
 
+enum ConversationType {
+  DM
+  GROUP
+  CHANNEL
+}
+
+enum MessageRefType {
+  USER
+  TASK
+  WIKI_PAGE
+}
+
 enum AccessRequestStatus {
   PENDING
   APPROVED
@@ -743,8 +755,12 @@ model RecentItem {
 
 model Conversation {
     id             String   @id @default(cuid())
+    type           ConversationType @default(DM)
     name           String?
-    isGroup        Boolean  @default(false)
+    topic          String?
+    isPrivate      Boolean  @default(false)
+    archived       Boolean  @default(false)
+    createdById    String?
     organizationId String
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
@@ -754,6 +770,7 @@ model Conversation {
     messages     Message[]
 
     @@index([organizationId])
+    @@index([organizationId, type])
 }
 
 model ConversationMember {
@@ -776,12 +793,27 @@ model Message {
     senderId       String
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
+    deletedAt      DateTime?
 
     conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
     sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+    references   MessageReference[]
 
     @@index([conversationId, createdAt])
     @@index([senderId])
+    @@index([deletedAt])
+}
+
+model MessageReference {
+    id         String         @id @default(cuid())
+    messageId  String
+    targetType MessageRefType
+    targetId   String
+
+    message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@index([messageId])
+    @@index([targetType, targetId])
 }
 
 model NotificationPreference {

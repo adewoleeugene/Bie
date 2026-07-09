@@ -6,6 +6,7 @@ import { ActionResult } from "@/types";
 import { TimeEntry } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -28,9 +29,12 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
 }
 
@@ -46,7 +50,24 @@ export async function createTimeEntry(
     input: CreateTimeEntryInput
 ): Promise<ActionResult<TimeEntry>> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+
+        const task = await db.task.findFirst({
+            where: {
+                id: input.taskId,
+                ...taskAccessWhere({
+                    userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+            select: { id: true },
+        });
+
+        if (!task) {
+            return { success: false, error: "Task not found" };
+        }
 
         const startedAt = new Date(input.startedAt);
         const endedAt = input.endedAt ? new Date(input.endedAt) : null;
@@ -98,12 +119,18 @@ export async function updateTimeEntry(
     input: UpdateTimeEntryInput
 ): Promise<ActionResult<TimeEntry>> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
         const existing = await db.timeEntry.findFirst({
             where: {
                 id: input.id,
                 userId,
+                task: taskAccessWhere({
+                    userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
             },
         });
 
@@ -144,12 +171,18 @@ export async function deleteTimeEntry(
     entryId: string
 ): Promise<ActionResult> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
         const existing = await db.timeEntry.findFirst({
             where: {
                 id: entryId,
                 userId,
+                task: taskAccessWhere({
+                    userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
             },
         });
 
@@ -179,9 +212,17 @@ export async function getTimeEntries(options?: {
     endDate?: string;
 }): Promise<TimeEntry[]> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
-        const where: Record<string, unknown> = { userId };
+        const where: Record<string, unknown> = {
+            userId,
+            task: taskAccessWhere({
+                userId,
+                organizationId: viewer.organizationId,
+                orgRole: viewer.role,
+            }),
+        };
         if (options?.taskId) where.taskId = options.taskId;
         if (options?.startDate || options?.endDate) {
             const dateFilter: Record<string, Date> = {};
@@ -229,10 +270,10 @@ export interface EstimateVsActualItem {
 
 export async function getEstimateVsActual(projectId?: string): Promise<EstimateVsActualItem[]> {
     try {
-        const { userId, organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
-        const where: Record<string, unknown> = {
-            organizationId,
+        const where = {
+            ...taskAccessWhere({ userId, organizationId, orgRole: role }),
             estimatedHours: { not: null },
         };
         if (projectId) where.projectId = projectId;
@@ -273,7 +314,13 @@ export async function getTimeTrackingStats(): Promise<{
     taskBreakdown: { taskId: string; taskTitle: string; totalMinutes: number }[];
 }> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+        const accessibleTask = taskAccessWhere({
+            userId,
+            organizationId: viewer.organizationId,
+            orgRole: viewer.role,
+        });
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -283,13 +330,13 @@ export async function getTimeTrackingStats(): Promise<{
 
         const [todayEntries, weekEntries, monthEntries] = await Promise.all([
             db.timeEntry.findMany({
-                where: { userId, startedAt: { gte: todayStart } },
+                where: { userId, startedAt: { gte: todayStart }, task: accessibleTask },
             }),
             db.timeEntry.findMany({
-                where: { userId, startedAt: { gte: weekStart } },
+                where: { userId, startedAt: { gte: weekStart }, task: accessibleTask },
             }),
             db.timeEntry.findMany({
-                where: { userId, startedAt: { gte: monthStart } },
+                where: { userId, startedAt: { gte: monthStart }, task: accessibleTask },
                 include: {
                     task: { select: { id: true, title: true } },
                 },

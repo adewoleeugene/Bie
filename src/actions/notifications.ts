@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
 
 async function getUserOrganization() {
     const session = await auth();
@@ -26,9 +27,12 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
 }
 
@@ -113,7 +117,7 @@ export interface TaskAlert {
  */
 export async function getTaskAlerts(): Promise<TaskAlert[]> {
     try {
-        const { userId, organizationId } = await getUserOrganization();
+        const { userId, organizationId, role } = await getUserOrganization();
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -125,7 +129,7 @@ export async function getTaskAlerts(): Promise<TaskAlert[]> {
         // Get all non-done tasks with due dates in this org
         const tasks = await db.task.findMany({
             where: {
-                organizationId,
+                ...taskAccessWhere({ userId, organizationId, orgRole: role }),
                 status: { not: "DONE" },
                 dueDate: { not: null, lte: tomorrow },
             },

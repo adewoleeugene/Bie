@@ -3,9 +3,27 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ActionResult } from "@/types";
-import { FocusSession, FocusSessionType } from "@prisma/client";
+import { FocusSession, FocusSessionType, OrgRole, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
+import { taskAccessWhere } from "@/lib/permissions";
+
+type FocusViewer = { userId: string; organizationId: string; role: OrgRole };
+
+function focusSessionTaskAccessWhere(viewer: FocusViewer): Prisma.FocusSessionWhereInput {
+    return {
+        OR: [
+            { taskId: null },
+            {
+                task: taskAccessWhere({
+                    userId: viewer.userId,
+                    organizationId: viewer.organizationId,
+                    orgRole: viewer.role,
+                }),
+            },
+        ],
+    };
+}
 
 async function getUserOrganization() {
     const session = await auth();
@@ -28,9 +46,12 @@ async function getUserOrganization() {
         throw new Error("No organization found");
     }
 
+    const membership = await activeMembership(user.memberships);
+
     return {
         userId: user.id,
-        organizationId: (await activeMembership(user.memberships)).organizationId,
+        organizationId: membership.organizationId,
+        role: membership.role,
     };
 }
 
@@ -44,7 +65,23 @@ export async function startFocusSession(
     input: StartFocusSessionInput
 ): Promise<ActionResult<FocusSession>> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+
+        if (input.taskId) {
+            const task = await db.task.findFirst({
+                where: {
+                    id: input.taskId,
+                    ...taskAccessWhere({
+                        userId,
+                        organizationId: viewer.organizationId,
+                        orgRole: viewer.role,
+                    }),
+                },
+                select: { id: true },
+            });
+            if (!task) return { success: false, error: "Task not found" };
+        }
 
         // Check if there's already an active session
         const activeSession = await db.focusSession.findFirst({
@@ -102,12 +139,14 @@ export async function endFocusSession(
     input: EndFocusSessionInput
 ): Promise<ActionResult<FocusSession>> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
         const existingSession = await db.focusSession.findFirst({
             where: {
                 id: input.sessionId,
                 userId,
+                ...focusSessionTaskAccessWhere(viewer),
             },
         });
 
@@ -171,12 +210,14 @@ export async function endFocusSession(
 
 export async function getActiveFocusSession(): Promise<FocusSession | null> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
         const session = await db.focusSession.findFirst({
             where: {
                 userId,
                 endedAt: null,
+                ...focusSessionTaskAccessWhere(viewer),
             },
             include: {
                 task: {
@@ -199,9 +240,13 @@ export async function getFocusSessions(options?: {
     taskId?: string;
 }): Promise<FocusSession[]> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
-        const where: Record<string, unknown> = { userId };
+        const where: Prisma.FocusSessionWhereInput = {
+            userId,
+            ...focusSessionTaskAccessWhere(viewer),
+        };
         if (options?.taskId) {
             where.taskId = options.taskId;
         }
@@ -234,12 +279,14 @@ export async function deleteFocusSession(
     sessionId: string
 ): Promise<ActionResult> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
 
         const session = await db.focusSession.findFirst({
             where: {
                 id: sessionId,
                 userId,
+                ...focusSessionTaskAccessWhere(viewer),
             },
         });
 
@@ -273,7 +320,9 @@ export async function getFocusStats(): Promise<{
     streak: number;
 }> {
     try {
-        const { userId } = await getUserOrganization();
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+        const accessibleTask = focusSessionTaskAccessWhere(viewer);
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -284,6 +333,7 @@ export async function getFocusStats(): Promise<{
             db.focusSession.findMany({
                 where: {
                     userId,
+                    ...accessibleTask,
                     startedAt: { gte: todayStart },
                     completed: true,
                 },
@@ -291,6 +341,7 @@ export async function getFocusStats(): Promise<{
             db.focusSession.findMany({
                 where: {
                     userId,
+                    ...accessibleTask,
                     startedAt: { gte: weekStart },
                     completed: true,
                 },
@@ -298,6 +349,7 @@ export async function getFocusStats(): Promise<{
             db.focusSession.findMany({
                 where: {
                     userId,
+                    ...accessibleTask,
                     completed: true,
                 },
             }),

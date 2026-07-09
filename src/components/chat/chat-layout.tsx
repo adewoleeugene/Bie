@@ -2,21 +2,30 @@
 
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
-import { useConversations } from "@/hooks/use-chat";
+import { ConversationType } from "@prisma/client";
+import { useBrowsablePublicChannels, useConversations } from "@/hooks/use-chat";
 import { useSession } from "next-auth/react";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { NewConversationDialog } from "./new-conversation-dialog";
+import { CreateChannelDialog } from "./create-channel-dialog";
 
 export function ChatLayout() {
     const { data: conversations, isLoading } = useConversations();
+    const { data: browsableChannels = [] } = useBrowsablePublicChannels();
     const { data: session } = useSession();
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(() => {
+        if (typeof window === "undefined") return null;
+        return new URLSearchParams(window.location.search).get("conversation");
+    });
 
     const selectedConversation = conversations?.find((c) => c.id === selectedId);
 
     const getConversationName = () => {
         if (!selectedConversation) return "";
+        if (selectedConversation.type === ConversationType.CHANNEL) {
+            return selectedConversation.name ? `# ${selectedConversation.name}` : "# channel";
+        }
         if (selectedConversation.name) return selectedConversation.name;
         const others = selectedConversation.members.filter(
             (m) => m.user.id !== session?.user?.id
@@ -33,7 +42,10 @@ export function ChatLayout() {
                         <MessageSquare className="h-4 w-4" />
                         Chat
                     </h2>
-                    <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
+                    <div className="flex items-center gap-1">
+                        <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
+                        <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {isLoading ? (
@@ -45,6 +57,7 @@ export function ChatLayout() {
                     ) : (
                         <ConversationList
                             conversations={conversations || []}
+                            browsableChannels={browsableChannels}
                             selectedId={selectedId}
                             onSelect={setSelectedId}
                         />
@@ -58,6 +71,11 @@ export function ChatLayout() {
                     <MessageThread
                         conversationId={selectedId}
                         conversationName={getConversationName()}
+                        conversationTopic={selectedConversation?.topic}
+                        isChannel={selectedConversation?.type === ConversationType.CHANNEL}
+                        isPrivateChannel={Boolean(selectedConversation?.isPrivate)}
+                        conversation={selectedConversation}
+                        onConversationArchived={() => setSelectedId(null)}
                     />
                 ) : (
                     <div className="flex-1 flex items-center justify-center">
