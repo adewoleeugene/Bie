@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Hash, Plus } from "lucide-react";
+import { Hash } from "lucide-react";
 import { OrgRole } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +12,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,8 @@ import { useCreateChannel } from "@/hooks/use-chat";
 import { useMembers } from "@/hooks/use-members";
 
 interface CreateChannelDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     onCreated: (conversationId: string) => void;
 }
 
@@ -32,12 +33,11 @@ type ChatMember = {
     role: OrgRole;
 };
 
-export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
+export function CreateChannelDialog({ open, onOpenChange, onCreated }: CreateChannelDialogProps) {
     const { data: session } = useSession();
     const { data: members } = useMembers();
     const createChannel = useCreateChannel();
 
-    const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
     const [isPrivate, setIsPrivate] = useState(false);
@@ -50,7 +50,6 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
 
     const selectableMembers = useMemo(
         () => chatMembers.filter((member) =>
-            member.role !== OrgRole.GUEST &&
             member.id !== session?.user?.id &&
             member.name?.toLowerCase().includes(search.toLowerCase())
         ),
@@ -66,14 +65,6 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
         });
     };
 
-    const reset = () => {
-        setName("");
-        setTopic("");
-        setIsPrivate(false);
-        setSelectedIds(new Set());
-        setSearch("");
-    };
-
     const handleCreate = async () => {
         if (!name.trim()) return;
 
@@ -86,26 +77,19 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
 
         if (result.success && result.data) {
             onCreated(result.data.id);
-            setOpen(false);
-            reset();
+            onOpenChange(false);
         }
     };
 
     if (!canCreate) return null;
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-100">
-                    <Plus className="h-4 w-4" />
-                    <span className="sr-only">Create channel</span>
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Hash className="h-4 w-4" />
-                        Create Channel
+                        New channel
                     </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
@@ -113,17 +97,23 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
                         placeholder="channel-name"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
+                        autoFocus
                     />
                     <Textarea
-                        placeholder="Topic"
+                        placeholder="Topic (optional)"
                         value={topic}
                         onChange={(event) => setTopic(event.target.value)}
                         className="min-h-20"
                     />
-                    <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                        <Label htmlFor="private-channel" className="text-sm">
-                            Private channel
-                        </Label>
+                    <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <div>
+                            <Label htmlFor="private-channel" className="text-sm">
+                                Private channel
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                {isPrivate ? "Only invited people can see it" : "Everyone in the workspace can join"}
+                            </p>
+                        </div>
                         <Switch
                             id="private-channel"
                             checked={isPrivate}
@@ -134,15 +124,15 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
                     {isPrivate && (
                         <>
                             <Input
-                                placeholder="Search members..."
+                                placeholder="Search people..."
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                             />
-                            <div className="max-h-[240px] overflow-y-auto space-y-1">
+                            <div className="max-h-[240px] space-y-1 overflow-y-auto">
                                 {selectableMembers.map((member) => (
                                     <button
                                         key={member.id}
-                                        className="w-full flex items-center gap-3 rounded-md px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-muted"
                                         onClick={() => toggleMember(member.id)}
                                     >
                                         <Checkbox checked={selectedIds.has(member.id)} />
@@ -164,7 +154,7 @@ export function CreateChannelDialog({ onCreated }: CreateChannelDialogProps) {
                         onClick={handleCreate}
                         disabled={!name.trim() || createChannel.isPending}
                     >
-                        {createChannel.isPending ? "Creating..." : "Create Channel"}
+                        {createChannel.isPending ? "Creating..." : "Create channel"}
                     </Button>
                 </div>
             </DialogContent>

@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Hash, MessageSquare } from "lucide-react";
-import { ConversationType } from "@prisma/client";
+import { Hash, MessageSquare, MessageSquarePlus, Plus } from "lucide-react";
+import { ConversationType, OrgRole } from "@prisma/client";
 import { useBrowsablePublicChannels, useConversations } from "@/hooks/use-chat";
+import { useMembers } from "@/hooks/use-members";
 import { useSession } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { NewConversationDialog } from "./new-conversation-dialog";
@@ -13,11 +21,19 @@ import { CreateChannelDialog } from "./create-channel-dialog";
 export function ChatLayout() {
     const { data: conversations, isLoading } = useConversations();
     const { data: browsableChannels = [] } = useBrowsablePublicChannels();
+    const { data: members } = useMembers();
     const { data: session } = useSession();
+    const [creating, setCreating] = useState<"dm" | "channel" | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => {
         if (typeof window === "undefined") return null;
         return new URLSearchParams(window.location.search).get("conversation");
     });
+
+    const currentMember = (members as { id: string; role: OrgRole }[] | undefined)?.find(
+        (m) => m.id === session?.user?.id,
+    );
+    const canCreateChannel =
+        currentMember?.role === OrgRole.OWNER || currentMember?.role === OrgRole.ADMIN;
 
     const selectedConversation = conversations?.find((c) => c.id === selectedId);
 
@@ -44,10 +60,26 @@ export function ChatLayout() {
                         </span>
                         <span className="truncate text-[15px] font-semibold tracking-tight text-foreground">Team Chat</span>
                     </div>
-                    <div className="flex items-center gap-0.5">
-                        <CreateChannelDialog onCreated={(id) => setSelectedId(id)} />
-                        <NewConversationDialog onCreated={(id) => setSelectedId(id)} />
-                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm" className="h-8 gap-1.5">
+                                <Plus className="h-3.5 w-3.5" />
+                                New
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem onClick={() => setCreating("dm")}>
+                                <MessageSquarePlus className="h-4 w-4" />
+                                New message
+                            </DropdownMenuItem>
+                            {canCreateChannel && (
+                                <DropdownMenuItem onClick={() => setCreating("channel")}>
+                                    <Hash className="h-4 w-4" />
+                                    New channel
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
                 <div className="flex-1 overflow-y-auto px-2 py-3 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]">
                     {isLoading ? (
@@ -93,6 +125,21 @@ export function ChatLayout() {
                     </div>
                 )}
             </main>
+
+            {creating === "dm" && (
+                <NewConversationDialog
+                    open
+                    onOpenChange={(o) => { if (!o) setCreating(null); }}
+                    onCreated={(id) => { setSelectedId(id); setCreating(null); }}
+                />
+            )}
+            {creating === "channel" && canCreateChannel && (
+                <CreateChannelDialog
+                    open
+                    onOpenChange={(o) => { if (!o) setCreating(null); }}
+                    onCreated={(id) => { setSelectedId(id); setCreating(null); }}
+                />
+            )}
         </div>
     );
 }
