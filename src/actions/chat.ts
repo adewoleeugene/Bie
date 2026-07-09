@@ -135,26 +135,28 @@ async function filterConversationMemberRecipients(
     return memberships.map((membership) => membership.userId);
 }
 
-// When a project is tagged, surface the chat to the project team. For a public
-// channel we add the (non-guest) project members so the conversation shows up in
-// their list and the notification opens. For private channels / DMs we do NOT
-// pull outsiders in (that would leak the conversation's history) — we only
-// notify project members already in it. Returns the userIds to notify.
-async function resolveProjectTagRecipients(params: {
-    conversation: { id: string; type: ConversationType; isPrivate: boolean };
-    projectIds: string[];
-    senderId: string;
-    organizationId: string;
-}): Promise<string[]> {
-    const { conversation, projectIds, senderId, organizationId } = params;
+async function projectMemberIds(projectIds: string[]): Promise<string[]> {
     if (projectIds.length === 0) return [];
-
-    const projectMembers = await db.projectMember.findMany({
+    const members = await db.projectMember.findMany({
         where: { projectId: { in: projectIds } },
         select: { userId: true },
     });
-    const candidateIds = Array.from(new Set(projectMembers.map((member) => member.userId)))
-        .filter((id) => id !== senderId);
+    return Array.from(new Set(members.map((member) => member.userId)));
+}
+
+// Surface the chat to referenced people (task assignees, project members): for a
+// public channel we add the (non-guest) recipients so the conversation shows up
+// in their list and the notification opens. For private channels / DMs we do NOT
+// pull outsiders in (that would leak the conversation's history) — we only notify
+// recipients already in it. Returns the userIds to notify.
+async function fanoutRecipientsToConversation(params: {
+    conversation: { id: string; type: ConversationType; isPrivate: boolean };
+    userIds: string[];
+    senderId: string;
+    organizationId: string;
+}): Promise<string[]> {
+    const { conversation, userIds, senderId, organizationId } = params;
+    const candidateIds = Array.from(new Set(userIds)).filter((id) => id !== senderId);
     if (candidateIds.length === 0) return [];
 
     // Guests can't be channel members — keep only non-guest org members.
@@ -969,18 +971,15 @@ export async function sendMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const projectRecipients = await resolveProjectTagRecipients({
+        const fanoutRecipients = await fanoutRecipientsToConversation({
             conversation: { id: conversation.id, type: conversation.type, isPrivate: conversation.isPrivate },
-            projectIds: validProjects.map((project) => project.id),
+            userIds: [...taskRecipientIds, ...(await projectMemberIds(validProjects.map((project) => project.id)))],
             senderId: userId,
             organizationId,
         });
         const notificationRecipients = Array.from(new Set([
-            ...(await filterConversationMemberRecipients(
-                input.conversationId,
-                [...mentionedUserIds, ...taskRecipientIds],
-            )),
-            ...projectRecipients,
+            ...(await filterConversationMemberRecipients(input.conversationId, mentionedUserIds)),
+            ...fanoutRecipients,
         ]));
 
         if (notificationRecipients.length > 0) {
@@ -1144,18 +1143,15 @@ export async function updateMessage(input: {
 
         const mentionedUserIds = validMentionedUsers.map((member) => member.userId);
         const taskRecipientIds = validTasks.flatMap((task) => task.assignees.map((assignee) => assignee.userId));
-        const projectRecipients = await resolveProjectTagRecipients({
+        const fanoutRecipients = await fanoutRecipientsToConversation({
             conversation: existing.conversation,
-            projectIds: validProjects.map((project) => project.id),
+            userIds: [...taskRecipientIds, ...(await projectMemberIds(validProjects.map((project) => project.id)))],
             senderId: userId,
             organizationId,
         });
         const notificationRecipients = Array.from(new Set([
-            ...(await filterConversationMemberRecipients(
-                existing.conversationId,
-                [...mentionedUserIds, ...taskRecipientIds],
-            )),
-            ...projectRecipients,
+            ...(await filterConversationMemberRecipients(existing.conversationId, mentionedUserIds)),
+            ...fanoutRecipients,
         ]));
 
         if (notificationRecipients.length > 0) {
