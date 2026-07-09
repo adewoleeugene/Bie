@@ -16,7 +16,6 @@ import { useDeleteMessage, useMessages, useMarkConversationRead, useUpdateMessag
 import { getMessages, type MessageWithSender } from "@/actions/chat";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { useSession } from "next-auth/react";
-import { formatDistanceToNow } from "date-fns";
 import { MessageInput } from "./message-input";
 import { MessageContent } from "./message-content";
 import { MessageAttachments } from "./message-attachments";
@@ -172,49 +171,40 @@ export function MessageThread({
                         const showHeader = !sameSender || timeDiff > 5 * 60 * 1000;
                         const isDeleted = Boolean(msg.deletedAt);
                         const isEdited = !isDeleted && new Date(msg.updatedAt).getTime() > new Date(msg.createdAt).getTime() + 1000;
+                        const showSenderName = !isMe && (Boolean(isChannel) || Boolean(conversation?.isGroup));
+                        const time = new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
                         return (
                             <div
                                 key={msg.id}
                                 className={cn(
-                                    "group relative px-4 py-0.5 transition-colors hover:bg-muted/40",
-                                    showHeader && "mt-[17px]"
+                                    "group flex gap-2.5 px-4",
+                                    isMe ? "flex-row-reverse" : "flex-row",
+                                    showHeader ? "mt-4" : "mt-0.5",
                                 )}
                             >
-                                {showHeader && (
-                                    <div className="absolute left-4 top-1">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarImage src={msg.sender.image || undefined} />
-                                            <AvatarFallback className="bg-secondary text-sm font-medium text-foreground">
-                                                {msg.sender.name?.charAt(0).toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                {!isMe && (
+                                    <div className="w-9 shrink-0">
+                                        {showHeader && (
+                                            <Avatar className="h-9 w-9">
+                                                <AvatarImage src={msg.sender.image || undefined} />
+                                                <AvatarFallback className="bg-secondary text-sm font-medium text-foreground">
+                                                    {msg.sender.name?.charAt(0).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        )}
                                     </div>
                                 )}
-                                {showHeader && (
-                                    <div className="mb-0.5 flex items-baseline gap-2 pl-[52px]">
-                                        <span className="text-[15px] font-semibold text-foreground hover:underline">{msg.sender.name}</span>
-                                        <span className="text-[11px] text-muted-foreground">
-                                            {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className={cn(
-                                    "relative min-h-6 pl-[52px] text-[15px] leading-[1.4]",
-                                    isMe ? "text-foreground" : "text-foreground/90"
-                                )}>
-                                    {!showHeader && (
-                                        <span className="absolute left-0 top-0.5 hidden w-[52px] pr-2.5 text-right text-[10px] font-medium text-muted-foreground/70 group-hover:block">
-                                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                                                hour: "numeric",
-                                                minute: "2-digit",
-                                            })}
+
+                                <div className={cn("flex min-w-0 max-w-[78%] flex-col", isMe ? "items-end" : "items-start")}>
+                                    {showHeader && showSenderName && (
+                                        <span className="mb-1 px-1 text-[13px] font-semibold text-foreground">
+                                            {msg.sender.name}
                                         </span>
                                     )}
-                                    {isDeleted ? (
-                                        <p className="italic text-muted-foreground">Message deleted</p>
-                                    ) : editingId === msg.id ? (
-                                        <div className="max-w-2xl space-y-2">
+
+                                    {editingId === msg.id ? (
+                                        <div className="w-[min(560px,80vw)] space-y-2">
                                             <Textarea
                                                 value={editBody}
                                                 onChange={(event) => setEditBody(event.target.value)}
@@ -249,43 +239,63 @@ export function MessageThread({
                                             </div>
                                         </div>
                                     ) : (
-                                        <>
-                                            <MessageContent body={msg.body} references={msg.references} />
-                                            {isEdited && (
-                                                <span className="ml-1 text-[11px] text-muted-foreground">edited</span>
+                                        <div className="flex items-center gap-1">
+                                            {isMe && !isDeleted && (
+                                                <div className="hidden group-hover:block">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                <span className="sr-only">Message actions</span>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem
+                                                                onClick={() => {
+                                                                    setEditingId(msg.id);
+                                                                    setEditBody(msg.body);
+                                                                }}
+                                                            >
+                                                                <Edit3 className="h-4 w-4" />
+                                                                Edit
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                variant="destructive"
+                                                                onClick={() => deleteMessage.mutate({ conversationId, messageId: msg.id })}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                             )}
-                                            <MessageAttachments messageId={msg.id} />
-                                        </>
-                                    )}
-                                    {isMe && !isDeleted && editingId !== msg.id && (
-                                        <div className="absolute right-1 top-0 hidden rounded-lg border border-border bg-popover shadow-xl shadow-black/30 group-hover:block">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Message actions</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            setEditingId(msg.id);
-                                                            setEditBody(msg.body);
-                                                        }}
-                                                    >
-                                                        <Edit3 className="h-4 w-4" />
-                                                        Edit
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        variant="destructive"
-                                                        onClick={() => deleteMessage.mutate({ conversationId, messageId: msg.id })}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                        Delete
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <div
+                                                className={cn(
+                                                    "min-w-0 rounded-2xl px-3.5 py-2 text-[15px] leading-[1.45]",
+                                                    isDeleted
+                                                        ? "bg-muted/50 italic text-muted-foreground"
+                                                        : isMe
+                                                            ? "rounded-br-md bg-bz-blue text-white"
+                                                            : "rounded-bl-md bg-muted text-foreground",
+                                                )}
+                                            >
+                                                {isDeleted ? (
+                                                    <span>Message deleted</span>
+                                                ) : (
+                                                    <>
+                                                        <MessageContent body={msg.body} references={msg.references} />
+                                                        <MessageAttachments messageId={msg.id} />
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
+                                    )}
+
+                                    {!isDeleted && editingId !== msg.id && (
+                                        <span className="mt-0.5 hidden px-1 text-[11px] text-muted-foreground group-hover:inline">
+                                            {time}{isEdited ? " · edited" : ""}
+                                        </span>
                                     )}
                                 </div>
                             </div>
