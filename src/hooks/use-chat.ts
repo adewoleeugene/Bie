@@ -56,7 +56,7 @@ export function useMessages(conversationId: string | null) {
     });
 }
 
-export function useChatReferenceSearch(kind: "user" | "task", query: string, enabled: boolean) {
+export function useChatReferenceSearch(kind: "user" | "task" | "project", query: string, enabled: boolean) {
     return useQuery({
         queryKey: ["chat-reference-search", kind, query],
         queryFn: () => searchChatReferences(kind, query),

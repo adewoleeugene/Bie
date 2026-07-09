@@ -2,7 +2,7 @@
 
 import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AttachmentParent } from "@prisma/client";
-import { AtSign, FileText, Hash, Paperclip, Send, X } from "lucide-react";
+import { AtSign, FileText, FolderKanban, Hash, Paperclip, Send, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,8 +14,10 @@ interface MessageInputProps {
     conversationId: string;
 }
 
+type TriggerKind = "user" | "task" | "project";
+
 type TriggerState = {
-    kind: "user" | "task";
+    kind: TriggerKind;
     query: string;
     start: number;
     end: number;
@@ -23,7 +25,7 @@ type TriggerState = {
 
 function detectTrigger(value: string, cursor: number): TriggerState {
     const beforeCursor = value.slice(0, cursor);
-    const match = beforeCursor.match(/(^|\s)([@#])([^\s@#\[\]]{0,40})$/);
+    const match = beforeCursor.match(/(^|\s)([@#+])([^\s@#+\[\]]{0,40})$/);
     if (!match || match.index === undefined) return null;
 
     const marker = match[2];
@@ -32,11 +34,17 @@ function detectTrigger(value: string, cursor: number): TriggerState {
     const start = match.index + markerOffset;
 
     return {
-        kind: marker === "@" ? "user" : "task",
+        kind: marker === "@" ? "user" : marker === "#" ? "task" : "project",
         query,
         start,
         end: cursor,
     };
+}
+
+function tokenFor(suggestion: ChatReferenceSuggestion): string {
+    if (suggestion.type === "user") return `@[${suggestion.id}]`;
+    if (suggestion.type === "task") return `#[${suggestion.id}]`;
+    return `+[${suggestion.id}]`;
 }
 
 function formatBytes(bytes: number) {
@@ -90,7 +98,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     const insertSuggestion = (suggestion: ChatReferenceSuggestion) => {
         if (!trigger) return;
 
-        const token = suggestion.type === "user" ? `@[${suggestion.id}]` : `#[${suggestion.id}]`;
+        const token = tokenFor(suggestion);
         const next = `${body.slice(0, trigger.start)}${token} ${body.slice(trigger.end)}`;
         const nextCursor = trigger.start + token.length + 1;
 
@@ -181,8 +189,10 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-900">
                                     {suggestion.type === "user" ? (
                                         <AtSign className="h-4 w-4 text-neutral-500" />
-                                    ) : (
+                                    ) : suggestion.type === "task" ? (
                                         <Hash className="h-4 w-4 text-neutral-500" />
+                                    ) : (
+                                        <FolderKanban className="h-4 w-4 text-neutral-500" />
                                     )}
                                 </div>
                                 <div className="min-w-0">

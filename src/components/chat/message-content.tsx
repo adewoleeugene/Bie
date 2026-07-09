@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageRefType } from "@prisma/client";
-import { CheckCircle2, CircleDot, UserRound } from "lucide-react";
+import { CheckCircle2, CircleDot, FolderKanban, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { MessageReferencePreview } from "@/actions/chat";
@@ -18,11 +18,16 @@ function statusLabel(status: string) {
 export function MessageContent({ body, references }: MessageContentProps) {
     const refsByToken = new Map<string, MessageReferencePreview>();
     for (const ref of references) {
-        const prefix = ref.targetType === MessageRefType.USER ? "@" : "#";
+        const prefix =
+            ref.targetType === MessageRefType.USER
+                ? "@"
+                : ref.targetType === MessageRefType.PROJECT
+                    ? "+"
+                    : "#";
         refsByToken.set(`${prefix}[${ref.targetId}]`, ref);
     }
 
-    const parts = body.split(/(@\[[^\]]+\]|#\[[^\]]+\])/g).filter(Boolean);
+    const parts = body.split(/(@\[[^\]]+\]|#\[[^\]]+\]|\+\[[^\]]+\])/g).filter(Boolean);
 
     return (
         <div className="space-y-2">
@@ -56,6 +61,21 @@ export function MessageContent({ body, references }: MessageContentProps) {
                                     <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
                                         {ref.task.statusColumnName ?? statusLabel(ref.task.status)}
                                     </Badge>
+                                </span>
+                            </a>
+                        );
+                    }
+
+                    if (ref.targetType === MessageRefType.PROJECT && ref.project) {
+                        return (
+                            <a
+                                key={ref.id}
+                                href={ref.project.url}
+                                className="mx-0.5 inline-flex max-w-full align-middle"
+                            >
+                                <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900">
+                                    <FolderKanban className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                                    <span className="truncate font-medium">{ref.project.name}</span>
                                 </span>
                             </a>
                         );
