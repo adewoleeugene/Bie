@@ -74,8 +74,8 @@ export function MessageThread({
 
     if (isLoading) {
         return (
-            <div className="flex flex-1 items-center justify-center bg-[#101116]">
-                <div className="animate-pulse text-sm text-neutral-500">Loading messages...</div>
+            <div className="flex flex-1 items-center justify-center bg-background">
+                <div className="animate-pulse text-sm text-muted-foreground">Loading messages...</div>
             </div>
         );
     }
@@ -104,24 +104,24 @@ export function MessageThread({
     };
 
     return (
-        <div className="flex h-full min-w-0 flex-col bg-[#0f1116]">
+        <div className="flex h-full min-w-0 flex-col bg-background">
             {/* Header */}
-            <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-black/40 px-4 shadow-[0_1px_0_0_rgba(255,255,255,0.03)]">
+            <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
                 {isChannel ? (
                     isPrivateChannel ? (
-                        <Lock className="h-5 w-5 shrink-0 text-neutral-500" />
+                        <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
                     ) : (
-                        <Hash className="h-5 w-5 shrink-0 text-neutral-500" />
+                        <Hash className="h-5 w-5 shrink-0 text-muted-foreground" />
                     )
                 ) : null}
                 <div className="flex min-w-0 items-center gap-2.5">
-                    <h2 className="truncate text-[15px] font-semibold text-white">
+                    <h2 className="truncate text-[15px] font-semibold text-foreground">
                         {isChannel ? conversationName.replace(/^#\s*/, "") : conversationName}
                     </h2>
                     {isChannel && conversationTopic && (
                         <>
-                            <span className="h-4 w-px shrink-0 bg-white/10" />
-                            <p className="truncate text-[13px] text-neutral-500">{conversationTopic}</p>
+                            <span className="h-4 w-px shrink-0 bg-border" />
+                            <p className="truncate text-[13px] text-muted-foreground">{conversationTopic}</p>
                         </>
                     )}
                 </div>
@@ -139,11 +139,11 @@ export function MessageThread({
             <div className="flex-1 space-y-0 overflow-y-auto py-4">
                 {(!allMessages || allMessages.length === 0) ? (
                     <div className="flex h-full flex-col items-start justify-end px-6 pb-4 text-left">
-                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#1c2029] to-[#14161c] text-neutral-300">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-card text-muted-foreground">
                             {isChannel ? <Hash className="h-8 w-8" /> : <MessageSquare className="h-8 w-8" />}
                         </div>
-                        <h3 className="text-2xl font-bold text-white">Welcome to {conversationName}</h3>
-                        <p className="mt-1 text-[15px] text-neutral-500">
+                        <h3 className="text-2xl font-bold text-foreground">Welcome to {conversationName}</h3>
+                        <p className="mt-1 text-[15px] text-muted-foreground">
                             This is the very beginning of the {isChannel ? conversationName : "conversation"}. Send the first message to get things moving.
                         </p>
                     </div>
@@ -156,7 +156,7 @@ export function MessageThread({
                                 size="sm"
                                 onClick={loadOlder}
                                 disabled={loadingOlder}
-                                className="border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.08]"
+                                className="border-border bg-secondary text-foreground hover:bg-muted"
                             >
                                 {loadingOlder ? "Loading..." : "Load older"}
                             </Button>
@@ -177,7 +177,7 @@ export function MessageThread({
                             <div
                                 key={msg.id}
                                 className={cn(
-                                    "group relative px-4 py-0.5 transition-colors hover:bg-white/[0.025]",
+                                    "group relative px-4 py-0.5 transition-colors hover:bg-muted/40",
                                     showHeader && "mt-[17px]"
                                 )}
                             >
@@ -185,7 +185,7 @@ export function MessageThread({
                                     <div className="absolute left-4 top-1">
                                         <Avatar className="h-10 w-10">
                                             <AvatarImage src={msg.sender.image || undefined} />
-                                            <AvatarFallback className="bg-gradient-to-br from-[#2a2f3a] to-[#20232d] text-sm font-medium text-neutral-200">
+                                            <AvatarFallback className="bg-secondary text-sm font-medium text-foreground">
                                                 {msg.sender.name?.charAt(0).toUpperCase()}
                                             </AvatarFallback>
                                         </Avatar>
@@ -193,18 +193,18 @@ export function MessageThread({
                                 )}
                                 {showHeader && (
                                     <div className="mb-0.5 flex items-baseline gap-2 pl-[52px]">
-                                        <span className="text-[15px] font-semibold text-neutral-100 hover:underline">{msg.sender.name}</span>
-                                        <span className="text-[11px] text-neutral-600">
+                                        <span className="text-[15px] font-semibold text-foreground hover:underline">{msg.sender.name}</span>
+                                        <span className="text-[11px] text-muted-foreground">
                                             {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                                         </span>
                                     </div>
                                 )}
                                 <div className={cn(
                                     "relative min-h-6 pl-[52px] text-[15px] leading-[1.4]",
-                                    isMe ? "text-neutral-100" : "text-neutral-200"
+                                    isMe ? "text-foreground" : "text-foreground/90"
                                 )}>
                                     {!showHeader && (
-                                        <span className="absolute left-0 top-0.5 hidden w-[52px] pr-2.5 text-right text-[10px] font-medium text-neutral-600 group-hover:block">
+                                        <span className="absolute left-0 top-0.5 hidden w-[52px] pr-2.5 text-right text-[10px] font-medium text-muted-foreground/70 group-hover:block">
                                             {new Date(msg.createdAt).toLocaleTimeString([], {
                                                 hour: "numeric",
                                                 minute: "2-digit",
@@ -212,13 +212,13 @@ export function MessageThread({
                                         </span>
                                     )}
                                     {isDeleted ? (
-                                        <p className="italic text-neutral-400">Message deleted</p>
+                                        <p className="italic text-muted-foreground">Message deleted</p>
                                     ) : editingId === msg.id ? (
                                         <div className="max-w-2xl space-y-2">
                                             <Textarea
                                                 value={editBody}
                                                 onChange={(event) => setEditBody(event.target.value)}
-                                                className="min-h-20 resize-none border-white/10 bg-[#1c202a] text-sm"
+                                                className="min-h-20 resize-none border-border bg-card text-sm"
                                             />
                                             <div className="flex items-center gap-2">
                                                 <Button
@@ -240,7 +240,7 @@ export function MessageThread({
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 gap-1.5 border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
+                                                    className="h-8 gap-1.5 border-border bg-secondary hover:bg-muted"
                                                     onClick={() => setEditingId(null)}
                                                 >
                                                     <X className="h-3.5 w-3.5" />
@@ -252,16 +252,16 @@ export function MessageThread({
                                         <>
                                             <MessageContent body={msg.body} references={msg.references} />
                                             {isEdited && (
-                                                <span className="ml-1 text-[11px] text-neutral-600">edited</span>
+                                                <span className="ml-1 text-[11px] text-muted-foreground">edited</span>
                                             )}
                                             <MessageAttachments messageId={msg.id} />
                                         </>
                                     )}
                                     {isMe && !isDeleted && editingId !== msg.id && (
-                                        <div className="absolute right-1 top-0 hidden rounded-lg border border-white/10 bg-[#1c202a] shadow-xl shadow-black/30 group-hover:block">
+                                        <div className="absolute right-1 top-0 hidden rounded-lg border border-border bg-popover shadow-xl shadow-black/30 group-hover:block">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-white/[0.08]">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted">
                                                         <MoreHorizontal className="h-4 w-4" />
                                                         <span className="sr-only">Message actions</span>
                                                     </Button>
@@ -294,14 +294,14 @@ export function MessageThread({
                     </>
                 )}
                 {visibleTypingUsers.length > 0 && (
-                    <div className="flex items-center gap-2 px-4 pl-[52px] pt-2 text-xs text-neutral-400">
+                    <div className="flex items-center gap-2 px-4 pl-[52px] pt-2 text-xs text-muted-foreground">
                         <span className="flex gap-0.5">
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.15s]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
                         </span>
                         <span>
-                            <span className="font-semibold text-neutral-300">{visibleTypingUsers.map((user) => user.name).join(", ")}</span>
+                            <span className="font-semibold text-foreground">{visibleTypingUsers.map((user) => user.name).join(", ")}</span>
                             {visibleTypingUsers.length === 1 ? " is" : " are"} typing…
                         </span>
                     </div>
