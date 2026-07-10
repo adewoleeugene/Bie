@@ -121,11 +121,14 @@ export function AIPlanPicker({ onCommit, existingCommittedIds }: AIPlanPickerPro
                 }
             }
 
+            // Skip anything already on today's plan — only suggest new tasks.
+            const candidates = allTasks.filter((t) => !existingCommittedIds?.has(t.id));
+
             const prioRank: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
-            const inProgress = allTasks
+            const inProgress = candidates
                 .filter((t) => t.status === "IN_PROGRESS")
                 .sort((a, b) => (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2));
-            const rest = allTasks.filter((t) => t.status !== "IN_PROGRESS");
+            const rest = candidates.filter((t) => t.status !== "IN_PROGRESS");
             rest.sort((a, b) => (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2));
             const remaining = MAX_SUGGESTIONS - inProgress.length;
             const tasks = [...inProgress, ...rest.slice(0, Math.max(0, remaining))];
@@ -237,7 +240,6 @@ export function AIPlanPicker({ onCommit, existingCommittedIds }: AIPlanPickerPro
                             <ul className="space-y-1.5">
                                 {suggestions.map((task) => {
                                     const checked = selected.has(task.id);
-                                    const alreadyCommitted = existingCommittedIds?.has(task.id);
                                     const pri = PRIORITY_LABELS[task.priority];
                                     const st = STATUS_LABELS[task.status];
                                     return (
@@ -263,9 +265,6 @@ export function AIPlanPicker({ onCommit, existingCommittedIds }: AIPlanPickerPro
                                                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                                     {st && <Pill color={st.color}>{st.label}</Pill>}
                                                     {pri && <Pill color={pri.color}>{pri.label}</Pill>}
-                                                    {alreadyCommitted && (
-                                                        <Pill color="var(--bz-green)">Already added</Pill>
-                                                    )}
                                                 </div>
                                             </div>
                                         </li>
