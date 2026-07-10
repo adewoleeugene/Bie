@@ -75,10 +75,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: user.email,
             };
 
-            await db.$transaction(async (tx) => {
-                await ensurePersonalWorkspace(tx, signedInUser);
-                await acceptPendingInvitesForUser(tx, signedInUser);
-            });
+            try {
+                await db.$transaction(async (tx) => {
+                    await ensurePersonalWorkspace(tx, signedInUser);
+                    await acceptPendingInvitesForUser(tx, signedInUser);
+                });
+            } catch (error) {
+                console.error("[auth] post-sign-in provisioning failed", error);
+            }
 
             return true;
         },
