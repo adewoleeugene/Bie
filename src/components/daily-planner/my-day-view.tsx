@@ -23,7 +23,7 @@ import {
 import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
 import { AIPlanPicker } from "@/components/daily-planner/ai-plan-picker";
 import { useDailyReflection, useUpsertReflection } from "@/hooks/use-reflections";
-import { useTasks, useUpdateTask } from "@/hooks/use-tasks";
+import { useTasks, useUpdateTask, useMarkTaskInProgressForFocus } from "@/hooks/use-tasks";
 import { useFocusStats } from "@/hooks/use-focus-sessions";
 import { useTimeTrackingStats, useCreateTimeEntry } from "@/hooks/use-time-entries";
 
@@ -62,6 +62,7 @@ interface TaskWithRelations {
     status: string;
     priority: string;
     dueDate?: string | Date | null;
+    completedAt?: string | Date | null;
     estimatedHours?: number | null;
     project?: { id: string; name: string } | null;
     assignees?: { user: { id: string; name: string; image?: string | null } }[];
@@ -109,6 +110,7 @@ export function MyDayView() {
     const updateTask = useUpdateTask();
 
     const createTimeEntry = useCreateTimeEntry();
+    const markInProgress = useMarkTaskInProgressForFocus();
 
     const [showCompleted, setShowCompleted] = useState(false);
 
@@ -196,7 +198,15 @@ export function MyDayView() {
         return (allTasks as TaskWithRelations[])
             .filter((task) => {
                 if (task.status === "ARCHIVED") return false;
-                if (task.status === "DONE" && !showCompleted) return false;
+                if (task.status === "DONE") {
+                    if (!showCompleted) return false;
+                    // Show anything completed today, plus done tasks that were
+                    // on today's list by due date.
+                    const done = task.completedAt ? new Date(task.completedAt) : null;
+                    const doneToday = !!done && done >= todayStart;
+                    const dueByToday = !!task.dueDate && new Date(task.dueDate) < todayEnd;
+                    return doneToday || dueByToday;
+                }
                 if (task.dueDate && new Date(task.dueDate) < todayEnd) return true;
                 return task.status === "IN_PROGRESS" || task.status === "TODO";
             })
@@ -255,12 +265,15 @@ export function MyDayView() {
 
     const startHolisticFocus = () => {
         if (blockActive || selectedIds.size === 0) return;
+        const queue = [...selectedIds];
         setBlockActive(true);
-        setBlockQueue([...selectedIds]);
+        setBlockQueue(queue);
         setBlockElapsed(0);
         setLastMark(0);
         setBlockRunning(true);
         setSelectedIds(new Set());
+        // Focusing on the first task moves it to In Progress on the board.
+        if (queue[0]) markInProgress.mutate(queue[0]);
     };
 
     // Finish the current task: log its time, mark it done, advance the queue.
@@ -274,6 +287,7 @@ export function MyDayView() {
             resetBlock();
         } else {
             setBlockQueue(rest);
+            if (rest[0]) markInProgress.mutate(rest[0]);
         }
     };
 
@@ -288,6 +302,8 @@ export function MyDayView() {
         }
         setLastMark(blockElapsed);
         setBlockQueue((q) => [...q.slice(1), q[0]]);
+        // The next task in line becomes active → move it to In Progress.
+        if (blockQueue[1]) markInProgress.mutate(blockQueue[1]);
     };
 
     const resetBlock = () => {

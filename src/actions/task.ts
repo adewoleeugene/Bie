@@ -267,6 +267,7 @@ export async function createTask(
                 title: validated.title,
                 description: validated.description || undefined,
                 status: taskStatus,
+                completedAt: taskStatus === "DONE" ? new Date() : null,
                 statusColumnId: statusColumn?.id,
                 priority: validated.priority,
                 projectId: validated.projectId || null,
@@ -362,6 +363,14 @@ export async function updateTask(
             );
             updateData.statusColumnId = statusColumn?.id ?? null;
             updateData.status = statusColumn?.status ?? validated.status ?? existingTask.status;
+        }
+        // Stamp completedAt when a task transitions into/out of DONE.
+        const resolvedStatus: TaskStatus =
+            validated.statusColumnId !== undefined
+                ? (statusColumn?.status ?? validated.status ?? existingTask.status)
+                : (validated.status ?? existingTask.status);
+        if (resolvedStatus !== existingTask.status) {
+            updateData.completedAt = resolvedStatus === "DONE" ? new Date() : null;
         }
         if (validated.priority !== undefined)
             updateData.priority = validated.priority;
@@ -467,6 +476,71 @@ export async function updateTask(
     }
 }
 
+/**
+ * Promote a task to IN_PROGRESS when focus starts on it — moving it on the
+ * kanban too (status + statusColumnId). Only promotes queued tasks (TODO /
+ * BACKLOG); leaves IN_REVIEW / DONE / already-in-progress untouched.
+ */
+export async function markTaskInProgressForFocus(
+    taskId: string
+): Promise<ActionResult<Task>> {
+    try {
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
+        const editable = await requireEditableTask(taskId, viewer);
+        if (!editable.ok) {
+            return { success: false, error: editable.error };
+        }
+        const existing = editable.task;
+        if (existing.status !== "TODO" && existing.status !== "BACKLOG") {
+            return { success: true, data: existing as Task };
+        }
+
+        const column = await getColumnForTaskInput(
+            { status: "IN_PROGRESS" },
+            organizationId,
+            existing.projectId,
+        );
+
+        const task = await db.task.update({
+            where: { id: taskId },
+            data: {
+                status: "IN_PROGRESS",
+                statusColumnId: column?.id ?? existing.statusColumnId,
+            },
+            include: {
+                assignees: { include: { user: true } },
+                project: true,
+                statusColumn: true,
+                parentTask: true,
+            },
+        });
+
+        await db.taskActivity.create({
+            data: { taskId, userId, action: ActivityAction.STATUS_CHANGE },
+        });
+
+        if (task.projectId) {
+            processAutomationRules(
+                task.id,
+                task.projectId,
+                "STATUS_CHANGE",
+                task.status,
+                userId,
+            ).catch((e) => console.error(e));
+        }
+
+        revalidatePath("/");
+        return { success: true, data: task };
+    } catch (error) {
+        console.error("markTaskInProgressForFocus error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update task",
+        };
+    }
+}
+
 export async function deleteTask(
     input: DeleteTaskInput
 ): Promise<ActionResult> {
@@ -514,6 +588,10 @@ export async function reorderTask(
         };
         if (validated.statusColumnId !== undefined) {
             reorderData.statusColumnId = validated.statusColumnId;
+        }
+        // Stamp completedAt when dragging into/out of the Done column.
+        if (existingTask.status !== validated.status) {
+            reorderData.completedAt = validated.status === "DONE" ? new Date() : null;
         }
 
         await db.task.update({
