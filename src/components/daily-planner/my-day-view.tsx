@@ -24,11 +24,7 @@ import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
 import { AIPlanPicker } from "@/components/daily-planner/ai-plan-picker";
 import { useDailyReflection, useUpsertReflection } from "@/hooks/use-reflections";
 import { useTasks, useUpdateTask } from "@/hooks/use-tasks";
-import {
-    useFocusStats,
-    useStartFocusSession,
-    useEndFocusSession,
-} from "@/hooks/use-focus-sessions";
+import { useFocusStats } from "@/hooks/use-focus-sessions";
 import { useTimeTrackingStats, useCreateTimeEntry } from "@/hooks/use-time-entries";
 
 // ----- config -------------------------------------------------------------
@@ -112,8 +108,6 @@ export function MyDayView() {
     const { data: timeStats } = useTimeTrackingStats();
     const updateTask = useUpdateTask();
 
-    const startSession = useStartFocusSession();
-    const endSession = useEndFocusSession();
     const createTimeEntry = useCreateTimeEntry();
 
     const [showCompleted, setShowCompleted] = useState(false);
@@ -124,10 +118,8 @@ export function MyDayView() {
 
     // ----- multi-select → holistic focus block --------------------------
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [startError, setStartError] = useState<string | null>(null);
 
     const toggleSelect = (taskId: string) => {
-        setStartError(null);
         setSelectedIds((prev) => {
             const next = new Set(prev);
             if (next.has(taskId)) next.delete(taskId);
@@ -136,10 +128,12 @@ export function MyDayView() {
         });
     };
 
-    // The running block: one FREE session, worked as a sequential queue.
+    // The running block: a client-side timer worked as a sequential queue.
     // Time from `lastMark` → `blockElapsed` is the current task's segment;
     // it's logged to that task's Hours whenever we leave it (done/skip/end).
-    const [blockSessionId, setBlockSessionId] = useState<string | null>(null);
+    // Deliberately no server focus session — that would trigger the global
+    // Pomodoro popup and can orphan an open session.
+    const [blockActive, setBlockActive] = useState(false);
     const [blockQueue, setBlockQueue] = useState<string[]>([]); // queue[0] = current
     const [blockRunning, setBlockRunning] = useState(false);
     const [blockElapsed, setBlockElapsed] = useState(0); // total active seconds
@@ -259,30 +253,14 @@ export function MyDayView() {
         });
     };
 
-    const startHolisticFocus = async () => {
-        if (blockSessionId || selectedIds.size === 0) return;
-        const ids = [...selectedIds];
-        const titles = ids
-            .map((id) => tasksById.get(id)?.title)
-            .filter((t): t is string => Boolean(t));
-        const result = await startSession.mutateAsync({
-            taskId: null,
-            type: "FREE",
-            notes: `Holistic focus: ${titles.join(", ")}`,
-        });
-        if (!result.success) {
-            setStartError(result.error ?? "Couldn't start focus session.");
-            return;
-        }
-        if (result.data) {
-            setBlockSessionId(result.data.id);
-            setBlockQueue(ids);
-            setBlockElapsed(0);
-            setLastMark(0);
-            setBlockRunning(true);
-            setSelectedIds(new Set());
-            setStartError(null);
-        }
+    const startHolisticFocus = () => {
+        if (blockActive || selectedIds.size === 0) return;
+        setBlockActive(true);
+        setBlockQueue([...selectedIds]);
+        setBlockElapsed(0);
+        setLastMark(0);
+        setBlockRunning(true);
+        setSelectedIds(new Set());
     };
 
     // Finish the current task: log its time, mark it done, advance the queue.
@@ -293,7 +271,7 @@ export function MyDayView() {
         setLastMark(blockElapsed);
         const rest = blockQueue.slice(1);
         if (rest.length === 0) {
-            await finishSession();
+            resetBlock();
         } else {
             setBlockQueue(rest);
         }
@@ -307,14 +285,8 @@ export function MyDayView() {
         setBlockQueue((q) => [...q.slice(1), q[0]]);
     };
 
-    const finishSession = async () => {
-        if (!blockSessionId) return;
-        await endSession.mutateAsync({
-            sessionId: blockSessionId,
-            durationMinutes: Math.max(0, Math.round(blockElapsed / 60)),
-            completed: true,
-        });
-        setBlockSessionId(null);
+    const resetBlock = () => {
+        setBlockActive(false);
         setBlockQueue([]);
         setBlockRunning(false);
         setBlockElapsed(0);
@@ -324,7 +296,7 @@ export function MyDayView() {
     // End early: the still-open segment goes to whatever task is current.
     const endHolisticFocus = async () => {
         if (currentTask) await logSegment(currentTask.id);
-        await finishSession();
+        resetBlock();
     };
 
     const renderTaskRow = (task: TaskWithRelations) => {
@@ -335,7 +307,7 @@ export function MyDayView() {
         const status = STATUS_CONFIG[task.status];
         const isPinned = pinnedTaskIds.has(task.id);
         const isSelected = selectedIds.has(task.id);
-        const canSelect = !isDone && !blockSessionId;
+        const canSelect = !isDone && !blockActive;
         const edge = isOverdue ? "var(--bz-red)" : status?.color ?? "transparent";
 
         return (
@@ -485,14 +457,14 @@ export function MyDayView() {
 
     return (
         <div className="mx-auto max-w-3xl space-y-6 p-10">
-            {blockSessionId && currentTask && (
+            {blockActive && currentTask && (
                 <FocusBar
                     current={currentTask}
                     upcoming={upcomingTasks}
                     segmentSec={Math.max(0, blockElapsed - lastMark)}
                     totalSec={blockElapsed}
                     running={blockRunning}
-                    busy={createTimeEntry.isPending || updateTask.isPending || endSession.isPending}
+                    busy={createTimeEntry.isPending || updateTask.isPending}
                     onDone={completeCurrent}
                     onSkip={upcomingTasks.length > 0 ? skipCurrent : undefined}
                     onPause={() => setBlockRunning(false)}
@@ -596,7 +568,7 @@ export function MyDayView() {
             <ReflectionRow />
 
             {/* ===== Multi-select → holistic focus ===== */}
-            {selectedIds.size > 0 && !blockSessionId && (
+            {selectedIds.size > 0 && !blockActive && (
                 <div className="sticky bottom-6 z-40">
                     <div
                         className="mx-auto flex max-w-xl items-center justify-between gap-4 rounded-2xl border border-[color:var(--border)] bg-black/80 px-5 py-3 backdrop-blur"
@@ -607,11 +579,6 @@ export function MyDayView() {
                             <span className="text-neutral-400">
                                 {selectedIds.size === 1 ? "task selected" : "tasks selected"}
                             </span>
-                            {startError && (
-                                <span className="ml-2 text-[12px]" style={{ color: "var(--bz-red)" }}>
-                                    {startError}
-                                </span>
-                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -624,12 +591,11 @@ export function MyDayView() {
                             <button
                                 type="button"
                                 onClick={startHolisticFocus}
-                                disabled={startSession.isPending}
-                                className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold text-black transition-all disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold text-black transition-all"
                                 style={{ background: "var(--bz-pink)" }}
                             >
                                 <Play className="h-3.5 w-3.5" />
-                                {startSession.isPending ? "Starting…" : "Start focus"}
+                                Start focus
                             </button>
                         </div>
                     </div>
