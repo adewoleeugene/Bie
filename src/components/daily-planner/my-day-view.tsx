@@ -277,10 +277,15 @@ export function MyDayView() {
         }
     };
 
-    // Defer the current task: log its time so far, send it to the back.
+    // Defer the current task: log its time, leave it not-done. If others
+    // remain, send it to the back; if it's the last, that ends the block.
     const skipCurrent = async () => {
-        if (!currentTask || blockQueue.length < 2) return;
+        if (!currentTask) return;
         await logSegment(currentTask.id);
+        if (blockQueue.length < 2) {
+            resetBlock();
+            return;
+        }
         setLastMark(blockElapsed);
         setBlockQueue((q) => [...q.slice(1), q[0]]);
     };
@@ -466,7 +471,7 @@ export function MyDayView() {
                     running={blockRunning}
                     busy={createTimeEntry.isPending || updateTask.isPending}
                     onDone={completeCurrent}
-                    onSkip={upcomingTasks.length > 0 ? skipCurrent : undefined}
+                    onSkip={skipCurrent}
                     onPause={() => setBlockRunning(false)}
                     onResume={() => setBlockRunning(true)}
                     onEnd={endHolisticFocus}
@@ -725,7 +730,7 @@ function FocusBar({
                         disabled={busy}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 py-2 text-[13px] font-medium text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
                     >
-                        Skip
+                        {upcoming.length > 0 ? "Skip" : "Skip · finish"}
                     </button>
                 )}
             </div>
