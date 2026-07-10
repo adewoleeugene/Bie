@@ -76,7 +76,7 @@ export function KanbanColumn({
     return (
         <div
             className={cn(
-                "flex w-[300px] shrink-0 flex-col rounded-2xl border transition-colors",
+                "flex max-h-full w-[300px] shrink-0 flex-col rounded-2xl border transition-colors",
                 "border-[color:var(--border)] bg-white/[0.015]",
                 isOver && "border-[color:var(--bz-blue)]/70 bg-white/[0.04]",
             )}
@@ -157,7 +157,7 @@ export function KanbanColumn({
 
             <div
                 ref={setNodeRef}
-                className="flex flex-1 flex-col gap-1 p-2 min-h-[200px]"
+                className="scrollbar-thin flex min-h-[200px] flex-1 flex-col gap-1 overflow-y-auto p-2"
             >
                 <SortableContext
                     items={tasks.map((t) => t.id)}

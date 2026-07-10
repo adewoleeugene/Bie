@@ -386,7 +386,8 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <div className="flex items-center justify-between border-b border-[color:var(--border)] px-6 py-2.5">
+            <div className="flex h-full min-h-0 flex-col">
+            <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--border)] px-6 py-2.5">
                 <div className="flex items-center gap-2">
                     {totalSubtasks > 0 && (
                         <button
@@ -448,7 +449,7 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
                 </DropdownMenu>
             </div>
 
-            <div className="scrollbar-thin flex h-full gap-4 overflow-x-auto px-6 py-5">
+            <div className="scrollbar-thin flex min-h-0 flex-1 gap-4 overflow-x-auto px-6 py-5">
                 {columns.map((column) => (
                     <KanbanColumn
                         key={column.id}
@@ -515,6 +516,7 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
                         </form>
                     </DialogContent>
                 </Dialog>
+            </div>
             </div>
 
             {createPortal(
