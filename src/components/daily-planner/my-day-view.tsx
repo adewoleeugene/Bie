@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
@@ -371,11 +370,6 @@ export function MyDayView() {
                         {isSelected ? <Check className="h-3 w-3" /> : <Circle className="h-2 w-2" />}
                     </button>
                 )}
-                <Checkbox
-                    checked={isDone}
-                    onCheckedChange={() => handleToggleDone(task)}
-                    className="h-[18px] w-[18px]"
-                />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                         {isPinned && !isDone && (
@@ -420,18 +414,56 @@ export function MyDayView() {
                     {isOverdue && <Chip color="var(--bz-red)">Overdue</Chip>}
                     {prio && <Chip color={prio.color}>{task.priority}</Chip>}
                     {status && <Chip color={status.color}>{status.label}</Chip>}
-                    {!isDone && (
+                    {!isDone ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    startFocusForTask(task.id);
+                                }}
+                                aria-label="Start focus session"
+                                className="inline-flex items-center gap-1 rounded-md border border-[color:var(--border)] px-2 py-1 text-[11px] font-medium text-neutral-300 opacity-0 transition-all hover:bg-white/[0.06] hover:text-white group-hover:opacity-100"
+                            >
+                                <Play className="h-3 w-3" />
+                                Start
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleDone(task);
+                                }}
+                                aria-label="Mark done"
+                                className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium text-neutral-300 transition-colors hover:text-white"
+                                style={{ borderColor: "var(--border)" }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor =
+                                        "color-mix(in oklab, var(--bz-green) 55%, transparent)";
+                                    e.currentTarget.style.background =
+                                        "color-mix(in oklab, var(--bz-green) 12%, transparent)";
+                                    e.currentTarget.style.color = "var(--bz-green)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = "var(--border)";
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "";
+                                }}
+                            >
+                                <Check className="h-3 w-3" />
+                                Done
+                            </button>
+                        </>
+                    ) : (
                         <button
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                startFocusForTask(task.id);
+                                handleToggleDone(task);
                             }}
-                            aria-label="Start focus session"
-                            className="inline-flex items-center gap-1 rounded-md border border-[color:var(--border)] px-2 py-1 text-[11px] font-medium text-neutral-300 opacity-0 transition-all hover:bg-white/[0.06] hover:text-white group-hover:opacity-100"
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:text-white"
                         >
-                            <Play className="h-3 w-3" />
-                            Start
+                            Undo
                         </button>
                     )}
                 </div>
