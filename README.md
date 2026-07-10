@@ -101,15 +101,23 @@ AUTH_GOOGLE_ID="your-google-client-id"
 AUTH_GOOGLE_SECRET="your-google-client-secret"
 
 AUTH_SECRET="your-secret-key"
-AUTH_URL="http://localhost:3000"
+AUTH_URL="http://localhost:3004"
+AUTH_TRUST_HOST="true"
 ```
 
 For Google OAuth setup:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create OAuth 2.0 credentials
-3. Add the authorized redirect URI that matches your local `AUTH_URL` exactly:
-   - If `AUTH_URL="http://localhost:3000"`, add `http://localhost:3000/api/auth/callback/google`
-   - If `AUTH_URL="http://localhost:3004"`, add `http://localhost:3004/api/auth/callback/google`
+3. Add every authorized redirect URI that the app will serve:
+   - Local development: `http://localhost:3004/api/auth/callback/google`
+   - Production: `https://trybie.space/api/auth/callback/google`
+   - Production: `https://getbie.space/api/auth/callback/google`
+
+For production with both `trybie.space` and `getbie.space`, do not force
+`AUTH_URL` or `NEXTAUTH_URL` to only one domain unless all sign-ins should
+return to that domain. Set `AUTH_TRUST_HOST="true"` and let Auth.js use the
+incoming request host, so users who start on `trybie.space` stay on
+`trybie.space` and users who start on `getbie.space` stay on `getbie.space`.
 
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL`
 are also supported for older local environments.
@@ -132,7 +140,7 @@ npm run dev
 npm run dev:desktop
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3004](http://localhost:3004).
 
 ## Scripts
 

@@ -51,9 +51,10 @@ Edit `.env`:
 # Database
 DATABASE_URL="postgresql://postgres:password@localhost:5432/christbase?schema=public"
 
-# NextAuth
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="$(openssl rand -base64 32)"
+# Auth.js
+AUTH_URL="http://localhost:3004"
+AUTH_SECRET="$(openssl rand -base64 32)"
+AUTH_TRUST_HOST="true"
 
 # Google OAuth (get from https://console.cloud.google.com/)
 GOOGLE_CLIENT_ID="your-google-client-id"
@@ -80,7 +81,7 @@ npx prisma db seed
 npm run dev
 ```
 
-Open **http://localhost:3000** and sign in with Google!
+Open **http://localhost:3004** and sign in with Google!
 
 ## 📊 What You'll See
 
@@ -160,9 +161,11 @@ echo $DATABASE_URL
 ```
 
 ### Google OAuth not working
-- Verify the Google Cloud redirect URI matches your auth URL exactly:
-  - `http://localhost:3000/api/auth/callback/google` when `AUTH_URL` or `NEXTAUTH_URL` is `http://localhost:3000`
-  - `http://localhost:3004/api/auth/callback/google` when `AUTH_URL` or `NEXTAUTH_URL` is `http://localhost:3004`
+- Verify the Google Cloud redirect URIs include every host the app uses:
+  - `http://localhost:3004/api/auth/callback/google`
+  - `https://trybie.space/api/auth/callback/google`
+  - `https://getbie.space/api/auth/callback/google`
+- For production on both `trybie.space` and `getbie.space`, set `AUTH_TRUST_HOST="true"` and avoid forcing `AUTH_URL` or `NEXTAUTH_URL` to just one of those domains.
 - Check client ID and secret in .env
 - Ensure Google+ API is enabled
 
