@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,11 @@ import {
     ArrowUp,
     ArrowDown,
     Play,
+    Pause,
+    StopCircle,
+    Flame,
+    Circle,
+    Check,
     Sparkles,
     Star,
     ChevronDown,
@@ -20,8 +25,12 @@ import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
 import { AIPlanPicker } from "@/components/daily-planner/ai-plan-picker";
 import { useDailyReflection, useUpsertReflection } from "@/hooks/use-reflections";
 import { useTasks, useUpdateTask } from "@/hooks/use-tasks";
-import { useFocusStats } from "@/hooks/use-focus-sessions";
-import { useTimeTrackingStats } from "@/hooks/use-time-entries";
+import {
+    useFocusStats,
+    useStartFocusSession,
+    useEndFocusSession,
+} from "@/hooks/use-focus-sessions";
+import { useTimeTrackingStats, useCreateTimeEntry } from "@/hooks/use-time-entries";
 
 // ----- config -------------------------------------------------------------
 
@@ -104,11 +113,48 @@ export function MyDayView() {
     const { data: timeStats } = useTimeTrackingStats();
     const updateTask = useUpdateTask();
 
+    const startSession = useStartFocusSession();
+    const endSession = useEndFocusSession();
+    const createTimeEntry = useCreateTimeEntry();
+
     const [showCompleted, setShowCompleted] = useState(false);
 
     // Per-task pomodoro launcher (uses existing PomodoroTimer)
     const [pomodoroTaskId, setPomodoroTaskId] = useState<string | null>(null);
     const startFocusForTask = (taskId: string) => setPomodoroTaskId(taskId);
+
+    // ----- multi-select → holistic focus block --------------------------
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [startError, setStartError] = useState<string | null>(null);
+
+    const toggleSelect = (taskId: string) => {
+        setStartError(null);
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    };
+
+    // The running block: one FREE session, worked as a sequential queue.
+    // Time from `lastMark` → `blockElapsed` is the current task's segment;
+    // it's logged to that task's Hours whenever we leave it (done/skip/end).
+    const [blockSessionId, setBlockSessionId] = useState<string | null>(null);
+    const [blockQueue, setBlockQueue] = useState<string[]>([]); // queue[0] = current
+    const [blockRunning, setBlockRunning] = useState(false);
+    const [blockElapsed, setBlockElapsed] = useState(0); // total active seconds
+    const [lastMark, setLastMark] = useState(0); // blockElapsed when current task began
+    const blockTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (blockRunning) {
+            blockTickRef.current = setInterval(() => setBlockElapsed((s) => s + 1), 1000);
+        }
+        return () => {
+            if (blockTickRef.current) clearInterval(blockTickRef.current);
+        };
+    }, [blockRunning]);
 
     // Optional AI helper: pinned tasks sort to the top — never a gate.
     const [pinnedTaskIds, setPinnedTaskIds] = useState<Set<string>>(() => {
@@ -186,6 +232,102 @@ export function MyDayView() {
         await updateTask.mutateAsync({ id: task.id, status: newStatus });
     };
 
+    const tasksById = useMemo(() => {
+        const map = new Map<string, TaskWithRelations>();
+        for (const t of (allTasks as TaskWithRelations[] | undefined) ?? []) map.set(t.id, t);
+        return map;
+    }, [allTasks]);
+
+    const blockTasks = blockQueue
+        .map((id) => tasksById.get(id))
+        .filter((t): t is TaskWithRelations => Boolean(t));
+    const currentTask = blockTasks[0] ?? null;
+    const upcomingTasks = blockTasks.slice(1);
+
+    // Log the current task's segment (lastMark → blockElapsed) to Hours.
+    const logSegment = async (taskId: string) => {
+        const seconds = Math.max(0, blockElapsed - lastMark);
+        const minutes = Math.round(seconds / 60);
+        if (minutes < 1) return; // don't log sub-minute noise
+        const endedAt = new Date();
+        const startedAt = new Date(endedAt.getTime() - seconds * 1000);
+        await createTimeEntry.mutateAsync({
+            taskId,
+            startedAt: startedAt.toISOString(),
+            endedAt: endedAt.toISOString(),
+            duration: minutes,
+            description: "Holistic focus",
+        });
+    };
+
+    const startHolisticFocus = async () => {
+        if (blockSessionId || selectedIds.size === 0) return;
+        const ids = [...selectedIds];
+        const titles = ids
+            .map((id) => tasksById.get(id)?.title)
+            .filter((t): t is string => Boolean(t));
+        const result = await startSession.mutateAsync({
+            taskId: null,
+            type: "FREE",
+            notes: `Holistic focus: ${titles.join(", ")}`,
+        });
+        if (!result.success) {
+            setStartError(result.error ?? "Couldn't start focus session.");
+            return;
+        }
+        if (result.data) {
+            setBlockSessionId(result.data.id);
+            setBlockQueue(ids);
+            setBlockElapsed(0);
+            setLastMark(0);
+            setBlockRunning(true);
+            setSelectedIds(new Set());
+            setStartError(null);
+        }
+    };
+
+    // Finish the current task: log its time, mark it done, advance the queue.
+    const completeCurrent = async () => {
+        if (!currentTask) return;
+        await logSegment(currentTask.id);
+        await updateTask.mutateAsync({ id: currentTask.id, status: "DONE" });
+        setLastMark(blockElapsed);
+        const rest = blockQueue.slice(1);
+        if (rest.length === 0) {
+            await finishSession();
+        } else {
+            setBlockQueue(rest);
+        }
+    };
+
+    // Defer the current task: log its time so far, send it to the back.
+    const skipCurrent = async () => {
+        if (!currentTask || blockQueue.length < 2) return;
+        await logSegment(currentTask.id);
+        setLastMark(blockElapsed);
+        setBlockQueue((q) => [...q.slice(1), q[0]]);
+    };
+
+    const finishSession = async () => {
+        if (!blockSessionId) return;
+        await endSession.mutateAsync({
+            sessionId: blockSessionId,
+            durationMinutes: Math.max(0, Math.round(blockElapsed / 60)),
+            completed: true,
+        });
+        setBlockSessionId(null);
+        setBlockQueue([]);
+        setBlockRunning(false);
+        setBlockElapsed(0);
+        setLastMark(0);
+    };
+
+    // End early: the still-open segment goes to whatever task is current.
+    const endHolisticFocus = async () => {
+        if (currentTask) await logSegment(currentTask.id);
+        await finishSession();
+    };
+
     const renderTaskRow = (task: TaskWithRelations) => {
         const isDone = task.status === "DONE";
         const isOverdue =
@@ -193,21 +335,42 @@ export function MyDayView() {
         const prio = PRIORITY_CONFIG[task.priority];
         const status = STATUS_CONFIG[task.status];
         const isPinned = pinnedTaskIds.has(task.id);
+        const isSelected = selectedIds.has(task.id);
+        const canSelect = !isDone && !blockSessionId;
         const edge = isOverdue ? "var(--bz-red)" : status?.color ?? "transparent";
 
         return (
             <li
                 key={task.id}
                 className={cn(
-                    "group relative flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-white/[0.025]",
+                    "group relative flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.025]",
                     isDone && "opacity-50",
+                    isSelected && "bg-white/[0.04]",
                 )}
             >
                 <span
                     aria-hidden
                     className="absolute left-0 top-0 h-full w-[3px]"
-                    style={{ background: edge }}
+                    style={{ background: isSelected ? "var(--bz-pink)" : edge }}
                 />
+                {canSelect && (
+                    <button
+                        type="button"
+                        onClick={() => toggleSelect(task.id)}
+                        aria-label={isSelected ? "Deselect task" : "Select for focus"}
+                        aria-pressed={isSelected}
+                        className={cn(
+                            "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-all",
+                            isSelected
+                                ? "border-transparent text-black"
+                                : "border-neutral-600 text-transparent opacity-0 hover:border-neutral-400 group-hover:opacity-100",
+                            selectedIds.size > 0 && !isSelected && "opacity-100",
+                        )}
+                        style={isSelected ? { background: "var(--bz-pink)" } : undefined}
+                    >
+                        {isSelected ? <Check className="h-3 w-3" /> : <Circle className="h-2 w-2" />}
+                    </button>
+                )}
                 <Checkbox
                     checked={isDone}
                     onCheckedChange={() => handleToggleDone(task)}
@@ -290,6 +453,21 @@ export function MyDayView() {
 
     return (
         <div className="mx-auto max-w-3xl space-y-6 p-10">
+            {blockSessionId && currentTask && (
+                <FocusBar
+                    current={currentTask}
+                    upcoming={upcomingTasks}
+                    segmentSec={Math.max(0, blockElapsed - lastMark)}
+                    totalSec={blockElapsed}
+                    running={blockRunning}
+                    busy={createTimeEntry.isPending || updateTask.isPending || endSession.isPending}
+                    onDone={completeCurrent}
+                    onSkip={upcomingTasks.length > 0 ? skipCurrent : undefined}
+                    onPause={() => setBlockRunning(false)}
+                    onResume={() => setBlockRunning(true)}
+                    onEnd={endHolisticFocus}
+                />
+            )}
             {/* ===== Header ===== */}
             <header className="flex items-end justify-between gap-6">
                 <div>
@@ -385,6 +563,47 @@ export function MyDayView() {
             {/* ===== Reflection (collapsed) ===== */}
             <ReflectionRow />
 
+            {/* ===== Multi-select → holistic focus ===== */}
+            {selectedIds.size > 0 && !blockSessionId && (
+                <div className="sticky bottom-6 z-40">
+                    <div
+                        className="mx-auto flex max-w-xl items-center justify-between gap-4 rounded-2xl border border-[color:var(--border)] bg-black/80 px-5 py-3 backdrop-blur"
+                        style={{ boxShadow: "0 16px 40px -16px rgba(0,0,0,0.8)" }}
+                    >
+                        <div className="flex items-center gap-2 text-[13px]">
+                            <span className="mono font-semibold text-white">{selectedIds.size}</span>
+                            <span className="text-neutral-400">
+                                {selectedIds.size === 1 ? "task selected" : "tasks selected"}
+                            </span>
+                            {startError && (
+                                <span className="ml-2 text-[12px]" style={{ color: "var(--bz-red)" }}>
+                                    {startError}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedIds(new Set())}
+                                className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-neutral-400 hover:text-white"
+                            >
+                                Clear
+                            </button>
+                            <button
+                                type="button"
+                                onClick={startHolisticFocus}
+                                disabled={startSession.isPending}
+                                className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold text-black transition-all disabled:opacity-50"
+                                style={{ background: "var(--bz-pink)" }}
+                            >
+                                <Play className="h-3.5 w-3.5" />
+                                {startSession.isPending ? "Starting…" : "Start focus"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {pomodoroTaskId && (
                 <PomodoroTimer
                     isOpen={!!pomodoroTaskId}
@@ -392,6 +611,139 @@ export function MyDayView() {
                     preSelectedTaskId={pomodoroTaskId}
                     preSelectedMode="pomodoro"
                 />
+            )}
+        </div>
+    );
+}
+
+// ============================================================================
+// Sticky holistic-focus bar
+// ============================================================================
+
+function fmtClock(sec: number): string {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    const mm = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return h > 0 ? `${h}:${mm}` : mm;
+}
+
+interface FocusBarProps {
+    current: TaskWithRelations;
+    upcoming: TaskWithRelations[];
+    segmentSec: number;
+    totalSec: number;
+    running: boolean;
+    busy: boolean;
+    onDone: () => void;
+    onSkip?: () => void;
+    onPause: () => void;
+    onResume: () => void;
+    onEnd: () => void;
+}
+
+function FocusBar({
+    current,
+    upcoming,
+    segmentSec,
+    totalSec,
+    running,
+    busy,
+    onDone,
+    onSkip,
+    onPause,
+    onResume,
+    onEnd,
+}: FocusBarProps) {
+    const remaining = upcoming.length + 1;
+
+    return (
+        <div
+            className="sticky top-4 z-40 rounded-2xl border bg-black/80 p-4 backdrop-blur"
+            style={{
+                borderColor: "color-mix(in oklab, var(--bz-pink) 40%, var(--border))",
+                boxShadow: "0 16px 40px -18px rgba(255,0,128,0.5)",
+            }}
+        >
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                    <Flame className="h-3.5 w-3.5" style={{ color: "var(--bz-pink)" }} />
+                    Holistic focus · {remaining} {remaining === 1 ? "task left" : "tasks left"}
+                    {!running && " · paused"}
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="mono text-[11px] text-neutral-500">total {fmtClock(totalSec)}</span>
+                    <button
+                        type="button"
+                        onClick={running ? onPause : onResume}
+                        aria-label={running ? "Pause" : "Resume"}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-2.5 py-1 text-[12px] font-medium text-neutral-300 hover:bg-white/[0.06] hover:text-white"
+                    >
+                        {running ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onEnd}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-2.5 py-1 text-[12px] font-medium text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                    >
+                        <StopCircle className="h-3.5 w-3.5" />
+                        End
+                    </button>
+                </div>
+            </div>
+
+            {/* Current task */}
+            <div className="mt-3 flex items-center gap-4">
+                <div className="min-w-0 flex-1">
+                    <div className="truncate text-[16px] font-semibold text-white">{current.title}</div>
+                    {current.project && (
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--bz-mint)" }} />
+                            {current.project.name}
+                        </div>
+                    )}
+                </div>
+                <div className="mono text-[26px] font-semibold leading-none text-white tabular-nums">
+                    {fmtClock(segmentSec)}
+                </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onDone}
+                    disabled={busy}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold text-black transition-all disabled:opacity-50"
+                    style={{ background: "var(--bz-pink)" }}
+                >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {upcoming.length > 0 ? "Done · next" : "Done · finish"}
+                </button>
+                {onSkip && (
+                    <button
+                        type="button"
+                        onClick={onSkip}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 py-2 text-[13px] font-medium text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                    >
+                        Skip
+                    </button>
+                )}
+            </div>
+
+            {upcoming.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-1.5 border-t border-[color:var(--border)] pt-3">
+                    {upcoming.map((task, i) => (
+                        <li
+                            key={task.id}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--border)] px-2.5 py-1 text-[11px] text-neutral-400"
+                        >
+                            <span className="mono text-neutral-600">{i + 1}</span>
+                            <span className="max-w-[180px] truncate">{task.title}</span>
+                        </li>
+                    ))}
+                </ul>
             )}
         </div>
     );
