@@ -95,21 +95,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return token;
         },
     },
-    events: {
-        async createUser({ user }) {
-            if (!user.id) return;
-            const createdUser = {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-            };
-
-            await db.$transaction(async (tx) => {
-                await ensurePersonalWorkspace(tx, createdUser);
-                await acceptPendingInvitesForUser(tx, createdUser);
-            });
-        },
-    },
     pages: {
         signIn: "/login",
     },

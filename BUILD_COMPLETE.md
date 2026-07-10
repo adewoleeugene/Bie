@@ -126,7 +126,10 @@ This will create:
 4. Click "Create Credentials" → "OAuth 2.0 Client ID"
 5. Configure OAuth consent screen if prompted
 6. Application type: "Web application"
-7. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+7. Add authorized redirect URIs:
+   - `http://localhost:3004/api/auth/callback/google`
+   - `https://trybie.space/api/auth/callback/google`
+   - `https://getbie.space/api/auth/callback/google`
 8. Copy the Client ID and Client Secret
 
 Update `.env`:
@@ -134,7 +137,8 @@ Update `.env`:
 GOOGLE_CLIENT_ID="your-google-client-id-here"
 GOOGLE_CLIENT_SECRET="your-google-client-secret-here"
 NEXTAUTH_SECRET="generate-a-random-secret-here"
-NEXTAUTH_URL="http://localhost:3000"
+AUTH_URL="http://localhost:3004"
+AUTH_TRUST_HOST="true"
 ```
 
 To generate a secure NEXTAUTH_SECRET:
@@ -148,7 +152,7 @@ openssl rand -base64 32
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with Google!
+Open [http://localhost:3004](http://localhost:3004) and sign in with Google!
 
 ## 🎯 What You Can Do
 
