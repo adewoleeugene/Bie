@@ -6,6 +6,7 @@ import {
     getTask,
     createTask,
     updateTask,
+    markTaskInProgressForFocus,
     deleteTask,
     reorderTask,
     bulkReorderTasks,
@@ -102,6 +103,19 @@ export function useCreateTask() {
         },
         onError: () => {
             toast.error("Failed to create task");
+        },
+    });
+}
+
+export function useMarkTaskInProgressForFocus() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (taskId: string) => markTaskInProgressForFocus(taskId),
+        onSuccess: (result) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            }
         },
     });
 }

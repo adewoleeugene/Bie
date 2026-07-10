@@ -427,6 +427,7 @@ model Task {
   priority       TaskPriority @default(P2)
   dueDate        DateTime?
   startDate      DateTime?
+  completedAt    DateTime?
   estimatedHours Float?
   labels         String[]     @default([])
   sortOrder      Int          @default(0)

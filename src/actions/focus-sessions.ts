@@ -7,6 +7,7 @@ import { FocusSession, FocusSessionType, OrgRole, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
 import { taskAccessWhere } from "@/lib/permissions";
+import { markTaskInProgressForFocus } from "@/actions/task";
 
 type FocusViewer = { userId: string; organizationId: string; role: OrgRole };
 
@@ -112,6 +113,11 @@ export async function startFocusSession(
                 task: true,
             },
         });
+
+        // Starting focus on a task moves it to In Progress on the board.
+        if (session.taskId) {
+            await markTaskInProgressForFocus(session.taskId);
+        }
 
         revalidatePath("/focus");
         return { success: true, data: session };
