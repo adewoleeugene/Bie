@@ -449,7 +449,7 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
                 </DropdownMenu>
             </div>
 
-            <div className="scrollbar-thin flex min-h-0 flex-1 gap-4 overflow-x-auto px-6 py-5">
+            <div className="scrollbar-thin flex min-h-0 flex-1 items-start gap-4 overflow-auto px-6 py-5">
                 {columns.map((column) => (
                     <KanbanColumn
                         key={column.id}

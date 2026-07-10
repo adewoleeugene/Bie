@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createTaskSchema, CreateTaskInput } from "@/lib/validators/task";
 import { useCreateTask, useTaskStatusColumns } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
+import { useSquads } from "@/hooks/use-squads";
 import { useProjects } from "@/hooks/use-projects";
 import { useSprints } from "@/hooks/use-sprints";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,7 @@ export function TaskForm({
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
     const createTask = useCreateTask();
     const { data: members } = useMembers();
+    const { data: squads } = useSquads();
     const { data: projects } = useProjects();
     const { data: statusColumnsResult } = useTaskStatusColumns(initialProjectId ?? null);
 
@@ -185,6 +187,15 @@ export function TaskForm({
         } else {
             form.setValue("assigneeIds", [...current, userId]);
         }
+    };
+
+    // Assigning a squad is a shortcut that adds all of its members as assignees.
+    const assignSquad = (squad: { members?: { userId?: string; user?: { id?: string } }[] }) => {
+        const memberIds = (squad.members || [])
+            .map((m) => m.userId || m.user?.id)
+            .filter((id): id is string => Boolean(id));
+        const current = form.getValues("assigneeIds") || [];
+        form.setValue("assigneeIds", Array.from(new Set([...current, ...memberIds])));
     };
 
     return (
@@ -408,10 +419,39 @@ export function TaskForm({
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[280px] p-0" align="start">
                                             <Command>
-                                                <CommandInput placeholder="Search members..." />
+                                                <CommandInput placeholder="Search people or squads..." />
                                                 <CommandList>
-                                                    <CommandEmpty>No member found.</CommandEmpty>
-                                                    <CommandGroup>
+                                                    <CommandEmpty>No match found.</CommandEmpty>
+                                                    {squads && squads.length > 0 && (
+                                                        <CommandGroup heading="Squads">
+                                                            {squads.map((squad: any) => {
+                                                                const memberIds = (squad.members || [])
+                                                                    .map((m: any) => m.userId || m.user?.id)
+                                                                    .filter(Boolean);
+                                                                const allSelected =
+                                                                    memberIds.length > 0 &&
+                                                                    memberIds.every((id: string) => selectedAssigneeIds?.includes(id));
+                                                                return (
+                                                                    <CommandItem
+                                                                        key={squad.id}
+                                                                        value={`squad ${squad.name}`}
+                                                                        onSelect={() => assignSquad(squad)}
+                                                                        className="gap-2"
+                                                                    >
+                                                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted/60 dark:bg-muted/40">
+                                                                            <Users className="h-3 w-3" />
+                                                                        </span>
+                                                                        <span className="flex-1 truncate">{squad.name}</span>
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {memberIds.length}
+                                                                        </span>
+                                                                        {allSelected && <Check className="h-4 w-4" />}
+                                                                    </CommandItem>
+                                                                );
+                                                            })}
+                                                        </CommandGroup>
+                                                    )}
+                                                    <CommandGroup heading={squads && squads.length > 0 ? "People" : undefined}>
                                                         {members?.map((member) => {
                                                             const isSelected = selectedAssigneeIds?.includes(member.id);
                                                             return (

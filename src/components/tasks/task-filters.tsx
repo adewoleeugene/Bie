@@ -25,13 +25,15 @@ import {
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Filter, X, Plus, Calendar, UserCircle, Flag, CircleDot, Check } from "lucide-react";
+import { Filter, X, Plus, Calendar, UserCircle, Flag, CircleDot, Check, Users } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
+import { useSquads } from "@/hooks/use-squads";
 
 export interface TaskFilters {
     statuses: string[];
     priorities: string[];
     assigneeIds: string[];
+    squadIds?: string[];
     dateRange: {
         from?: string;
         to?: string;
@@ -42,6 +44,7 @@ const EMPTY_FILTERS: TaskFilters = {
     statuses: [],
     priorities: [],
     assigneeIds: [],
+    squadIds: [],
     dateRange: {},
 };
 
@@ -63,20 +66,24 @@ const PRIORITY_OPTIONS = [
 interface TaskFiltersBarProps {
     filters: TaskFilters;
     onFiltersChange: (filters: TaskFilters) => void;
+    /** Show a "Squad" filter (tasks assigned to anyone in the squad). */
+    showSquadFilter?: boolean;
 }
 
-export function TaskFiltersBar({ filters, onFiltersChange }: TaskFiltersBarProps) {
+export function TaskFiltersBar({ filters, onFiltersChange, showSquadFilter = false }: TaskFiltersBarProps) {
     const { data: members } = useMembers();
+    const { data: squads } = useSquads();
     const [filterMenuOpen, setFilterMenuOpen] = useState(false);
 
     const activeFilterCount =
         filters.statuses.length +
         filters.priorities.length +
         filters.assigneeIds.length +
+        (filters.squadIds?.length ?? 0) +
         (filters.dateRange.from || filters.dateRange.to ? 1 : 0);
 
-    const toggleArrayFilter = (key: "statuses" | "priorities" | "assigneeIds", value: string) => {
-        const current = filters[key];
+    const toggleArrayFilter = (key: "statuses" | "priorities" | "assigneeIds" | "squadIds", value: string) => {
+        const current = filters[key] ?? [];
         const updated = current.includes(value)
             ? current.filter((v) => v !== value)
             : [...current, value];
@@ -199,6 +206,51 @@ export function TaskFiltersBar({ filters, onFiltersChange }: TaskFiltersBarProps
                         </Command>
                     </div>
 
+                    {/* Squad Filter */}
+                    {showSquadFilter && (
+                        <div className="p-3 border-b">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-xs font-medium">Squad</span>
+                                {(filters.squadIds?.length ?? 0) > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                        {filters.squadIds!.length} selected
+                                    </span>
+                                )}
+                            </div>
+                            {squads && squads.length > 0 ? (
+                                <Command className="rounded-md border">
+                                    <CommandInput placeholder="Search squads..." className="h-8 text-xs" />
+                                    <CommandList className="max-h-[160px]">
+                                        <CommandEmpty>No squad found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {squads.map((squad: any) => {
+                                                const isActive = filters.squadIds?.includes(squad.id) ?? false;
+                                                return (
+                                                    <CommandItem
+                                                        key={squad.id}
+                                                        value={squad.name}
+                                                        onSelect={() => toggleArrayFilter("squadIds", squad.id)}
+                                                        className="gap-2 text-xs"
+                                                    >
+                                                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        <span className="flex-1 truncate">{squad.name}</span>
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            {squad.members?.length ?? 0}
+                                                        </span>
+                                                        {isActive && <Check className="h-4 w-4 text-primary" />}
+                                                    </CommandItem>
+                                                );
+                                            })}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            ) : (
+                                <p className="text-[11px] text-muted-foreground">No squads yet.</p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Date Range Filter */}
                     <div className="p-3 border-b">
                         <div className="flex items-center gap-2 mb-2">
@@ -282,6 +334,18 @@ export function TaskFiltersBar({ filters, onFiltersChange }: TaskFiltersBarProps
                     </Badge>
                 );
             })}
+            {filters.squadIds?.map((id) => {
+                const squad = squads?.find((s: any) => s.id === id);
+                return (
+                    <Badge key={id} variant="secondary" className="gap-1 h-6 text-[11px] pl-1.5 pr-1">
+                        <Users className="h-3 w-3" />
+                        {squad?.name || "Squad"}
+                        <button onClick={() => toggleArrayFilter("squadIds", id)} className="ml-0.5 hover:text-red-500">
+                            <X className="h-3 w-3" />
+                        </button>
+                    </Badge>
+                );
+            })}
             {(filters.dateRange.from || filters.dateRange.to) && (
                 <Badge variant="secondary" className="gap-1 h-6 text-[11px] pl-1.5 pr-1">
                     <Calendar className="h-3 w-3" />
@@ -304,8 +368,18 @@ export function TaskFiltersBar({ filters, onFiltersChange }: TaskFiltersBarProps
     );
 }
 
-/** Utility: apply filters to a task array client-side */
-export function applyTaskFilters(tasks: any[], filters: TaskFilters): any[] {
+/**
+ * Utility: apply filters to a task array client-side.
+ *
+ * `squadMembers` maps a squadId to the userIds of its members. It's required to
+ * resolve the squad filter (tasks have no direct squad relation — a task matches
+ * a squad when one of its assignees belongs to that squad).
+ */
+export function applyTaskFilters(
+    tasks: any[],
+    filters: TaskFilters,
+    squadMembers?: Record<string, string[]>,
+): any[] {
     return tasks.filter((task) => {
         // Status filter
         if (filters.statuses.length > 0 && !filters.statuses.includes(task.status)) {
@@ -321,6 +395,14 @@ export function applyTaskFilters(tasks: any[], filters: TaskFilters): any[] {
         if (filters.assigneeIds.length > 0) {
             const taskAssigneeIds = task.assignees?.map((a: any) => a.userId || a.user?.id || a.id) || [];
             const hasMatch = filters.assigneeIds.some((id) => taskAssigneeIds.includes(id));
+            if (!hasMatch) return false;
+        }
+
+        // Squad filter — match tasks assigned to anyone in a selected squad
+        if (filters.squadIds && filters.squadIds.length > 0 && squadMembers) {
+            const taskAssigneeIds = task.assignees?.map((a: any) => a.userId || a.user?.id || a.id) || [];
+            const squadUserIds = filters.squadIds.flatMap((id) => squadMembers[id] ?? []);
+            const hasMatch = taskAssigneeIds.some((id: string) => squadUserIds.includes(id));
             if (!hasMatch) return false;
         }
 

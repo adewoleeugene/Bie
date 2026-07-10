@@ -6,6 +6,7 @@ import { SmartTaskInput } from "@/components/tasks/smart-task-input";
 import { TaskFiltersBar, applyTaskFilters, TaskFilters } from "@/components/tasks/task-filters";
 import { useTasks } from "@/hooks/use-tasks";
 import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
+import { useSquads } from "@/hooks/use-squads";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, CheckCircle2, ExternalLink, Download, Plus } from "lucide-react";
@@ -44,7 +45,15 @@ export default function BoardPage() {
     const { data: tasks, isLoading: tasksLoading } = useTasks(projectId, { sprintId: sprintId || undefined });
     const { data: sprints, isLoading: sprintsLoading } = useSprints(projectId);
     const { data: sprint, isLoading: sprintLoading } = useSprint(sprintId || "");
+    const { data: squads } = useSquads();
     const completeSprint = useCompleteSprint();
+
+    // Map each squad to its members' userIds so the squad filter can match tasks
+    // by assignee (tasks have no direct squad relation).
+    const squadMembers = (squads || []).reduce<Record<string, string[]>>((acc, squad: any) => {
+        acc[squad.id] = (squad.members || []).map((m: any) => m.userId || m.user?.id).filter(Boolean);
+        return acc;
+    }, {});
 
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [showSprintDialog, setShowSprintDialog] = useState(false);
@@ -54,6 +63,7 @@ export default function BoardPage() {
         statuses: [],
         priorities: [],
         assigneeIds: [],
+        squadIds: [],
         dateRange: {},
     });
 
@@ -214,7 +224,7 @@ export default function BoardPage() {
 
                         <button
                             type="button"
-                            onClick={() => exportTasksToCSV(applyTaskFilters(tasks || [], taskFilters))}
+                            onClick={() => exportTasksToCSV(applyTaskFilters(tasks || [], taskFilters, squadMembers))}
                             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[color:var(--border)] px-3 text-[12px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.04] hover:text-white"
                         >
                             <Download className="h-3.5 w-3.5" />
@@ -229,7 +239,7 @@ export default function BoardPage() {
                     <div className="min-w-0 flex-1">
                         <SmartTaskInput projectId={projectId} sprintId={sprintId || undefined} />
                     </div>
-                    <TaskFiltersBar filters={taskFilters} onFiltersChange={setTaskFilters} />
+                    <TaskFiltersBar filters={taskFilters} onFiltersChange={setTaskFilters} showSquadFilter />
                 </div>
             </header>
             <div className="flex-1 overflow-hidden">
@@ -244,7 +254,7 @@ export default function BoardPage() {
                     </div>
                 ) : (
                     <KanbanBoard
-                        tasks={applyTaskFilters(tasks || [], taskFilters)}
+                        tasks={applyTaskFilters(tasks || [], taskFilters, squadMembers)}
                         projectId={projectId}
                         sprintId={sprintId || undefined}
                     />
