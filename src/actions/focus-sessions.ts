@@ -214,6 +214,92 @@ export async function endFocusSession(
     }
 }
 
+export interface LogCompletedFocusSessionInput {
+    taskId?: string | null;
+    type: FocusSessionType;
+    /** ISO timestamps for the segment that just finished. */
+    startedAt: string;
+    endedAt: string;
+    durationMinutes: number;
+    pomodoroCount?: number;
+    notes?: string | null;
+}
+
+/**
+ * Record an already-finished focus session (endedAt set) plus its time entry.
+ * Used by Today's holistic focus, which runs its timer client-side. Because
+ * the session is closed on creation, the global Pomodoro widget — which only
+ * adopts *open* sessions — never surfaces, while focus stats and the daily
+ * streak still count this time.
+ */
+export async function logCompletedFocusSession(
+    input: LogCompletedFocusSessionInput
+): Promise<ActionResult<FocusSession>> {
+    try {
+        const viewer = await getUserOrganization();
+        const { userId } = viewer;
+
+        if (input.taskId) {
+            const task = await db.task.findFirst({
+                where: {
+                    id: input.taskId,
+                    ...taskAccessWhere({
+                        userId,
+                        organizationId: viewer.organizationId,
+                        orgRole: viewer.role,
+                    }),
+                },
+                select: { id: true },
+            });
+            if (!task) return { success: false, error: "Task not found" };
+        }
+
+        const startedAt = new Date(input.startedAt);
+        const endedAt = new Date(input.endedAt);
+        const duration = Math.max(0, Math.round(input.durationMinutes));
+
+        const session = await db.focusSession.create({
+            data: {
+                userId,
+                taskId: input.taskId || null,
+                type: input.type,
+                notes: input.notes || null,
+                startedAt,
+                endedAt,
+                duration,
+                pomodoroCount: Math.max(0, input.pomodoroCount ?? 0),
+                completed: true,
+            },
+            include: { task: true },
+        });
+
+        // Mirror endFocusSession: log the time to the task's ledger too.
+        if (input.taskId && duration > 0) {
+            await db.timeEntry.create({
+                data: {
+                    userId,
+                    taskId: input.taskId,
+                    startedAt,
+                    endedAt,
+                    duration,
+                    description: `Focus session: ${input.type === "POMODORO" ? "Pomodoro" : "Free focus"}`,
+                    source: "FOCUS_SESSION",
+                },
+            });
+        }
+
+        revalidatePath("/focus");
+        revalidatePath("/time-tracking");
+        return { success: true, data: session };
+    } catch (error) {
+        console.error("Log completed focus session error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to log focus session",
+        };
+    }
+}
+
 export async function getActiveFocusSession(): Promise<FocusSession | null> {
     try {
         const viewer = await getUserOrganization();
