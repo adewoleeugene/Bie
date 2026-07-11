@@ -27,8 +27,8 @@ import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
 import { AIPlanPicker } from "@/components/daily-planner/ai-plan-picker";
 import { useDailyReflection, useUpsertReflection } from "@/hooks/use-reflections";
 import { useTasks, useUpdateTask, useMarkTaskInProgressForFocus } from "@/hooks/use-tasks";
-import { useFocusStats } from "@/hooks/use-focus-sessions";
-import { useTimeTrackingStats, useCreateTimeEntry } from "@/hooks/use-time-entries";
+import { useFocusStats, useLogFocusSession } from "@/hooks/use-focus-sessions";
+import { useTimeTrackingStats } from "@/hooks/use-time-entries";
 
 // ----- config -------------------------------------------------------------
 
@@ -131,7 +131,7 @@ export function MyDayView() {
     const { data: timeStats } = useTimeTrackingStats();
     const updateTask = useUpdateTask();
 
-    const createTimeEntry = useCreateTimeEntry();
+    const logFocusSession = useLogFocusSession();
     const markInProgress = useMarkTaskInProgressForFocus();
 
     const [showCompleted, setShowCompleted] = useState(false);
@@ -332,19 +332,22 @@ export function MyDayView() {
     const currentTask = blockTasks[0] ?? null;
     const upcomingTasks = blockTasks.slice(1);
 
-    // Log the current task's segment (lastMark → blockElapsed) to Hours.
+    // Log the current task's segment (lastMark → blockElapsed) as a completed
+    // focus session — feeds the streak + focus stats, and writes the Hours
+    // entry too. No open session is created, so the global timer stays quiet.
     const logSegment = async (taskId: string) => {
         const seconds = Math.max(0, blockElapsed - lastMark);
         const minutes = Math.round(seconds / 60);
         if (minutes < 1) return; // don't log sub-minute noise
         const endedAt = new Date();
         const startedAt = new Date(endedAt.getTime() - seconds * 1000);
-        await createTimeEntry.mutateAsync({
+        await logFocusSession.mutateAsync({
             taskId,
+            type: blockMode === "pomodoro" ? "POMODORO" : "FREE",
             startedAt: startedAt.toISOString(),
             endedAt: endedAt.toISOString(),
-            duration: minutes,
-            description: "Holistic focus",
+            durationMinutes: minutes,
+            pomodoroCount: blockMode === "pomodoro" ? Math.round(minutes / workMin) : 0,
         });
     };
 
@@ -597,7 +600,7 @@ export function MyDayView() {
                     segmentSec={Math.max(0, blockElapsed - lastMark)}
                     totalSec={blockElapsed}
                     running={blockRunning}
-                    busy={createTimeEntry.isPending || updateTask.isPending}
+                    busy={logFocusSession.isPending || updateTask.isPending}
                     onDone={completeCurrent}
                     onSkip={skipCurrent}
                     onSkipBreak={skipBreak}
