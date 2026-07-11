@@ -13,6 +13,9 @@ import {
     Pause,
     StopCircle,
     Flame,
+    Coffee,
+    Settings2,
+    SkipForward,
     Circle,
     Check,
     Sparkles,
@@ -28,6 +31,25 @@ import { useFocusStats } from "@/hooks/use-focus-sessions";
 import { useTimeTrackingStats, useCreateTimeEntry } from "@/hooks/use-time-entries";
 
 // ----- config -------------------------------------------------------------
+
+// Pomodoro durations are shared with the per-task timer via these localStorage
+// keys, so a change in one place applies everywhere.
+const WORK_KEY = "pomodoro-work";
+const BREAK_KEY = "pomodoro-short-break";
+const LONG_BREAK_KEY = "pomodoro-long-break";
+const DEFAULT_WORK_MIN = 25;
+const DEFAULT_BREAK_MIN = 5;
+const DEFAULT_LONG_BREAK_MIN = 15;
+const MAX_WORK_MIN = 120;
+const MAX_BREAK_MIN = 60;
+const MAX_LONG_BREAK_MIN = 60;
+const POMODOROS_BEFORE_LONG = 4; // long break after every 4 focus rounds
+
+function readDurationSetting(key: string, fallback: number): number {
+    if (typeof window === "undefined") return fallback;
+    const stored = parseInt(localStorage.getItem(key) || "", 10);
+    return Number.isFinite(stored) && stored > 0 ? stored : fallback;
+}
 
 const PRIORITY_CONFIG: Record<
     string,
@@ -138,14 +160,77 @@ export function MyDayView() {
     const [blockActive, setBlockActive] = useState(false);
     const [blockQueue, setBlockQueue] = useState<string[]>([]); // queue[0] = current
     const [blockRunning, setBlockRunning] = useState(false);
-    const [blockElapsed, setBlockElapsed] = useState(0); // total active seconds
+    const [blockElapsed, setBlockElapsed] = useState(0); // focused seconds (work only)
     const [lastMark, setLastMark] = useState(0); // blockElapsed when current task began
+    // User-editable Pomodoro durations (persisted, shared with the per-task timer).
+    const [workMin, setWorkMin] = useState(() => readDurationSetting(WORK_KEY, DEFAULT_WORK_MIN));
+    const [breakMin, setBreakMin] = useState(() => readDurationSetting(BREAK_KEY, DEFAULT_BREAK_MIN));
+    const [longBreakMin, setLongBreakMin] = useState(() => readDurationSetting(LONG_BREAK_KEY, DEFAULT_LONG_BREAK_MIN));
+    const workSecRef = useRef(workMin * 60);
+    const breakSecRef = useRef(breakMin * 60);
+    const longBreakSecRef = useRef(longBreakMin * 60);
+    useEffect(() => { workSecRef.current = workMin * 60; }, [workMin]);
+    useEffect(() => { breakSecRef.current = breakMin * 60; }, [breakMin]);
+    useEffect(() => { longBreakSecRef.current = longBreakMin * 60; }, [longBreakMin]);
+    // Count of completed focus rounds — every 4th break is a long one.
+    const pomodoroCountRef = useRef(0);
+    const [breakKind, setBreakKind] = useState<"short" | "long">("short");
+
+    const setDuration = (
+        key: string,
+        minutes: number,
+        setter: (n: number) => void,
+        max: number,
+    ) => {
+        const clamped = Math.max(1, Math.min(max, Math.round(minutes) || 1));
+        setter(clamped);
+        try {
+            localStorage.setItem(key, String(clamped));
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const [showPomoSettings, setShowPomoSettings] = useState(false);
+
+    // Pomodoro rhythm — runs across the whole block; tasks switch underneath it.
+    const [blockMode, setBlockMode] = useState<"pomodoro" | "free">("pomodoro");
+    const [phase, setPhase] = useState<"work" | "break">("work");
+    const [phaseRemaining, setPhaseRemaining] = useState(workMin * 60);
+    const phaseRef = useRef<"work" | "break">("work");
+    const remainingRef = useRef(workMin * 60);
+    const modeRef = useRef<"pomodoro" | "free">("pomodoro");
     const blockTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
-        if (blockRunning) {
-            blockTickRef.current = setInterval(() => setBlockElapsed((s) => s + 1), 1000);
-        }
+        if (!blockRunning) return;
+        blockTickRef.current = setInterval(() => {
+            if (modeRef.current === "free") {
+                setBlockElapsed((s) => s + 1);
+                return;
+            }
+            // Pomodoro: count down the phase; focus seconds accrue in "work".
+            const next = remainingRef.current - 1;
+            if (next <= 0) {
+                if (phaseRef.current === "work") {
+                    pomodoroCountRef.current += 1;
+                    const isLong = pomodoroCountRef.current % POMODOROS_BEFORE_LONG === 0;
+                    phaseRef.current = "break";
+                    remainingRef.current = isLong ? longBreakSecRef.current : breakSecRef.current;
+                    setBreakKind(isLong ? "long" : "short");
+                    setPhase("break");
+                } else {
+                    phaseRef.current = "work";
+                    remainingRef.current = workSecRef.current;
+                    setPhase("work");
+                }
+                setPhaseRemaining(remainingRef.current);
+            } else {
+                remainingRef.current = next;
+                if (phaseRef.current === "work") setBlockElapsed((s) => s + 1);
+                setPhaseRemaining(next);
+            }
+        }, 1000);
         return () => {
             if (blockTickRef.current) clearInterval(blockTickRef.current);
         };
@@ -263,9 +348,17 @@ export function MyDayView() {
         });
     };
 
-    const startHolisticFocus = () => {
+    const startHolisticFocus = (mode: "pomodoro" | "free") => {
         if (blockActive || selectedIds.size === 0) return;
         const queue = [...selectedIds];
+        modeRef.current = mode;
+        phaseRef.current = "work";
+        remainingRef.current = workMin * 60;
+        pomodoroCountRef.current = 0;
+        setBreakKind("short");
+        setBlockMode(mode);
+        setPhase("work");
+        setPhaseRemaining(workMin * 60);
         setBlockActive(true);
         setBlockQueue(queue);
         setBlockElapsed(0);
@@ -312,6 +405,21 @@ export function MyDayView() {
         setBlockRunning(false);
         setBlockElapsed(0);
         setLastMark(0);
+        phaseRef.current = "work";
+        remainingRef.current = workMin * 60;
+        pomodoroCountRef.current = 0;
+        setBreakKind("short");
+        setPhase("work");
+        setPhaseRemaining(workMin * 60);
+    };
+
+    // Skip the current break → jump straight back to a fresh focus round.
+    const skipBreak = () => {
+        if (phaseRef.current !== "break") return;
+        phaseRef.current = "work";
+        remainingRef.current = workMin * 60;
+        setPhase("work");
+        setPhaseRemaining(workMin * 60);
     };
 
     // End early: the still-open segment goes to whatever task is current.
@@ -482,12 +590,17 @@ export function MyDayView() {
                 <FocusBar
                     current={currentTask}
                     upcoming={upcomingTasks}
+                    mode={blockMode}
+                    phase={phase}
+                    breakKind={breakKind}
+                    phaseRemaining={phaseRemaining}
                     segmentSec={Math.max(0, blockElapsed - lastMark)}
                     totalSec={blockElapsed}
                     running={blockRunning}
                     busy={createTimeEntry.isPending || updateTask.isPending}
                     onDone={completeCurrent}
                     onSkip={skipCurrent}
+                    onSkipBreak={skipBreak}
                     onPause={() => setBlockRunning(false)}
                     onResume={() => setBlockRunning(true)}
                     onEnd={endHolisticFocus}
@@ -591,6 +704,56 @@ export function MyDayView() {
             {/* ===== Multi-select → holistic focus ===== */}
             {selectedIds.size > 0 && !blockActive && (
                 <div className="sticky bottom-6 z-40">
+                    {blockMode === "pomodoro" && showPomoSettings && (
+                        <div className="mx-auto mb-2 flex max-w-xl items-center gap-5 rounded-2xl border border-[color:var(--border)] bg-black/80 px-5 py-3 text-[12px] text-neutral-300 backdrop-blur">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                                Timing
+                            </span>
+                            <label className="flex items-center gap-2">
+                                Focus
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={MAX_WORK_MIN}
+                                    value={workMin}
+                                    onChange={(e) =>
+                                        setDuration(WORK_KEY, parseInt(e.target.value) || DEFAULT_WORK_MIN, setWorkMin, MAX_WORK_MIN)
+                                    }
+                                    className="mono w-14 rounded-md border border-[color:var(--border)] bg-white/[0.04] px-2 py-1 text-center text-white outline-none focus:ring-1 focus:ring-[var(--bz-pink)]"
+                                />
+                                min
+                            </label>
+                            <label className="flex items-center gap-2">
+                                Break
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={MAX_BREAK_MIN}
+                                    value={breakMin}
+                                    onChange={(e) =>
+                                        setDuration(BREAK_KEY, parseInt(e.target.value) || DEFAULT_BREAK_MIN, setBreakMin, MAX_BREAK_MIN)
+                                    }
+                                    className="mono w-14 rounded-md border border-[color:var(--border)] bg-white/[0.04] px-2 py-1 text-center text-white outline-none focus:ring-1 focus:ring-[var(--bz-pink)]"
+                                />
+                                min
+                            </label>
+                            <label className="flex items-center gap-2">
+                                Long break
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={MAX_LONG_BREAK_MIN}
+                                    value={longBreakMin}
+                                    onChange={(e) =>
+                                        setDuration(LONG_BREAK_KEY, parseInt(e.target.value) || DEFAULT_LONG_BREAK_MIN, setLongBreakMin, MAX_LONG_BREAK_MIN)
+                                    }
+                                    className="mono w-14 rounded-md border border-[color:var(--border)] bg-white/[0.04] px-2 py-1 text-center text-white outline-none focus:ring-1 focus:ring-[var(--bz-pink)]"
+                                />
+                                min
+                            </label>
+                            <span className="text-[11px] text-neutral-500">every {POMODOROS_BEFORE_LONG}</span>
+                        </div>
+                    )}
                     <div
                         className="mx-auto flex max-w-xl items-center justify-between gap-4 rounded-2xl border border-[color:var(--border)] bg-black/80 px-5 py-3 backdrop-blur"
                         style={{ boxShadow: "0 16px 40px -16px rgba(0,0,0,0.8)" }}
@@ -602,6 +765,38 @@ export function MyDayView() {
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
+                            {/* Pomodoro / Free toggle */}
+                            <div className="flex items-center rounded-lg border border-[color:var(--border)] p-0.5">
+                                {(["pomodoro", "free"] as const).map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setBlockMode(m)}
+                                        className={cn(
+                                            "rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-colors",
+                                            blockMode === m
+                                                ? "bg-white/[0.1] text-white"
+                                                : "text-neutral-500 hover:text-neutral-300",
+                                        )}
+                                    >
+                                        {m}
+                                    </button>
+                                ))}
+                            </div>
+                            {blockMode === "pomodoro" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPomoSettings((s) => !s)}
+                                    aria-label="Pomodoro timing"
+                                    aria-pressed={showPomoSettings}
+                                    className={cn(
+                                        "rounded-lg border border-[color:var(--border)] p-1.5 transition-colors hover:bg-white/[0.06] hover:text-white",
+                                        showPomoSettings ? "text-white bg-white/[0.06]" : "text-neutral-400",
+                                    )}
+                                >
+                                    <Settings2 className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setSelectedIds(new Set())}
@@ -611,7 +806,7 @@ export function MyDayView() {
                             </button>
                             <button
                                 type="button"
-                                onClick={startHolisticFocus}
+                                onClick={() => startHolisticFocus(blockMode)}
                                 className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold text-black transition-all"
                                 style={{ background: "var(--bz-pink)" }}
                             >
@@ -650,12 +845,17 @@ function fmtClock(sec: number): string {
 interface FocusBarProps {
     current: TaskWithRelations;
     upcoming: TaskWithRelations[];
+    mode: "pomodoro" | "free";
+    phase: "work" | "break";
+    breakKind: "short" | "long";
+    phaseRemaining: number;
     segmentSec: number;
     totalSec: number;
     running: boolean;
     busy: boolean;
     onDone: () => void;
     onSkip?: () => void;
+    onSkipBreak: () => void;
     onPause: () => void;
     onResume: () => void;
     onEnd: () => void;
@@ -664,17 +864,27 @@ interface FocusBarProps {
 function FocusBar({
     current,
     upcoming,
+    mode,
+    phase,
+    breakKind,
+    phaseRemaining,
     segmentSec,
     totalSec,
     running,
     busy,
     onDone,
     onSkip,
+    onSkipBreak,
     onPause,
     onResume,
     onEnd,
 }: FocusBarProps) {
     const remaining = upcoming.length + 1;
+    const onBreak = mode === "pomodoro" && phase === "break";
+    const bigTimer = mode === "pomodoro" ? fmtClock(phaseRemaining) : fmtClock(segmentSec);
+    const timerLabel =
+        mode !== "pomodoro" ? "Elapsed" : onBreak ? (breakKind === "long" ? "Long break" : "Break") : "Focus";
+    const accent = onBreak ? "var(--bz-mint)" : "var(--bz-pink)";
 
     return (
         <div
@@ -723,8 +933,35 @@ function FocusBar({
                         </div>
                     )}
                 </div>
-                <div className="mono text-[26px] font-semibold leading-none text-white tabular-nums">
-                    {fmtClock(segmentSec)}
+                <div className="flex flex-col items-end">
+                    <span
+                        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+                        style={{ color: mode === "pomodoro" ? accent : "var(--muted-foreground, #737373)" }}
+                    >
+                        {onBreak ? <Coffee className="h-3 w-3" /> : <Flame className="h-3 w-3" />}
+                        {timerLabel}
+                    </span>
+                    <span
+                        className="mono text-[26px] font-semibold leading-none tabular-nums"
+                        style={{ color: onBreak ? "var(--bz-mint)" : "#fff" }}
+                    >
+                        {bigTimer}
+                    </span>
+                    {mode === "pomodoro" && !onBreak && (
+                        <span className="mono mt-1 text-[10px] text-neutral-500">
+                            {fmtClock(segmentSec)} on this task
+                        </span>
+                    )}
+                    {onBreak && (
+                        <button
+                            type="button"
+                            onClick={onSkipBreak}
+                            className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-[color:var(--border)] px-2 py-1 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        >
+                            <SkipForward className="h-3 w-3" />
+                            Skip break
+                        </button>
+                    )}
                 </div>
             </div>
 
