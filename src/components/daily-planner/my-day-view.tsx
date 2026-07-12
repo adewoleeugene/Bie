@@ -19,12 +19,11 @@ import {
     Circle,
     Check,
     Sparkles,
-    Star,
     ChevronDown,
     Notebook,
 } from "lucide-react";
 import { PomodoroTimer } from "@/components/focus/pomodoro-timer";
-import { AIPlanPicker } from "@/components/daily-planner/ai-plan-picker";
+import { FocusAIStrip } from "@/components/focus/focus-ai-strip";
 import { useDailyReflection, useUpsertReflection } from "@/hooks/use-reflections";
 import { useTasks, useUpdateTask, useMarkTaskInProgressForFocus } from "@/hooks/use-tasks";
 import { useFocusStats, useLogFocusSession } from "@/hooks/use-focus-sessions";
@@ -88,11 +87,6 @@ interface TaskWithRelations {
     estimatedHours?: number | null;
     project?: { id: string; name: string } | null;
     assignees?: { user: { id: string; name: string; image?: string | null } }[];
-}
-
-function getDailyPlanKey(): string {
-    const d = new Date();
-    return `daily-plan-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 // ----- small UI primitives ------------------------------------------------
@@ -236,26 +230,6 @@ export function MyDayView() {
         };
     }, [blockRunning]);
 
-    // Optional AI helper: pinned tasks sort to the top — never a gate.
-    const [pinnedTaskIds, setPinnedTaskIds] = useState<Set<string>>(() => {
-        if (typeof window === "undefined") return new Set();
-        try {
-            const stored = localStorage.getItem(getDailyPlanKey());
-            return stored ? new Set(JSON.parse(stored)) : new Set();
-        } catch {
-            return new Set();
-        }
-    });
-
-    const pinTasks = (ids: string[]) => {
-        setPinnedTaskIds((prev) => {
-            const next = new Set(prev);
-            for (const id of ids) next.add(id);
-            localStorage.setItem(getDailyPlanKey(), JSON.stringify([...next]));
-            return next;
-        });
-    };
-
     // Captured once on mount — stable across renders so the memos below don't churn.
     const today = useMemo(() => new Date(), []);
     const todayStart = useMemo(
@@ -296,10 +270,7 @@ export function MyDayView() {
                 return task.status === "IN_PROGRESS" || task.status === "TODO";
             })
             .sort((a, b) => {
-                // Pinned first, then overdue, then priority, then status.
-                const aPin = pinnedTaskIds.has(a.id) ? 0 : 1;
-                const bPin = pinnedTaskIds.has(b.id) ? 0 : 1;
-                if (aPin !== bPin) return aPin - bPin;
+                // Overdue first, then priority, then status.
                 const aOver = a.dueDate && new Date(a.dueDate) < todayStart ? 0 : 1;
                 const bOver = b.dueDate && new Date(b.dueDate) < todayStart ? 0 : 1;
                 if (aOver !== bOver) return aOver - bOver;
@@ -307,7 +278,7 @@ export function MyDayView() {
                 if (p !== 0) return p;
                 return (statusRank[a.status] ?? 3) - (statusRank[b.status] ?? 3);
             });
-    }, [allTasks, showCompleted, pinnedTaskIds, todayStart]);
+    }, [allTasks, showCompleted, todayStart]);
 
     const activeTasks = myDayTasks.filter((t) => t.status !== "DONE");
     const doneTasks = myDayTasks.filter((t) => t.status === "DONE");
@@ -437,7 +408,6 @@ export function MyDayView() {
             !!task.dueDate && new Date(task.dueDate) < todayStart && !isDone;
         const prio = PRIORITY_CONFIG[task.priority];
         const status = STATUS_CONFIG[task.status];
-        const isPinned = pinnedTaskIds.has(task.id);
         const isSelected = selectedIds.has(task.id);
         const canSelect = !isDone && !blockActive;
         const edge = isOverdue ? "var(--bz-red)" : status?.color ?? "transparent";
@@ -476,12 +446,6 @@ export function MyDayView() {
                 )}
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        {isPinned && !isDone && (
-                            <Star
-                                className="h-3 w-3 shrink-0"
-                                style={{ color: "var(--bz-amber)", fill: "var(--bz-amber)" }}
-                            />
-                        )}
                         <span
                             className={cn(
                                 "truncate text-[14px] font-medium text-white",
@@ -631,7 +595,6 @@ export function MyDayView() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <AIPlanPicker existingCommittedIds={pinnedTaskIds} onCommit={pinTasks} />
                     <button
                         type="button"
                         onClick={() => setShowCompleted(!showCompleted)}
@@ -641,6 +604,9 @@ export function MyDayView() {
                     </button>
                 </div>
             </header>
+
+            {/* ===== BieAI focus copilot ===== */}
+            <FocusAIStrip onStartFocus={startFocusForTask} />
 
             {/* ===== Compact stat strip ===== */}
             <div className="flex items-center gap-5 rounded-xl border border-[color:var(--border)] px-4 py-3">
