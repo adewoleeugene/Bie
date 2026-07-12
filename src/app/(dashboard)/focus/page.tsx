@@ -1,11 +1,8 @@
-import type { Metadata } from "next";
-import { FocusSessionList } from "@/components/focus/focus-session-list";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-    title: "Focus",
-    description: "Focus sessions and deep work tracking",
-};
-
+// The Focus page was folded into Today (copilot + streak) and Insights
+// (focus stats + history). Keep the URL alive as a redirect so old
+// bookmarks and links don't break.
 export default function FocusPage() {
-    return <FocusSessionList />;
+    redirect("/my-day");
 }

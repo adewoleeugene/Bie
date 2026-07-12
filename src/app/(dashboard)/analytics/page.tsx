@@ -12,6 +12,7 @@ import { TeamProductivity } from "@/components/analytics/team-productivity";
 import { ProjectProgressList } from "@/components/analytics/project-progress-list";
 import { ExportButton } from "@/components/analytics/export-button";
 import { ReportBuilder } from "@/components/analytics/report-builder";
+import { FocusInsights } from "@/components/analytics/focus-insights";
 import {
     useOverviewMetrics,
     useTaskCompletionTrend,
@@ -99,6 +100,9 @@ export default function AnalyticsPage() {
                     {projectProg && <ProjectProgressList data={projectProg} />}
                 </div>
             </div>
+
+            {/* Focus — folded in from the retired Focus page */}
+            <FocusInsights />
         </div>
     );
 }

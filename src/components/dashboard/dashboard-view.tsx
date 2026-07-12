@@ -190,7 +190,7 @@ export function DashboardView() {
                     <QuickAction
                         label="Start a focus session"
                         description="25-minute Pomodoro, distraction-free."
-                        href="/focus"
+                        href="/my-day"
                         icon={Zap}
                         accent="var(--bz-pink)"
                     />
