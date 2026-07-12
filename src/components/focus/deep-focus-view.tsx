@@ -326,7 +326,7 @@ export function DeepFocusView({
             <SessionReflectionModal
                 taskTitle={taskTitle}
                 sessionMinutes={sessionDurationMin}
-                onDone={() => router.push("/focus")}
+                onDone={() => router.push("/my-day")}
             />
         );
     }

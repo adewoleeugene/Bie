@@ -28,7 +28,7 @@ export default function FocusSessionPage() {
                 const active = await getActiveFocusSession();
                 if (!active) {
                     // No active session — redirect back
-                    router.replace("/focus");
+                    router.replace("/my-day");
                     return;
                 }
                 // The active session includes task + project from the server action.
