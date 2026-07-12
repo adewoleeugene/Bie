@@ -655,6 +655,16 @@ export function MyDayView() {
                     value={timeStats ? formatDuration(timeStats.todayMinutes) : "0m"}
                     label="tracked"
                 />
+                <span className="h-4 w-px bg-[color:var(--border)]" />
+                <div className="flex items-center gap-1.5">
+                    <Flame className="h-4 w-4" style={{ color: "var(--bz-pink)" }} />
+                    <span className="mono text-[20px] font-semibold leading-none text-white">
+                        {focusStats?.streak ?? 0}
+                    </span>
+                    <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-neutral-500">
+                        day streak
+                    </span>
+                </div>
             </div>
 
             {/* ===== Task list ===== */}
