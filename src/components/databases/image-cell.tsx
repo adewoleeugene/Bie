@@ -39,7 +39,7 @@ export function ImageCell({
             fd.append("parentId", rowId);
             const result = await uploadAttachment(fd);
             if (result.success && result.data) {
-                onChange(`/uploads/${result.data.key}`);
+                onChange(result.data.publicUrl);
                 toast.success("Image uploaded");
             } else {
                 toast.error(result.error || "Upload failed");

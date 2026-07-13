@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { AttachmentParent } from "@prisma/client";
-import { saveFile, deleteFile } from "@/lib/storage";
+import { saveFile, deleteFile, publicUrl } from "@/lib/storage";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
 
@@ -25,7 +25,16 @@ const ALLOWED_MIME = new Set<string>([
     "text/markdown",
     // archives
     "application/zip",
+    // audio
+    "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav",
+    "audio/webm", "audio/ogg", "audio/aac", "audio/x-m4a", "audio/flac",
+    // video
+    "video/mp4", "video/webm", "video/quicktime", "video/ogg",
 ]);
+
+function normalizeMime(type: string): string {
+    return type.split(";")[0].trim().toLowerCase();
+}
 
 async function getUserOrganization() {
     const session = await auth();
@@ -94,7 +103,8 @@ export async function uploadAttachment(formData: FormData) {
         if (file.size > MAX_BYTES) {
             return { success: false, error: "File exceeds 25 MB limit" };
         }
-        if (!ALLOWED_MIME.has(file.type)) {
+        const mimeType = normalizeMime(file.type);
+        if (!ALLOWED_MIME.has(mimeType)) {
             return { success: false, error: `Unsupported file type: ${file.type}` };
         }
 
@@ -107,7 +117,7 @@ export async function uploadAttachment(formData: FormData) {
                 parentId,
                 key: "", // filled in after save
                 filename: file.name,
-                mimeType: file.type,
+                mimeType,
                 size: file.size,
                 ready: false,
             },
@@ -115,7 +125,7 @@ export async function uploadAttachment(formData: FormData) {
 
         try {
             const buffer = Buffer.from(await file.arrayBuffer());
-            const saved = await saveFile(organizationId, pending.id, file.name, buffer);
+            const saved = await saveFile(organizationId, pending.id, file.name, buffer, mimeType);
 
             const finalized = await db.attachment.update({
                 where: { id: pending.id },
@@ -123,7 +133,7 @@ export async function uploadAttachment(formData: FormData) {
             });
 
             revalidatePath("/");
-            return { success: true, data: finalized };
+            return { success: true, data: { ...finalized, publicUrl: saved.publicUrl } };
         } catch (err) {
             // Roll back the pending row if the disk write failed.
             await db.attachment.delete({ where: { id: pending.id } }).catch(() => {});
@@ -148,10 +158,14 @@ export async function uploadEditorFile(formData: FormData): Promise<string> {
     const file = formData.get("file");
     if (!(file instanceof File)) throw new Error("No file provided");
     if (file.size > MAX_BYTES) throw new Error("File exceeds 25 MB limit");
+    const mimeType = normalizeMime(file.type);
+    if (!ALLOWED_MIME.has(mimeType)) {
+        throw new Error(`Unsupported file type: ${file.type}`);
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const id = crypto.randomUUID();
-    const saved = await saveFile(organizationId, id, file.name, buffer);
+    const saved = await saveFile(organizationId, id, file.name, buffer, mimeType);
     return saved.publicUrl;
 }
 
@@ -162,7 +176,7 @@ export async function listAttachments(parentType: AttachmentParent, parentId: st
         const canAccessParent = await canAccessAttachmentParent(parentType, parentId, { userId, organizationId });
         if (!canAccessParent) return [];
 
-        return db.attachment.findMany({
+        const attachments = await db.attachment.findMany({
             where: {
                 organizationId,
                 parentType,
@@ -174,6 +188,11 @@ export async function listAttachments(parentType: AttachmentParent, parentId: st
             },
             orderBy: { createdAt: "desc" },
         });
+
+        return attachments.map((attachment) => ({
+            ...attachment,
+            publicUrl: publicUrl(attachment.key),
+        }));
     } catch (error) {
         console.error("List attachments error:", error);
         return [];

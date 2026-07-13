@@ -2,7 +2,8 @@
 
 import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentParent } from "@prisma/client";
-import { AtSign, FileText, FolderKanban, Hash, Paperclip, Send, X } from "lucide-react";
+import { AtSign, FileText, FolderKanban, Hash, Mic, Paperclip, Send, Square, X } from "lucide-react";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { uploadAttachment } from "@/actions/attachments";
@@ -80,6 +81,9 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     const typingTimerRef = useRef<number | null>(null);
     const [files, setFiles] = useState<File[]>([]);
     const [isEmpty, setIsEmpty] = useState(true);
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const recordChunksRef = useRef<Blob[]>([]);
+    const [isRecording, setIsRecording] = useState(false);
     const [trigger, setTrigger] = useState<{ kind: TriggerKind; query: string } | null>(null);
     const queryClient = useQueryClient();
     const sendMessage = useSendMessage();
@@ -95,8 +99,44 @@ export function MessageInput({ conversationId }: MessageInputProps) {
     useEffect(() => {
         return () => {
             if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+            recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
         };
     }, []);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            recordChunksRef.current = [];
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordChunksRef.current.push(event.data);
+            };
+            recorder.onstop = () => {
+                stream.getTracks().forEach((track) => track.stop());
+                const mime = (recorder.mimeType || "audio/webm").split(";")[0];
+                const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+                const blob = new Blob(recordChunksRef.current, { type: mime });
+                if (blob.size > 0) {
+                    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+                    setFiles((current) => [
+                        ...current,
+                        new File([blob], `voice-note-${stamp}.${ext}`, { type: mime }),
+                    ]);
+                }
+            };
+            recorderRef.current = recorder;
+            recorder.start();
+            setIsRecording(true);
+        } catch {
+            toast.error("Microphone unavailable. Check browser permissions.");
+        }
+    };
+
+    const stopRecording = () => {
+        recorderRef.current?.stop();
+        recorderRef.current = null;
+        setIsRecording(false);
+    };
 
     const refreshEmpty = useCallback(() => {
         const editor = editorRef.current;
@@ -277,7 +317,11 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                                 key={`${file.name}-${file.size}-${index}`}
                                 className="flex max-w-[240px] items-center gap-2 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs text-foreground"
                             >
-                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                {file.type.startsWith("audio/") ? (
+                                    <Mic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                ) : (
+                                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                )}
                                 <span className="truncate">{file.name}</span>
                                 <span className="shrink-0 text-muted-foreground">{formatBytes(file.size)}</span>
                                 <button
@@ -311,6 +355,23 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                     >
                         <Paperclip className="h-4 w-4" />
                         <span className="sr-only">Attach files</span>
+                    </Button>
+                    <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={sendMessage.isPending}
+                        className={`h-9 w-9 shrink-0 rounded-lg ${
+                            isRecording
+                                ? "animate-pulse bg-bz-red/15 text-bz-red hover:bg-bz-red/25 hover:text-bz-red"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        }`}
+                    >
+                        {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                        <span className="sr-only">
+                            {isRecording ? "Stop recording" : "Record voice note"}
+                        </span>
                     </Button>
                     <div className="relative flex-1">
                         <div

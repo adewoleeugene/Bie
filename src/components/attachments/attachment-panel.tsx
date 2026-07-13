@@ -8,7 +8,7 @@ import {
     useDeleteAttachment,
 } from "@/hooks/use-attachments";
 import { Button } from "@/components/ui/button";
-import { Paperclip, Upload, X, FileText, Image as ImageIcon } from "lucide-react";
+import { Paperclip, Upload, X, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface AttachmentPanelProps {
@@ -26,6 +26,10 @@ function formatBytes(bytes: number): string {
 
 function isImage(mime: string): boolean {
     return mime.startsWith("image/");
+}
+
+function isAudio(mime: string): boolean {
+    return mime.startsWith("audio/");
 }
 
 export function AttachmentPanel({
@@ -107,7 +111,40 @@ export function AttachmentPanel({
                 {isLoading ? (
                     <p className="text-xs text-neutral-500">Loading…</p>
                 ) : attachments && attachments.length > 0 ? (
-                    attachments.map((a) => (
+                    attachments.map((a) =>
+                        isAudio(a.mimeType) ? (
+                            <div
+                                key={a.id}
+                                className="flex items-center gap-2 rounded-md border border-neutral-200 p-2 dark:border-neutral-800"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <audio
+                                        controls
+                                        preload="metadata"
+                                        src={a.publicUrl}
+                                        className="h-9 w-full"
+                                    />
+                                    <div className="mt-1 flex justify-between gap-2 text-xs text-neutral-500">
+                                        <span className="truncate">{a.filename}</span>
+                                        <span className="shrink-0">
+                                            {formatBytes(a.size)} ·{" "}
+                                            {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
+                                        </span>
+                                    </div>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-neutral-400 hover:text-red-500"
+                                    onClick={() => remove.mutate(a.id)}
+                                    disabled={remove.isPending}
+                                    aria-label="Delete attachment"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ) : (
                         <div
                             key={a.id}
                             className="flex items-center gap-2 rounded-md border border-neutral-200 p-2 dark:border-neutral-800"
@@ -115,7 +152,7 @@ export function AttachmentPanel({
                             {isImage(a.mimeType) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
-                                    src={`/uploads/${a.key}`}
+                                    src={a.publicUrl}
                                     alt={a.filename}
                                     className="h-10 w-10 rounded object-cover"
                                 />
@@ -125,7 +162,7 @@ export function AttachmentPanel({
                                 </div>
                             )}
                             <a
-                                href={`/uploads/${a.key}`}
+                                href={a.publicUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex-1 min-w-0"
@@ -150,7 +187,8 @@ export function AttachmentPanel({
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
-                    ))
+                        ),
+                    )
                 ) : (
                     !compact && (
                         <p className="text-xs text-neutral-500 italic">No attachments yet.</p>
