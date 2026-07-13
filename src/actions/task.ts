@@ -363,6 +363,20 @@ export async function updateTask(
             );
             updateData.statusColumnId = statusColumn?.id ?? null;
             updateData.status = statusColumn?.status ?? validated.status ?? existingTask.status;
+        } else if (validated.status !== undefined && validated.status !== existingTask.status) {
+            // Status-only updates (e.g. the task drawer's Status select) must
+            // also move the task to the matching board column — the kanban
+            // places cards by statusColumnId, so leaving it behind makes the
+            // saved change invisible on the board.
+            const nextProjectId = validated.projectId !== undefined ? validated.projectId : existingTask.projectId;
+            statusColumn = await getColumnForTaskInput(
+                { status: validated.status },
+                organizationId,
+                nextProjectId
+            );
+            if (statusColumn) {
+                updateData.statusColumnId = statusColumn.id;
+            }
         }
         // Stamp completedAt when a task transitions into/out of DONE.
         const resolvedStatus: TaskStatus =
