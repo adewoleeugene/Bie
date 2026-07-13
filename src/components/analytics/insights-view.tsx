@@ -23,7 +23,6 @@ import {
 import { DateRangePicker } from "@/components/analytics/date-range-picker";
 import { ExportButton } from "@/components/analytics/export-button";
 import { ReportBuilder } from "@/components/analytics/report-builder";
-import { LogTimeDialog } from "@/components/time-tracking/log-time-dialog";
 import {
     useOverviewMetrics,
     useTaskCompletionTrend,
@@ -475,7 +474,15 @@ export function InsightsView() {
 
             {/* ===== Time tracked ===== */}
             <section>
-                <SectionHeader right={<LogTimeDialog />}>Time tracked</SectionHeader>
+                <SectionHeader
+                    right={
+                        <span className="text-[11px] text-neutral-500">
+                            auto-logged from focus sessions
+                        </span>
+                    }
+                >
+                    Time tracked
+                </SectionHeader>
                 <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
                         <StatCell value={formatDuration(timeStats?.todayMinutes ?? 0)} label="today" />
