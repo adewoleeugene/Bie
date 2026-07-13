@@ -1,7 +1,7 @@
 "use client";
 
 import { AttachmentParent } from "@prisma/client";
-import { FileText, Image as ImageIcon } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useAttachments } from "@/hooks/use-attachments";
 
 interface MessageAttachmentsProps {
@@ -46,6 +46,25 @@ export function MessageAttachments({ messageId }: MessageAttachmentsProps) {
                             <span className="shrink-0">{formatBytes(attachment.size)}</span>
                         </div>
                     </div>
+                ) : isImage(attachment.mimeType) ? (
+                    <a
+                        key={attachment.id}
+                        href={attachment.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group block overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-xs sm:col-span-2 dark:border-neutral-800 dark:bg-neutral-950"
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={attachment.publicUrl}
+                            alt={attachment.filename}
+                            className="max-h-[360px] w-full object-contain"
+                        />
+                        <div className="flex justify-between gap-2 border-t border-neutral-200 bg-white/90 px-2 py-1.5 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/90">
+                            <span className="truncate">{attachment.filename}</span>
+                            <span className="shrink-0">{formatBytes(attachment.size)}</span>
+                        </div>
+                    </a>
                 ) : (
                 <a
                     key={attachment.id}
@@ -54,22 +73,9 @@ export function MessageAttachments({ messageId }: MessageAttachmentsProps) {
                     rel="noreferrer"
                     className="flex items-center gap-2 rounded-md border border-neutral-200 bg-white p-2 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900"
                 >
-                    {isImage(attachment.mimeType) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={attachment.publicUrl}
-                            alt={attachment.filename}
-                            className="h-10 w-10 rounded object-cover"
-                        />
-                    ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded bg-neutral-100 dark:bg-neutral-900">
-                            {attachment.mimeType.startsWith("image/") ? (
-                                <ImageIcon className="h-5 w-5 text-neutral-500" />
-                            ) : (
-                                <FileText className="h-5 w-5 text-neutral-500" />
-                            )}
-                        </div>
-                    )}
+                    <div className="flex h-10 w-10 items-center justify-center rounded bg-neutral-100 dark:bg-neutral-900">
+                        <FileText className="h-5 w-5 text-neutral-500" />
+                    </div>
                     <div className="min-w-0">
                         <div className="truncate font-medium">{attachment.filename}</div>
                         <div className="text-neutral-500">{formatBytes(attachment.size)}</div>
