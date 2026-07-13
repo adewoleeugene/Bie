@@ -18,6 +18,7 @@ export interface WhatsAppListSection {
 
 export async function sendWhatsAppMessage(params: SendWhatsAppParams): Promise<boolean> {
     if (!process.env.WHAPI_TOKEN) {
+        console.error("Failed to send WhatsApp message: WHAPI_TOKEN is not configured");
         return false;
     }
 
@@ -43,6 +44,7 @@ export async function sendWhatsAppMessage(params: SendWhatsAppParams): Promise<b
             return false;
         }
 
+        console.info("Sent WhatsApp message", { to: toWhapiRecipient(params.to) });
         return true;
     } catch (error) {
         console.error("Failed to send WhatsApp message:", error);

@@ -30,14 +30,31 @@ function extractMessages(payload: unknown): Array<{ id?: string; from?: string; 
             const text = item.text && typeof item.text === "object" ? item.text as Record<string, unknown> : undefined;
             const message = item.message && typeof item.message === "object" ? item.message as Record<string, unknown> : undefined;
             const messageText = message?.text && typeof message.text === "object" ? message.text as Record<string, unknown> : undefined;
+            const chat = item.chat && typeof item.chat === "object" ? item.chat as Record<string, unknown> : undefined;
+            const contact = item.contact && typeof item.contact === "object" ? item.contact as Record<string, unknown> : undefined;
+            const sender = item.sender && typeof item.sender === "object" ? item.sender as Record<string, unknown> : undefined;
             const interactive = item.interactive && typeof item.interactive === "object" ? item.interactive as Record<string, unknown> : undefined;
             const listReply = interactive?.list_reply && typeof interactive.list_reply === "object" ? interactive.list_reply as Record<string, unknown> : undefined;
             const buttonReply = interactive?.button_reply && typeof interactive.button_reply === "object" ? interactive.button_reply as Record<string, unknown> : undefined;
             const reply = item.list_reply && typeof item.list_reply === "object" ? item.list_reply as Record<string, unknown> : undefined;
             return {
                 id: typeof item.id === "string" ? item.id : undefined,
-                from: typeof item.from === "string" ? item.from : typeof item.sender === "string" ? item.sender : undefined,
-                chatId: typeof item.chat_id === "string" ? item.chat_id : typeof item.chatId === "string" ? item.chatId : undefined,
+                from: typeof item.from === "string"
+                    ? item.from
+                    : typeof item.sender === "string"
+                      ? item.sender
+                      : typeof sender?.id === "string"
+                        ? sender.id
+                        : typeof contact?.id === "string"
+                          ? contact.id
+                          : undefined,
+                chatId: typeof item.chat_id === "string"
+                    ? item.chat_id
+                    : typeof item.chatId === "string"
+                      ? item.chatId
+                      : typeof chat?.id === "string"
+                        ? chat.id
+                        : undefined,
                 body: typeof item.body === "string"
                     ? item.body
                     : typeof item.text === "string"
@@ -105,6 +122,12 @@ export async function POST(request: NextRequest) {
         console.warn("[whatsapp:webhook] no messages extracted", {
             keys: Object.keys(payload as Record<string, unknown>),
         });
+    } else {
+        console.info("[whatsapp:webhook] messages extracted", {
+            count: messages.length,
+            hasBody: messages.map((message) => Boolean(message.body || message.replyId)),
+            hasSender: messages.map((message) => Boolean(message.from || message.chatId)),
+        });
     }
 
     await Promise.allSettled(
@@ -112,7 +135,14 @@ export async function POST(request: NextRequest) {
             if (message.fromMe) return;
 
             const phone = normalizeWhapiSender(message.from || message.chatId || "");
-            if (!phone) return;
+            if (!phone) {
+                console.warn("[whatsapp:webhook] message missing sender phone", {
+                    id: message.id,
+                    from: message.from,
+                    chatId: message.chatId,
+                });
+                return;
+            }
 
             await handleWhatsAppInbound({
                 phone,
