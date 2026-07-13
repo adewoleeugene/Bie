@@ -9,7 +9,6 @@ import {
     Settings,
     Users,
     BookOpen,
-    Clock,
     Sun,
     TrendingUp,
     MessageSquare,
@@ -57,7 +56,6 @@ type NavItem = {
 const PRIMARY: NavItem[] = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard, accent: "var(--bz-blue)", match: (p) => p === "/" },
     { href: "/my-day", label: "Today", icon: Sun, accent: "var(--bz-amber)" },
-    { href: "/time-tracking", label: "Hours", icon: Clock, accent: "var(--bz-mint)" },
     { href: "/sprintboard", label: "Sprints", icon: LayoutDashboard, accent: "var(--bz-lime)" },
     { href: "/analytics", label: "Insights", icon: TrendingUp, accent: "var(--bz-peri)" },
 ];

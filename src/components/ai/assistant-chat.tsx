@@ -522,7 +522,7 @@ export function AssistantChat() {
                 "- Don't claim to have created anything; the action JSON is what actually does it.",
                 "- Reply messages should be short, plain, grounded.",
                 "",
-                "App navigation: Dashboard (/), Today (/my-day), Focus (/focus), Hours (/time-tracking), Sprints (/sprintboard), Insights (/analytics), Wiki (/wiki), Squads (/squads), Chat (/chat). Each project has Board, Backlog, Calendar, Timeline, Table, Sprints, Wiki, Automation.",
+                "App navigation: Dashboard (/), Today (/my-day) — includes focus sessions and time tracking, Sprints (/sprintboard), Insights (/analytics) — includes focus and time stats, Wiki (/wiki), Squads (/squads), Chat (/chat). Each project has Board, Backlog, Calendar, Timeline, Table, Sprints, Wiki, Automation.",
                 "",
                 "Real projects in this workspace:",
                 projectList,

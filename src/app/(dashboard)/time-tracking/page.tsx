@@ -1,11 +1,9 @@
-import type { Metadata } from "next";
-import { TimeTrackingView } from "@/components/time-tracking/time-tracking-view";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-    title: "Time Tracking",
-    description: "Track time spent on tasks and projects",
-};
-
+// Hours was folded into Insights (time totals, task breakdown, estimate
+// vs actual) and Today (auto-logged focus time). Manual logging lives on
+// as the "Log time" action in Insights. Keep the URL as a redirect so
+// old bookmarks and links don't break.
 export default function TimeTrackingPage() {
-    return <TimeTrackingView />;
+    redirect("/analytics");
 }
