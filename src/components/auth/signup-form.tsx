@@ -16,7 +16,7 @@ export function SignupForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get("callbackUrl");
-    const nextUrl = callbackUrl?.startsWith("/") ? callbackUrl : "/dashboard";
+    const nextUrl = callbackUrl?.startsWith("/") ? callbackUrl : "/onboarding/whatsapp";
 
     const form = useForm<SignUpInput>({
         resolver: zodResolver(signUpSchema),
@@ -39,7 +39,7 @@ export function SignupForm() {
             } else {
                 toast.error(result.error);
             }
-        } catch (error) {
+        } catch {
             toast.error("Something went wrong. Please try again.");
         } finally {
             setIsLoading(false);

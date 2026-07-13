@@ -36,6 +36,7 @@ export interface NotificationPreferenceItem {
     type: NotificationType;
     inApp: boolean;
     email: boolean;
+    whatsapp: boolean;
 }
 
 const ALL_TYPES: NotificationType[] = [
@@ -44,6 +45,9 @@ const ALL_TYPES: NotificationType[] = [
     "OVERDUE",
     "ASSIGNED",
     "COMMENT",
+    "DAILY_DIGEST",
+    "DAILY_REPORT",
+    "OWNER_REPORT",
 ];
 
 export async function getNotificationPreferences(): Promise<NotificationPreferenceItem[]> {
@@ -60,16 +64,17 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
             type,
             inApp: prefMap.get(type)?.inApp ?? true,
             email: prefMap.get(type)?.email ?? false,
+            whatsapp: prefMap.get(type)?.whatsapp ?? false,
         }));
     } catch (error) {
         console.error("Get notification preferences error:", error);
-        return ALL_TYPES.map((type) => ({ type, inApp: true, email: false }));
+        return ALL_TYPES.map((type) => ({ type, inApp: true, email: false, whatsapp: false }));
     }
 }
 
 export async function updateNotificationPreference(
     type: NotificationType,
-    field: "inApp" | "email",
+    field: "inApp" | "email" | "whatsapp",
     value: boolean
 ): Promise<{ success: boolean }> {
     try {
@@ -85,6 +90,7 @@ export async function updateNotificationPreference(
                 type,
                 inApp: field === "inApp" ? value : true,
                 email: field === "email" ? value : false,
+                whatsapp: field === "whatsapp" ? value : false,
             },
             update: {
                 [field]: value,
