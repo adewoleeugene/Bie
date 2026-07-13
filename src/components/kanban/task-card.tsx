@@ -26,7 +26,7 @@ import {
 import { Calendar, MoreHorizontal, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useDeleteTask } from "@/hooks/use-tasks";
+import { useDeleteTask, useDuplicateTask } from "@/hooks/use-tasks";
 import { TaskWithRelations } from "@/types/task";
 
 interface TaskCardProps {
@@ -85,6 +85,7 @@ export function TaskCard({
     });
 
     const deleteTask = useDeleteTask();
+    const duplicateTask = useDuplicateTask();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     const style = {
@@ -262,6 +263,14 @@ export function TaskCard({
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={onClick}>
                                         Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            duplicateTask.mutate({ id: task.id });
+                                        }}
+                                    >
+                                        Duplicate
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         className="text-[color:var(--bz-red)] focus:text-[color:var(--bz-red)]"

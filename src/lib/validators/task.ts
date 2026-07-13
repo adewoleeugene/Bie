@@ -38,6 +38,10 @@ export const deleteTaskSchema = z.object({
     id: z.string(),
 });
 
+export const duplicateTaskSchema = z.object({
+    id: z.string(),
+});
+
 export const reorderTaskSchema = z.object({
     id: z.string(),
     status: z.nativeEnum(TaskStatus),
@@ -66,6 +70,7 @@ export const deleteTaskStatusColumnSchema = z.object({
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type DeleteTaskInput = z.infer<typeof deleteTaskSchema>;
+export type DuplicateTaskInput = z.infer<typeof duplicateTaskSchema>;
 export type ReorderTaskInput = z.infer<typeof reorderTaskSchema>;
 export type BulkReorderTasksInput = z.infer<typeof bulkReorderTasksSchema>;
 export type CreateTaskStatusColumnInput = z.infer<typeof createTaskStatusColumnSchema>;
