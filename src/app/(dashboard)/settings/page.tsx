@@ -17,6 +17,7 @@ import { updateUserAvatar, updateUserProfile } from "@/actions/user";
 import { MemberManagement } from "@/components/settings/member-management";
 import { PrivacyAdminPanel } from "@/components/settings/privacy-admin-panel";
 import { PrivacyControls } from "@/components/settings/privacy-controls";
+import { WhatsAppSettings } from "@/components/settings/whatsapp-settings";
 
 export default function SettingsPage() {
     const { data: session, update } = useSession();
@@ -39,6 +40,9 @@ export default function SettingsPage() {
         COMMENT: "Comments",
         ACCESS_REQUEST: "Access Requests",
         ACCESS_GRANTED: "Access Granted",
+        DAILY_DIGEST: "Daily Digest",
+        DAILY_REPORT: "Daily Report",
+        OWNER_REPORT: "Owner Report",
     };
 
     const handleSaveProfile = async () => {
@@ -163,13 +167,14 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="grid grid-cols-[1fr_80px_80px] gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
+                        <div className="grid grid-cols-[1fr_72px_72px_88px] gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
                             <span>Type</span>
                             <span className="text-center">In-App</span>
                             <span className="text-center">Email</span>
+                            <span className="text-center">WhatsApp</span>
                         </div>
                         {notifPrefs?.map((pref) => (
-                            <div key={pref.type} className="grid grid-cols-[1fr_80px_80px] gap-2 items-center">
+                            <div key={pref.type} className="grid grid-cols-[1fr_72px_72px_88px] gap-2 items-center">
                                 <span className="text-sm font-medium">
                                     {NOTIF_TYPE_LABELS[pref.type] || pref.type}
                                 </span>
@@ -189,11 +194,21 @@ export default function SettingsPage() {
                                         }
                                     />
                                 </div>
+                                <div className="flex justify-center">
+                                    <Switch
+                                        checked={pref.whatsapp}
+                                        onCheckedChange={(checked) =>
+                                            updatePref.mutate({ type: pref.type, field: "whatsapp", value: checked })
+                                        }
+                                    />
+                                </div>
                             </div>
                         ))}
                     </div>
                 </CardContent>
             </Card>
+
+            <WhatsAppSettings />
 
             <MemberManagement limit={5} />
             <PrivacyControls />

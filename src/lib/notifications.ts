@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { NotificationType } from "@prisma/client";
 import { sendEmail, buildNotificationEmail } from "@/lib/email";
+import { buildNotificationWhatsApp, isInsideQuietHours, sendWhatsAppMessage } from "@/lib/whatsapp";
 
 interface CreateNotificationParams {
     recipientIds: string[];
@@ -13,7 +14,7 @@ interface CreateNotificationParams {
 }
 
 /**
- * Create in-app notifications and send email notifications for multiple recipients.
+ * Create in-app notifications and send email / WhatsApp notifications for multiple recipients.
  * Automatically excludes the actor (excludeUserId) from recipients.
  * Respects each user's notification preferences (inApp / email toggles).
  * Fire-and-forget — errors are logged but not thrown.
@@ -90,6 +91,45 @@ export async function sendNotifications(params: CreateNotificationParams): Promi
                             html: email.html,
                         })
                     )
+            );
+        }
+
+        const whatsappRecipients = recipients.filter((id) => {
+            const pref = prefMap.get(id);
+            return pref?.whatsapp === true;
+        });
+
+        if (whatsappRecipients.length > 0) {
+            const users = await db.user.findMany({
+                where: {
+                    id: { in: whatsappRecipients },
+                    phone: { not: null },
+                    phoneVerifiedAt: { not: null },
+                    whatsappEnabled: true,
+                },
+                select: {
+                    phone: true,
+                    whatsappQuietHoursEnabled: true,
+                    whatsappQuietStart: true,
+                    whatsappQuietEnd: true,
+                    whatsappTimezone: true,
+                },
+            });
+
+            const message = buildNotificationWhatsApp({ title, body: body || undefined, linkUrl: linkUrl || undefined });
+
+            await Promise.allSettled(
+                users
+                    .filter((u) => {
+                        if (!u.phone) return false;
+                        if (!u.whatsappQuietHoursEnabled) return true;
+                        return !isInsideQuietHours({
+                            timezone: u.whatsappTimezone,
+                            quietStart: u.whatsappQuietStart,
+                            quietEnd: u.whatsappQuietEnd,
+                        });
+                    })
+                    .map((u) => sendWhatsAppMessage({ to: u.phone!, body: message }))
             );
         }
     } catch (error) {

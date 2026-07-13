@@ -103,6 +103,9 @@ enum NotificationType {
   COMMENT
   ACCESS_REQUEST
   ACCESS_GRANTED
+  DAILY_DIGEST
+  DAILY_REPORT
+  OWNER_REPORT
 }
 
 enum ConversationType {
@@ -220,10 +223,20 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+  phone         String?   @unique
+  phoneCountry  String?
+  phoneVerifiedAt DateTime?
+  whatsappEnabled Boolean @default(false)
+  whatsappQuietHoursEnabled Boolean @default(true)
+  whatsappQuietStart String @default("18:00")
+  whatsappQuietEnd String @default("08:00")
+  whatsappTimezone String @default("Africa/Freetown")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   memberships    OrganizationMember[]
+  phoneVerifications PhoneVerification[]
+  whatsappSession WhatsAppSession?
   squadMembers   SquadMember[]
   taskAssignees  TaskAssignee[]
   comments       Comment[]
@@ -291,6 +304,43 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model PhoneVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  phone     String
+  country   String
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+model WhatsAppSession {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  activeOrganizationId String?
+  activeProjectId      String?
+  activeTaskId         String?
+  activeFocusSessionId String?
+  lastDigestTaskIds    Json?
+  selectedTaskIds      Json?
+  pendingAction        Json?
+  lastInboundMessageId String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([activeOrganizationId])
+  @@index([activeProjectId])
+  @@index([updatedAt])
 }
 
 model OrganizationMember {
@@ -825,6 +875,7 @@ model NotificationPreference {
     type           NotificationType
     inApp          Boolean          @default(true)
     email          Boolean          @default(false)
+    whatsapp       Boolean          @default(false)
 
     user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
     organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

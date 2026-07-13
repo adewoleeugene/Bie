@@ -22,7 +22,7 @@ export function useUpdateNotificationPreference() {
             value,
         }: {
             type: NotificationType;
-            field: "inApp" | "email";
+            field: "inApp" | "email" | "whatsapp";
             value: boolean;
         }) => updateNotificationPreference(type, field, value),
         onSuccess: () => {
