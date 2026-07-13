@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { Download, FileWarning, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+import { Download, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -14,28 +13,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-    useCreatePrivacyRequest,
-    useExportPersonalData,
-    usePrivacyRequests,
-} from "@/hooks/use-privacy";
+import { useCreatePrivacyRequest, useExportPersonalData } from "@/hooks/use-privacy";
 
 export function PrivacyControls() {
-    const [details, setDetails] = useState("");
     const [confirmDeletion, setConfirmDeletion] = useState(false);
-    const { data: requests = [] } = usePrivacyRequests();
     const createRequest = useCreatePrivacyRequest();
     const exportData = useExportPersonalData();
-
-    const pendingDeletion = useMemo(
-        () => requests.find((request) => request.kind === "DELETION" && request.status === "PENDING"),
-        [requests],
-    );
 
     const handleDownload = async () => {
         const result = await exportData.mutateAsync();
@@ -58,10 +43,9 @@ export function PrivacyControls() {
         toast.success("Personal data export downloaded");
     };
 
-    const handleRequest = async (kind: "EXPORT" | "DELETION") => {
+    const handleDeletionRequest = async () => {
         const result = await createRequest.mutateAsync({
-            kind,
-            details: details.trim() || undefined,
+            kind: "DELETION",
         });
 
         if (!result.success) {
@@ -69,9 +53,8 @@ export function PrivacyControls() {
             return;
         }
 
-        setDetails("");
         setConfirmDeletion(false);
-        toast.success(kind === "DELETION" ? "Deletion request submitted" : "Export request submitted");
+        toast.success("Deletion request submitted");
     };
 
     return (
@@ -80,92 +63,44 @@ export function PrivacyControls() {
                 <CardHeader>
                     <CardTitle>Privacy and Data</CardTitle>
                     <CardDescription>
-                        Download your personal data or submit privacy-related requests.
+                        Download your personal data or request account deletion.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="rounded-lg border p-4">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
-                                <h3 className="text-sm font-medium">Self-service data export</h3>
+                                <h3 className="text-sm font-medium">Download your data</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    Download a JSON export of your profile, memberships, preferences, reflections,
-                                    tasks, wiki records, messages, and submitted privacy requests.
+                                    Export a JSON copy of your profile, workspace records, tasks, wiki pages,
+                                    messages, and preferences.
                                 </p>
                             </div>
-                            <Button onClick={handleDownload} disabled={exportData.isPending}>
+                            <Button onClick={handleDownload} disabled={exportData.isPending} className="sm:shrink-0">
                                 <Download className="mr-2 h-4 w-4" />
                                 {exportData.isPending ? "Preparing..." : "Download JSON"}
                             </Button>
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="privacy-request-details">Request details</Label>
-                        <Textarea
-                            id="privacy-request-details"
-                            placeholder="Add context for your request, such as scope, timing, or legal basis."
-                            value={details}
-                            onChange={(event) => setDetails(event.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            These details are stored with the request and emailed to the privacy contact if SMTP is configured.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => handleRequest("EXPORT")}
-                            disabled={createRequest.isPending}
-                        >
-                            <FileWarning className="mr-2 h-4 w-4" />
-                            Request manual export review
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={() => setConfirmDeletion(true)}
-                            disabled={createRequest.isPending || Boolean(pendingDeletion)}
-                        >
-                            <ShieldAlert className="mr-2 h-4 w-4" />
-                            {pendingDeletion ? "Deletion request pending" : "Request account deletion"}
-                        </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div>
-                            <h3 className="text-sm font-medium">Recent requests</h3>
-                            <p className="text-sm text-muted-foreground">
-                                Last 10 privacy requests linked to your account.
-                            </p>
-                        </div>
-                        {requests.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No privacy requests submitted yet.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {requests.map((request) => (
-                                    <div
-                                        key={request.id}
-                                        className="flex items-start justify-between gap-4 rounded-lg border p-3"
-                                    >
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">
-                                                    {request.kind === "DELETION" ? "Account deletion" : "Data export"}
-                                                </span>
-                                                <Badge variant="outline">{request.status}</Badge>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                Submitted {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
-                                            </p>
-                                            {request.details ? (
-                                                <p className="text-sm text-muted-foreground">{request.details}</p>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ))}
+                    <div className="rounded-lg border border-destructive/30 p-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-1">
+                                <h3 className="text-sm font-medium">Danger zone</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Request account deletion if you want maintainers to review and remove your account data.
+                                </p>
                             </div>
-                        )}
+                            <Button
+                                variant="destructive"
+                                onClick={() => setConfirmDeletion(true)}
+                                disabled={createRequest.isPending}
+                                className="sm:shrink-0"
+                            >
+                                <ShieldAlert className="mr-2 h-4 w-4" />
+                                Delete account
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -180,7 +115,7 @@ export function PrivacyControls() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleRequest("DELETION")}>
+                        <AlertDialogAction onClick={handleDeletionRequest}>
                             Submit request
                         </AlertDialogAction>
                     </AlertDialogFooter>
