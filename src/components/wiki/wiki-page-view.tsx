@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BlockEditor } from "./block-editor";
 import { AttachmentPanel } from "@/components/attachments/attachment-panel";
+import { uploadEditorFile } from "@/actions/attachments";
 import { AttachmentParent } from "@prisma/client";
 import { WikiBacklinks } from "@/components/wiki/wiki-backlinks";
 import { WikiBlockComments } from "@/components/wiki/wiki-block-comments";
@@ -44,7 +45,7 @@ import { WikiHistoryDialog } from "@/components/wiki/wiki-history-dialog";
 import { deleteWikiPage, updateWikiPage, duplicateWikiPage, trackWikiPageView, getWikiPageAnalytics, requestWikiPageEditAccess, getWikiPageAccessRequests, approveWikiPageAccessRequest, denyWikiPageAccessRequest } from "@/actions/wiki";
 import { createWikiTemplate } from "@/actions/wiki-template";
 import { useFavorites, useToggleFavorite, useTrackRecent } from "@/hooks/use-favorites";
-import { Star, Download, FileText, Eye } from "lucide-react";
+import { Star, Download, FileText, Eye, Loader2, Upload } from "lucide-react";
 import { blocknoteToMarkdown } from "@/lib/blocknote-to-markdown";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -139,6 +140,8 @@ export function WikiPageView({
     const [coverImage, setCoverImage] = useState(page.coverImage || "");
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showCoverInput, setShowCoverInput] = useState(false);
+    const [coverUploading, setCoverUploading] = useState(false);
+    const coverFileRef = useRef<HTMLInputElement>(null);
     const [path, setPath] = useState<{ id: string; title: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -146,7 +149,7 @@ export function WikiPageView({
     const { data: favorites } = useFavorites();
     const toggleFavorite = useToggleFavorite();
     const trackRecent = useTrackRecent();
-    const isFavorited = favorites?.some((f: any) => f.itemId === page.id && f.itemType === "wiki_page");
+    const isFavorited = favorites?.some((favorite) => favorite.itemId === page.id && favorite.itemType === "wiki_page");
 
     // Track page view as recent item + analytics
     useEffect(() => {
@@ -217,6 +220,20 @@ export function WikiPageView({
         setShowCoverInput(false);
         await updateWikiPage({ id: page.id, coverImage: url || null });
         router.refresh();
+    };
+
+    const uploadCover = async (file: File) => {
+        setCoverUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const url = await uploadEditorFile(formData);
+            await saveCover(url);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Cover upload failed");
+        } finally {
+            setCoverUploading(false);
+        }
     };
 
     useEffect(() => {
@@ -623,18 +640,43 @@ export function WikiPageView({
                     </div>
                 ) : null}
 
-                {/* Cover URL input */}
+                {/* Cover input: upload a file or paste a URL */}
                 {showCoverInput && (
                     <div className="border-b bg-muted/30 px-8 py-3 lg:px-12">
                         <div className="mx-auto flex max-w-4xl items-center gap-2">
                             <input
+                                ref={coverFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) uploadCover(file);
+                                    event.target.value = "";
+                                }}
+                            />
+                            <button
+                                type="button"
+                                disabled={coverUploading}
+                                onClick={() => coverFileRef.current?.click()}
+                                className="flex items-center gap-1.5 rounded border bg-background px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                            >
+                                {coverUploading ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Upload className="h-3.5 w-3.5" />
+                                )}
+                                {coverUploading ? "Uploading..." : "Upload image"}
+                            </button>
+                            <input
                                 autoFocus
-                                placeholder="Paste image URL..."
+                                placeholder="Or paste image URL..."
+                                disabled={coverUploading}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") saveCover((e.target as HTMLInputElement).value);
                                     if (e.key === "Escape") setShowCoverInput(false);
                                 }}
-                                className="flex-1 rounded border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
+                                className="flex-1 rounded border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                             />
                             <button
                                 type="button"

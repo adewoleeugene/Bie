@@ -103,7 +103,18 @@ AUTH_GOOGLE_SECRET="your-google-client-secret"
 AUTH_SECRET="your-secret-key"
 AUTH_URL="http://localhost:3004"
 AUTH_TRUST_HOST="true"
+
+# Cloudflare R2 uploads (required for production uploads)
+R2_BUCKET_NAME="bie-uploads"
+R2_ACCESS_KEY_ID="your-r2-access-key-id"
+R2_SECRET_ACCESS_KEY="your-r2-secret-access-key"
+CLOUDFLARE_ACCOUNT_ID="your-cloudflare-account-id"
+R2_PUBLIC_BASE_URL="https://files.example.com"
 ```
+
+`R2_ENDPOINT` can be used instead of `CLOUDFLARE_ACCOUNT_ID` when you need to
+override the R2 S3 endpoint directly. `R2_PUBLIC_BASE_URL` should point to the
+bucket's public `r2.dev` URL or, preferably, a custom domain.
 
 For Google OAuth setup:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
