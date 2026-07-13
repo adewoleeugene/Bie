@@ -13,6 +13,7 @@ import { ProjectProgressList } from "@/components/analytics/project-progress-lis
 import { ExportButton } from "@/components/analytics/export-button";
 import { ReportBuilder } from "@/components/analytics/report-builder";
 import { FocusInsights } from "@/components/analytics/focus-insights";
+import { EstimateVsActual } from "@/components/time-tracking/estimate-vs-actual";
 import {
     useOverviewMetrics,
     useTaskCompletionTrend,
@@ -100,6 +101,9 @@ export default function AnalyticsPage() {
                     {projectProg && <ProjectProgressList data={projectProg} />}
                 </div>
             </div>
+
+            {/* Estimate vs actual — surfaced from the Hours page */}
+            <EstimateVsActual />
 
             {/* Focus — folded in from the retired Focus page */}
             <FocusInsights />
