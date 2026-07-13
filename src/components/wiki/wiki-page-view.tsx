@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { BlockEditor } from "./block-editor";
+import { BlockEditor } from "./block-editor-lazy";
 import { AttachmentPanel } from "@/components/attachments/attachment-panel";
 import { uploadEditorFile } from "@/actions/attachments";
 import { AttachmentParent } from "@prisma/client";
