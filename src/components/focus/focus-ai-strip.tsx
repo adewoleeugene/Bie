@@ -412,11 +412,11 @@ Rules for the plan:
     };
 
     return (
-        <Card className="border-purple-200/60 bg-gradient-to-br from-purple-50/50 via-white to-orange-50/30 dark:border-purple-900/30 dark:from-purple-950/20 dark:via-neutral-950 dark:to-orange-950/10">
+        <Card className="border-[color:var(--border)] bg-[color:var(--card)]">
             <CardContent className="space-y-3 p-4">
                 <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm font-medium">BieAI — Focus copilot</span>
+                    <Sparkles className="h-4 w-4 text-[color:var(--bz-pink)]" />
+                    <span className="text-sm font-medium text-white">BieAI — Focus copilot</span>
                     {thread.length > 0 && (
                         <Button
                             type="button"
@@ -455,19 +455,19 @@ Rules for the plan:
                             return (
                                 <div
                                     key={task.id}
-                                    className={`flex items-center gap-2 rounded-md border px-3 py-2 transition-all ${
+                                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
                                         isDone
-                                            ? "border-green-200 bg-green-50/50 opacity-60 dark:border-green-900 dark:bg-green-950/30"
+                                            ? "border-[#00c281]/30 bg-[#00c281]/10 opacity-60"
                                             : isCurrent
-                                              ? "border-orange-300 bg-orange-50 shadow-sm dark:border-orange-800 dark:bg-orange-950/40"
-                                              : "border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50"
+                                              ? "border-[#ef82ef]/40 bg-[#ef82ef]/10"
+                                              : "border-[color:var(--border)] bg-white/[0.02]"
                                     }`}
                                 >
-                                    <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full border text-xs font-bold">
+                                    <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full border border-[color:var(--border)] text-xs font-bold">
                                         {isDone ? (
-                                            <span className="text-green-600">✓</span>
+                                            <span className="text-[#00c281]">✓</span>
                                         ) : (
-                                            <span className={isCurrent ? "text-orange-600" : "text-neutral-400"}>
+                                            <span className={isCurrent ? "text-[color:var(--bz-pink)]" : "text-neutral-400"}>
                                                 {idx + 1}
                                             </span>
                                         )}
@@ -498,10 +498,8 @@ Rules for the plan:
                                                     ? markQueueDone(idx)
                                                     : startQueueTask(idx)
                                             }
-                                            className={`h-7 shrink-0 px-3 text-xs text-white ${
-                                                isCurrent
-                                                    ? "bg-green-600 hover:bg-green-700"
-                                                    : "bg-orange-600 hover:bg-orange-700"
+                                            className={`h-7 shrink-0 px-3 text-xs text-black hover:opacity-90 ${
+                                                isCurrent ? "bg-[#00c281]" : "bg-[color:var(--bz-pink)]"
                                             }`}
                                         >
                                             {isCurrent ? (
@@ -521,7 +519,7 @@ Rules for the plan:
                             );
                         })}
                         {activeQueueIdx >= focusQueue.length && (
-                            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-center text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+                            <div className="rounded-lg border border-[#00c281]/30 bg-[#00c281]/10 p-3 text-center text-sm text-[#00c281]">
                                 All done! Great focus session.
                             </div>
                         )}
@@ -539,7 +537,7 @@ Rules for the plan:
                             variant="outline"
                             disabled={busy}
                             onClick={() => stream(prompt)}
-                            className="h-8 bg-white dark:bg-neutral-950"
+                            className="h-8 border-[color:var(--border)] bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white"
                         >
                             <Icon className="mr-1.5 h-3.5 w-3.5" />
                             {label}
@@ -550,7 +548,7 @@ Rules for the plan:
                         size="sm"
                         disabled={busy}
                         onClick={() => stream(DESTRUCTIVE_ACTION.prompt)}
-                        className="h-8 bg-orange-600 text-white hover:bg-orange-700"
+                        className="h-8 bg-[color:var(--bz-pink)] text-black hover:opacity-90"
                     >
                         {busy ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -565,7 +563,7 @@ Rules for the plan:
                 {thread.length > 0 && (
                     <div
                         ref={scrollRef}
-                        className="max-h-80 space-y-3 overflow-y-auto rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950"
+                        className="max-h-80 space-y-3 overflow-y-auto rounded-lg border border-[color:var(--border)] bg-black/20 p-3"
                     >
                         {thread.map((msg, i) => (
                             <ThreadMessage
@@ -603,7 +601,7 @@ Rules for the plan:
                             onChange={(e) => setFollowUp(e.target.value)}
                             placeholder="Ask a follow-up…"
                             disabled={busy}
-                            className="h-8 bg-white dark:bg-neutral-950"
+                            className="h-8 border-[color:var(--border)] bg-white/[0.04] text-white placeholder:text-white/20"
                         />
                         <Button
                             type="submit"
@@ -639,10 +637,10 @@ function ThreadMessage({
     if (msg.role === "user") {
         return (
             <div className="flex items-start gap-2">
-                <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-900">
+                <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-white/[0.06]">
                     <UserIcon className="h-3 w-3 text-neutral-500" />
                 </div>
-                <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                <p className="text-sm text-neutral-300">
                     {msg.content}
                 </p>
             </div>
@@ -651,8 +649,8 @@ function ThreadMessage({
 
     return (
         <div className="flex items-start gap-2">
-            <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-purple-100 dark:bg-purple-950">
-                <Sparkles className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+            <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#ef82ef]/15">
+                <Sparkles className="h-3 w-3 text-[color:var(--bz-pink)]" />
             </div>
             <div className="min-w-0 flex-1 space-y-1.5">
                 {/* Tool trace chips */}
@@ -823,18 +821,19 @@ function renderInline(text: string): React.ReactNode {
 
 // ─── Plan task extraction + cards ───────────────────────
 
+// Chip palette mirrors Today: 12% fill, 35% border, full-strength text.
 const PRIORITY_LABELS: Record<string, { label: string; cls: string }> = {
-    P0: { label: "Urgent", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
-    P1: { label: "High", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" },
-    P2: { label: "Med", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
-    P3: { label: "Low", cls: "bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400" },
+    P0: { label: "Urgent", cls: "border border-[#ff3d54]/35 bg-[#ff3d54]/12 text-[#ff3d54]" },
+    P1: { label: "High", cls: "border border-[#db9c1f]/35 bg-[#db9c1f]/12 text-[#db9c1f]" },
+    P2: { label: "Med", cls: "border border-[#6f98e8]/35 bg-[#6f98e8]/12 text-[#6f98e8]" },
+    P3: { label: "Low", cls: "border border-[#858585]/35 bg-[#858585]/12 text-[#a3a3a3]" },
 };
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-    IN_PROGRESS: { label: "In progress", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
-    TODO: { label: "To do", cls: "bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400" },
-    BACKLOG: { label: "Backlog", cls: "bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-500" },
-    IN_REVIEW: { label: "Review", cls: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300" },
+    IN_PROGRESS: { label: "In progress", cls: "border border-[#db9c1f]/35 bg-[#db9c1f]/12 text-[#db9c1f]" },
+    TODO: { label: "To do", cls: "border border-[#0099ff]/35 bg-[#0099ff]/12 text-[#0099ff]" },
+    BACKLOG: { label: "Backlog", cls: "border border-[#858585]/35 bg-[#858585]/12 text-[#a3a3a3]" },
+    IN_REVIEW: { label: "Review", cls: "border border-[#ef82ef]/35 bg-[#ef82ef]/12 text-[#ef82ef]" },
 };
 
 /** Extract task objects from a tool result into the plan tasks array. */
@@ -913,7 +912,7 @@ function PlanTaskCards({
                 return (
                     <div
                         key={task.id}
-                        className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50"
+                        className="flex items-center gap-2 rounded-lg border border-[color:var(--border)] bg-white/[0.02] px-3 py-2"
                     >
                         <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">
@@ -937,7 +936,7 @@ function PlanTaskCards({
                                 type="button"
                                 size="sm"
                                 onClick={() => onStartFocus(task.id)}
-                                className="h-7 shrink-0 bg-orange-600 px-3 text-xs text-white hover:bg-orange-700"
+                                className="h-7 shrink-0 bg-[color:var(--bz-pink)] px-3 text-xs text-black hover:opacity-90"
                             >
                                 <Play className="mr-1 h-3 w-3" />
                                 Focus
@@ -952,7 +951,7 @@ function PlanTaskCards({
                     type="button"
                     size="sm"
                     onClick={() => onCommitPlan(tasks)}
-                    className="mt-2 w-full bg-purple-600 text-white hover:bg-purple-700"
+                    className="mt-2 w-full bg-[color:var(--bz-pink)] text-black hover:opacity-90"
                 >
                     <Rocket className="mr-1.5 h-3.5 w-3.5" />
                     Plan my {tasks.length} tasks — start focus queue
