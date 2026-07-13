@@ -2,7 +2,6 @@
 
 import { Timer, TrendingUp, BarChart3 } from "lucide-react";
 import { useTimeTrackingStats } from "@/hooks/use-time-entries";
-import { LogTimeDialog } from "@/components/time-tracking/log-time-dialog";
 
 function formatDuration(minutes: number): string {
     if (!minutes) return "0m";
@@ -39,9 +38,11 @@ export function TimeInsights() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div>
                 <h3 className="text-lg font-semibold tracking-tight">Time tracked</h3>
-                <LogTimeDialog />
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Logged automatically from your focus sessions — start a task timer and it tracks itself.
+                </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
