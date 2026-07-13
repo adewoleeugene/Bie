@@ -55,6 +55,18 @@ function formatDuration(minutes: number): string {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
+// Cycle times can span weeks — switch to days past 48h so the strip stays scannable.
+function formatCycle(hours: number): string {
+    if (!hours) return "0h";
+    if (hours >= 48) return `${Math.round(hours / 24)}d`;
+    return `${Math.round(hours)}h`;
+}
+
+function formatHoursShort(hours: number): string {
+    const rounded = Math.round(hours * 10) / 10;
+    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}h`;
+}
+
 function formatDay(d: string | Date): string {
     return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -104,6 +116,48 @@ function SectionHeader({ children, right }: { children: React.ReactNode; right?:
             </h2>
             {right}
         </div>
+    );
+}
+
+// Collapsible list section — same pattern as Today's reflection row.
+function CollapsibleSection({
+    title,
+    count,
+    children,
+}: {
+    title: string;
+    count?: number;
+    children: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <section className="overflow-hidden rounded-xl border border-[color:var(--border)]">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02]"
+            >
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                    {title}
+                    {typeof count === "number" && (
+                        <span className="mono ml-2 tracking-normal text-neutral-400">{count}</span>
+                    )}
+                </h2>
+                <ChevronDown
+                    className={cn(
+                        "h-4 w-4 text-neutral-500 transition-transform",
+                        open && "rotate-180",
+                    )}
+                />
+            </button>
+            {open && (
+                <div className="divide-y divide-[color:var(--border)] border-t border-[color:var(--border)]">
+                    {children}
+                </div>
+            )}
+        </section>
     );
 }
 
@@ -218,13 +272,135 @@ export function InsightsView() {
                         color={overview.overdueTasks > 0 ? "var(--bz-red)" : undefined}
                     />
                     <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell value={`${overview.avgCompletionTime}h`} label="avg cycle" />
+                    <StatCell value={formatCycle(overview.avgCompletionTime)} label="avg cycle" />
                     <span className="h-4 w-px bg-[color:var(--border)]" />
                     <StatCell value={overview.activeSprints} label="sprints" />
                     <span className="h-4 w-px bg-[color:var(--border)]" />
                     <StatCell value={overview.teamMembers} label="people" />
                 </div>
             )}
+
+            {/* ===== Time tracked ===== */}
+            <section>
+                <SectionHeader
+                    right={
+                        <span className="text-[11px] text-neutral-500">
+                            auto-logged from focus sessions
+                        </span>
+                    }
+                >
+                    Time tracked
+                </SectionHeader>
+                <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
+                        <StatCell value={formatDuration(timeStats?.todayMinutes ?? 0)} label="today" />
+                        <span className="h-4 w-px bg-[color:var(--border)]" />
+                        <StatCell value={formatDuration(timeStats?.weekMinutes ?? 0)} label="week" />
+                        <span className="h-4 w-px bg-[color:var(--border)]" />
+                        <StatCell value={formatDuration(timeStats?.monthMinutes ?? 0)} label="month" />
+                    </div>
+                    {timeStats && timeStats.taskBreakdown.length > 0 && (
+                        <div className="bz-card p-4">
+                            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                                By task · this month
+                            </div>
+                            <ul className="space-y-3">
+                                {(() => {
+                                    const max = Math.max(
+                                        ...timeStats.taskBreakdown.map((t) => t.totalMinutes),
+                                    );
+                                    return timeStats.taskBreakdown.map((item) => (
+                                        <li key={item.taskId}>
+                                            <div className="flex items-center justify-between gap-3 text-[13px]">
+                                                <span className="truncate text-neutral-300">{item.taskTitle}</span>
+                                                <span className="mono shrink-0 text-neutral-400">
+                                                    {formatDuration(item.totalMinutes)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1.5">
+                                                <Meter
+                                                    pct={max ? (item.totalMinutes / max) * 100 : 0}
+                                                    color="var(--bz-blue)"
+                                                />
+                                            </div>
+                                        </li>
+                                    ));
+                                })()}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* ===== Estimate vs actual ===== */}
+            {estimateItems && estimateItems.length > 0 && (
+                <section>
+                    <SectionHeader>Estimate vs actual</SectionHeader>
+                    <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
+                        {estimateItems.map((item) => {
+                            const actualHours = item.actualMinutes / 60;
+                            // Variance is only meaningful once time has been logged.
+                            const variance =
+                                item.actualMinutes > 0 && item.estimatedHours > 0
+                                    ? ((actualHours - item.estimatedHours) / item.estimatedHours) * 100
+                                    : null;
+                            const varianceColor =
+                                variance === null ? "#858585"
+                                : variance > 10 ? "var(--bz-red)"
+                                : variance < -10 ? "var(--bz-green)"
+                                : "var(--bz-blue)";
+                            return (
+                                <div key={item.taskId} className="flex items-center gap-3 px-4 py-3">
+                                    <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-300">
+                                        {item.taskTitle}
+                                    </span>
+                                    <span className="mono text-[12px] text-neutral-500">
+                                        est {formatHoursShort(item.estimatedHours)}
+                                    </span>
+                                    <span className="mono text-[12px] text-white">
+                                        {formatHoursShort(actualHours)}
+                                    </span>
+                                    <span className="w-16 text-right">
+                                        {variance !== null ? (
+                                            <Chip color={varianceColor}>
+                                                {variance > 0 ? "+" : ""}
+                                                {variance.toFixed(0)}%
+                                            </Chip>
+                                        ) : (
+                                            <span className="text-[11px] text-neutral-600">—</span>
+                                        )}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
+
+            {/* ===== Focus ===== */}
+            <section>
+                <SectionHeader>Focus</SectionHeader>
+                <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
+                        <StatCell value={formatDuration(focusStats?.weekMinutes ?? 0)} label="week" />
+                        <span className="h-4 w-px bg-[color:var(--border)]" />
+                        <StatCell value={formatDuration(focusStats?.totalMinutes ?? 0)} label="all time" />
+                        <span className="h-4 w-px bg-[color:var(--border)]" />
+                        <StatCell value={focusStats?.totalSessions ?? 0} label="sessions" />
+                        <span className="h-4 w-px bg-[color:var(--border)]" />
+                        <div className="flex items-center gap-1.5">
+                            <Flame className="h-4 w-4" style={{ color: "var(--bz-pink)" }} />
+                            <span className="mono text-[20px] font-semibold leading-none text-white">
+                                {focusStats?.streak ?? 0}
+                            </span>
+                            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-neutral-500">
+                                day streak
+                            </span>
+                        </div>
+                    </div>
+                    <FocusHistory />
+                </div>
+            </section>
 
             {/* ===== Completion trend ===== */}
             <section>
@@ -352,243 +528,116 @@ export function InsightsView() {
                 </div>
             </section>
 
-            {/* ===== Projects ===== */}
-            <section>
-                <SectionHeader>Projects</SectionHeader>
-                <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
-                    {projectProg && projectProg.length > 0 ? (
-                        projectProg.map((project) => (
-                            <div key={project.projectId} className="px-4 py-3.5">
-                                <div className="flex items-center gap-2">
-                                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--bz-mint)" }} />
-                                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-white">
-                                        {project.projectName}
-                                    </span>
-                                    {project.overdueTasks > 0 && (
-                                        <Chip color="var(--bz-red)">{project.overdueTasks} overdue</Chip>
-                                    )}
-                                    {project.progressPercentage === 100 && (
-                                        <Chip color="var(--bz-green)">Complete</Chip>
-                                    )}
-                                    <span className="mono text-[13px] text-neutral-400">
-                                        {project.progressPercentage}%
-                                    </span>
-                                </div>
-                                <div className="mt-2.5">
-                                    <Meter
-                                        pct={project.progressPercentage}
-                                        color={project.progressPercentage === 100 ? "var(--bz-green)" : "var(--bz-peri)"}
+            {/* ===== Projects (collapsible) ===== */}
+            <CollapsibleSection title="Projects" count={projectProg?.length ?? 0}>
+                {projectProg && projectProg.length > 0 ? (
+                    projectProg.map((project) => (
+                        <div key={project.projectId} className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--bz-mint)" }} />
+                                <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-white">
+                                    {project.projectName}
+                                </span>
+                                {project.overdueTasks > 0 && (
+                                    <Chip color="var(--bz-red)">{project.overdueTasks} overdue</Chip>
+                                )}
+                                {project.progressPercentage === 100 && (
+                                    <Chip color="var(--bz-green)">Complete</Chip>
+                                )}
+                                <span className="mono text-[13px] text-neutral-400">
+                                    {project.progressPercentage}%
+                                </span>
+                            </div>
+                            <div className="mt-2.5">
+                                <Meter
+                                    pct={project.progressPercentage}
+                                    color={project.progressPercentage === 100 ? "var(--bz-green)" : "var(--bz-peri)"}
+                                />
+                            </div>
+                            <div className="mono mt-1.5 text-[11px] text-neutral-500">
+                                {project.completedTasks} of {project.totalTasks} tasks
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <EmptyRow>No active projects.</EmptyRow>
+                )}
+            </CollapsibleSection>
+
+            {/* ===== Sprint velocity (collapsible) ===== */}
+            <CollapsibleSection title="Sprint velocity" count={sprintVel?.length ?? 0}>
+                {sprintVel && sprintVel.length > 0 ? (
+                    sprintVel.map((sprint) => (
+                        <div key={sprint.sprintId} className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-white">
+                                    {sprint.sprintName}
+                                </span>
+                                <span className="mono text-[12px] text-neutral-400">
+                                    {sprint.tasksCompleted}/{sprint.tasksPlanned}
+                                </span>
+                                <span className="mono w-12 text-right text-[13px] text-neutral-300">
+                                    {sprint.completionRate}%
+                                </span>
+                            </div>
+                            <div className="mt-2.5">
+                                <Meter pct={sprint.completionRate} color="var(--bz-amber)" />
+                            </div>
+                            <div className="mono mt-1.5 text-[11px] text-neutral-500">
+                                {formatDay(sprint.startDate)} – {formatDay(sprint.endDate)}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <EmptyRow>No sprints yet.</EmptyRow>
+                )}
+            </CollapsibleSection>
+
+            {/* ===== Team (collapsible) ===== */}
+            <CollapsibleSection title="Team" count={teamProd?.length ?? 0}>
+                {teamProd && teamProd.length > 0 ? (
+                    teamProd.map((member) => {
+                        const rate = member.tasksAssigned > 0
+                            ? Math.round((member.tasksCompleted / member.tasksAssigned) * 100)
+                            : 0;
+                        return (
+                            <div key={member.userId} className="flex items-center gap-3 px-4 py-3.5">
+                                {member.userImage ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={member.userImage}
+                                        alt=""
+                                        className="h-7 w-7 shrink-0 rounded-full object-cover"
                                     />
-                                </div>
-                                <div className="mono mt-1.5 text-[11px] text-neutral-500">
-                                    {project.completedTasks} of {project.totalTasks} tasks
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <EmptyRow>No active projects.</EmptyRow>
-                    )}
-                </div>
-            </section>
-
-            {/* ===== Sprint velocity ===== */}
-            <section>
-                <SectionHeader>Sprint velocity</SectionHeader>
-                <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
-                    {sprintVel && sprintVel.length > 0 ? (
-                        sprintVel.map((sprint) => (
-                            <div key={sprint.sprintId} className="px-4 py-3.5">
-                                <div className="flex items-center gap-2">
-                                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-white">
-                                        {sprint.sprintName}
+                                ) : (
+                                    <span
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                                        style={{ background: "color-mix(in oklab, var(--bz-peri) 30%, transparent)" }}
+                                    >
+                                        {member.userName.charAt(0).toUpperCase()}
                                     </span>
-                                    <span className="mono text-[12px] text-neutral-400">
-                                        {sprint.tasksCompleted}/{sprint.tasksPlanned}
-                                    </span>
-                                    <span className="mono w-12 text-right text-[13px] text-neutral-300">
-                                        {sprint.completionRate}%
-                                    </span>
-                                </div>
-                                <div className="mt-2.5">
-                                    <Meter pct={sprint.completionRate} color="var(--bz-amber)" />
-                                </div>
-                                <div className="mono mt-1.5 text-[11px] text-neutral-500">
-                                    {formatDay(sprint.startDate)} – {formatDay(sprint.endDate)}
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <EmptyRow>No sprints yet.</EmptyRow>
-                    )}
-                </div>
-            </section>
-
-            {/* ===== Team ===== */}
-            <section>
-                <SectionHeader>Team</SectionHeader>
-                <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
-                    {teamProd && teamProd.length > 0 ? (
-                        teamProd.map((member) => {
-                            const rate = member.tasksAssigned > 0
-                                ? Math.round((member.tasksCompleted / member.tasksAssigned) * 100)
-                                : 0;
-                            return (
-                                <div key={member.userId} className="flex items-center gap-3 px-4 py-3.5">
-                                    {member.userImage ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={member.userImage}
-                                            alt=""
-                                            className="h-7 w-7 shrink-0 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <span
-                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-                                            style={{ background: "color-mix(in oklab, var(--bz-peri) 30%, transparent)" }}
-                                        >
-                                            {member.userName.charAt(0).toUpperCase()}
-                                        </span>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                        <div className="truncate text-[14px] font-medium text-white">
-                                            {member.userName}
-                                        </div>
-                                        <div className="mono mt-0.5 text-[11px] text-neutral-500">
-                                            {formatDuration(member.focusTime)} focus · {formatDuration(member.loggedTime)} tracked
-                                        </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-[14px] font-medium text-white">
+                                        {member.userName}
                                     </div>
-                                    <span className="mono text-[12px] text-neutral-400">
-                                        {member.tasksCompleted}/{member.tasksAssigned}
-                                    </span>
-                                    <div className="w-20">
-                                        <Meter pct={rate} color="var(--bz-peri)" />
+                                    <div className="mono mt-0.5 text-[11px] text-neutral-500">
+                                        {formatDuration(member.focusTime)} focus · {formatDuration(member.loggedTime)} tracked
                                     </div>
                                 </div>
-                            );
-                        })
-                    ) : (
-                        <EmptyRow>No activity in this range.</EmptyRow>
-                    )}
-                </div>
-            </section>
-
-            {/* ===== Time tracked ===== */}
-            <section>
-                <SectionHeader
-                    right={
-                        <span className="text-[11px] text-neutral-500">
-                            auto-logged from focus sessions
-                        </span>
-                    }
-                >
-                    Time tracked
-                </SectionHeader>
-                <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
-                        <StatCell value={formatDuration(timeStats?.todayMinutes ?? 0)} label="today" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <StatCell value={formatDuration(timeStats?.weekMinutes ?? 0)} label="week" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <StatCell value={formatDuration(timeStats?.monthMinutes ?? 0)} label="month" />
-                    </div>
-                    {timeStats && timeStats.taskBreakdown.length > 0 && (
-                        <div className="bz-card p-4">
-                            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                                By task · this month
-                            </div>
-                            <ul className="space-y-3">
-                                {(() => {
-                                    const max = Math.max(
-                                        ...timeStats.taskBreakdown.map((t) => t.totalMinutes),
-                                    );
-                                    return timeStats.taskBreakdown.map((item) => (
-                                        <li key={item.taskId}>
-                                            <div className="flex items-center justify-between gap-3 text-[13px]">
-                                                <span className="truncate text-neutral-300">{item.taskTitle}</span>
-                                                <span className="mono shrink-0 text-neutral-400">
-                                                    {formatDuration(item.totalMinutes)}
-                                                </span>
-                                            </div>
-                                            <div className="mt-1.5">
-                                                <Meter
-                                                    pct={max ? (item.totalMinutes / max) * 100 : 0}
-                                                    color="var(--bz-blue)"
-                                                />
-                                            </div>
-                                        </li>
-                                    ));
-                                })()}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            </section>
-
-            {/* ===== Estimate vs actual ===== */}
-            {estimateItems && estimateItems.length > 0 && (
-                <section>
-                    <SectionHeader>Estimate vs actual</SectionHeader>
-                    <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
-                        {estimateItems.map((item) => {
-                            const actualHours = item.actualMinutes / 60;
-                            const variance = item.estimatedHours > 0
-                                ? ((actualHours - item.estimatedHours) / item.estimatedHours) * 100
-                                : null;
-                            const varianceColor =
-                                variance === null ? "#858585"
-                                : variance > 10 ? "var(--bz-red)"
-                                : variance < -10 ? "var(--bz-green)"
-                                : "var(--bz-blue)";
-                            return (
-                                <div key={item.taskId} className="flex items-center gap-3 px-4 py-3">
-                                    <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-300">
-                                        {item.taskTitle}
-                                    </span>
-                                    <span className="mono text-[12px] text-neutral-500">
-                                        est {item.estimatedHours.toFixed(1)}h
-                                    </span>
-                                    <span className="mono text-[12px] text-white">
-                                        {actualHours.toFixed(1)}h
-                                    </span>
-                                    <span className="w-16 text-right">
-                                        {variance !== null && (
-                                            <Chip color={varianceColor}>
-                                                {variance > 0 ? "+" : ""}
-                                                {variance.toFixed(0)}%
-                                            </Chip>
-                                        )}
-                                    </span>
+                                <span className="mono text-[12px] text-neutral-400">
+                                    {member.tasksCompleted}/{member.tasksAssigned}
+                                </span>
+                                <div className="w-20">
+                                    <Meter pct={rate} color="var(--bz-peri)" />
                                 </div>
-                            );
-                        })}
-                    </div>
-                </section>
-            )}
-
-            {/* ===== Focus ===== */}
-            <section>
-                <SectionHeader>Focus</SectionHeader>
-                <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
-                        <StatCell value={formatDuration(focusStats?.weekMinutes ?? 0)} label="week" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <StatCell value={formatDuration(focusStats?.totalMinutes ?? 0)} label="all time" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <StatCell value={focusStats?.totalSessions ?? 0} label="sessions" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <div className="flex items-center gap-1.5">
-                            <Flame className="h-4 w-4" style={{ color: "var(--bz-pink)" }} />
-                            <span className="mono text-[20px] font-semibold leading-none text-white">
-                                {focusStats?.streak ?? 0}
-                            </span>
-                            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-neutral-500">
-                                day streak
-                            </span>
-                        </div>
-                    </div>
-                    <FocusHistory />
-                </div>
-            </section>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <EmptyRow>No activity in this range.</EmptyRow>
+                )}
+            </CollapsibleSection>
         </div>
     );
 }
