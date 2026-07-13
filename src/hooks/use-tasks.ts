@@ -31,6 +31,11 @@ export function useTasks(projectId?: string | null, options?: { sprintId?: strin
     return useQuery({
         queryKey: ["tasks", projectId, options?.sprintId],
         queryFn: () => getTasks(projectId, options),
+        // Server-action fetches can be rejected at the edge under load (503)
+        // before reaching the app. Keep retrying in the background so a board
+        // opened during a throttle window fills in instead of staying blank.
+        retry: 5,
+        refetchInterval: (query) => (query.state.status === "error" ? 15_000 : false),
     });
 }
 

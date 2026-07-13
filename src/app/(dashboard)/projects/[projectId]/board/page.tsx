@@ -43,7 +43,7 @@ export default function BoardPage() {
     const projectId = params.projectId as string;
     const sprintId = searchParams.get("sprint");
 
-    const { data: tasks, isLoading: tasksLoading } = useTasks(projectId, { sprintId: sprintId || undefined });
+    const { data: tasks, isLoading: tasksLoading, isError: tasksError, refetch: refetchTasks } = useTasks(projectId, { sprintId: sprintId || undefined });
     const { data: sprints, isLoading: sprintsLoading } = useSprints(projectId);
     const { data: sprint, isLoading: sprintLoading } = useSprint(sprintId || "");
     const { data: squads } = useSquads();
@@ -127,6 +127,28 @@ export default function BoardPage() {
                         <Skeleton key={i} className="h-[420px] w-[300px] rounded-2xl bg-white/[0.04]" />
                     ))}
                 </div>
+            </div>
+        );
+    }
+
+    // A failed fetch must not look like an empty board — surface it and offer
+    // a retry (the query also keeps retrying in the background).
+    if (tasksError && !tasks) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+                <div>
+                    <p className="text-sm font-medium text-white">Couldn&apos;t load the board.</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        The server is busy right now — your tasks are safe. Retrying automatically.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => refetchTasks()}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
+                >
+                    Retry now
+                </button>
             </div>
         );
     }

@@ -31,7 +31,7 @@ export default function SprintBoardPage() {
         projectFilter === "all" ? undefined : projectFilter === "general" ? null : projectFilter;
     const sprintIdArg = sprintFilter === "all" ? undefined : sprintFilter;
 
-    const { data: tasks, isLoading } = useTasks(projectIdArg, { sprintId: sprintIdArg });
+    const { data: tasks, isLoading, isError: tasksError, refetch: refetchTasks } = useTasks(projectIdArg, { sprintId: sprintIdArg });
     const { data: projects } = useProjects();
     const sprintProjectFilter =
         projectFilter !== "all" && projectFilter !== "general" ? projectFilter : undefined;
@@ -74,6 +74,28 @@ export default function SprintBoardPage() {
                         <Skeleton key={i} className="h-[420px] w-[300px] rounded-2xl bg-white/[0.04]" />
                     ))}
                 </div>
+            </div>
+        );
+    }
+
+    // A failed fetch must not look like an empty board — surface it and offer
+    // a retry (the query also keeps retrying in the background).
+    if (tasksError && !tasks) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+                <div>
+                    <p className="text-sm font-medium text-white">Couldn&apos;t load the board.</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        The server is busy right now — your tasks are safe. Retrying automatically.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => refetchTasks()}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
+                >
+                    Retry now
+                </button>
             </div>
         );
     }
