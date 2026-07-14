@@ -201,7 +201,7 @@ export function TaskCard({
                             )}
 
                             {Array.isArray(task.labels) && task.labels.length > 0 && (
-                                <div className="ml-6 flex flex-wrap gap-1">
+                                <div className="flex flex-wrap justify-start gap-1">
                                     {task.labels.map((label: string) => (
                                         <Badge
                                             key={label}

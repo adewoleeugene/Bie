@@ -933,7 +933,7 @@ async function createTaskAsUser(input: {
             dueDate: input.dueDate ? new Date(input.dueDate) : null,
             projectId: input.projectId ?? null,
             organizationId: input.viewer.organizationId,
-            labels: ["whatsapp"],
+            labels: ["whatsapp generated"],
             assignees: { create: input.assigneeIds.map((userId) => ({ userId })) },
         },
         include: { project: true },
