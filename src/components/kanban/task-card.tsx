@@ -200,6 +200,20 @@ export function TaskCard({
                                 </p>
                             )}
 
+                            {Array.isArray(task.labels) && task.labels.length > 0 && (
+                                <div className="ml-6 flex flex-wrap gap-1">
+                                    {task.labels.map((label: string) => (
+                                        <Badge
+                                            key={label}
+                                            variant="outline"
+                                            className="h-4 rounded-full border-[color:var(--border)] px-1.5 text-[10px] font-normal text-neutral-400"
+                                        >
+                                            {label}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* Subtask Progress Bar (only for parents with subtasks) */}
                             {subtaskCount > 0 && visibleProperties.subtaskProgress && (
                                 <div className="space-y-1 ml-6">
