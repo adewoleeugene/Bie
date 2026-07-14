@@ -1,6 +1,4 @@
-import { toWhapiRecipient } from "@/lib/phone";
-
-const WHAPI_BASE_URL = process.env.WHAPI_BASE_URL || "https://gate.whapi.cloud";
+import { toWhatsAppChatId } from "@/lib/phone";
 
 interface SendWhatsAppParams {
     to: string;
@@ -16,25 +14,40 @@ export interface WhatsAppListSection {
     }>;
 }
 
+function getOpenWAConfig() {
+    const baseUrl = process.env.OPENWA_BASE_URL?.replace(/\/+$/, "");
+    const apiKey = process.env.OPENWA_API_KEY;
+    const sessionId = process.env.OPENWA_SESSION_ID;
+
+    if (!baseUrl || !apiKey || !sessionId) return null;
+    return { baseUrl, apiKey, sessionId };
+}
+
+export function isWhatsAppConfigured(): boolean {
+    return getOpenWAConfig() !== null;
+}
+
 export async function sendWhatsAppMessage(params: SendWhatsAppParams): Promise<boolean> {
-    if (!process.env.WHAPI_TOKEN) {
-        console.error("Failed to send WhatsApp message: WHAPI_TOKEN is not configured");
+    const config = getOpenWAConfig();
+    if (!config) {
+        console.error("Failed to send WhatsApp message: OpenWA is not configured (OPENWA_BASE_URL, OPENWA_API_KEY, OPENWA_SESSION_ID)");
         return false;
     }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
+    const chatId = toWhatsAppChatId(params.to);
 
     try {
-        const response = await fetch(`${WHAPI_BASE_URL}/messages/text`, {
+        const response = await fetch(`${config.baseUrl}/sessions/${config.sessionId}/messages/send-text`, {
             method: "POST",
             headers: {
-                Authorization: `Bearer ${process.env.WHAPI_TOKEN}`,
+                "X-API-Key": config.apiKey,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                to: toWhapiRecipient(params.to),
-                body: params.body,
+                chatId,
+                text: params.body,
             }),
             signal: controller.signal,
         });
@@ -44,7 +57,8 @@ export async function sendWhatsAppMessage(params: SendWhatsAppParams): Promise<b
             return false;
         }
 
-        console.info("Sent WhatsApp message", { to: toWhapiRecipient(params.to) });
+        const result = await response.json().catch(() => null) as { messageId?: string } | null;
+        console.info("Sent WhatsApp message", { to: chatId, messageId: result?.messageId });
         return true;
     } catch (error) {
         console.error("Failed to send WhatsApp message:", error);
@@ -54,43 +68,14 @@ export async function sendWhatsAppMessage(params: SendWhatsAppParams): Promise<b
     }
 }
 
+// OpenWA has no interactive list-message endpoint, and unofficial gateways are
+// unreliable for interactive UI anyway. Lists always go out as numbered text;
+// the router accepts the matching text replies.
 export async function sendWhatsAppListMessage(params: SendWhatsAppParams & {
     buttonText: string;
     sections: WhatsAppListSection[];
 }): Promise<boolean> {
-    if (!process.env.WHAPI_TOKEN) {
-        return false;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    try {
-        const response = await fetch(`${WHAPI_BASE_URL}/messages/list`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${process.env.WHAPI_TOKEN}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                to: toWhapiRecipient(params.to),
-                body: params.body,
-                button: params.buttonText,
-                sections: params.sections,
-            }),
-            signal: controller.signal,
-        });
-
-        if (response.ok) return true;
-
-        console.error("Failed to send WhatsApp list message:", response.status, await response.text());
-        return sendWhatsAppMessage({ to: params.to, body: formatListFallback(params) });
-    } catch (error) {
-        console.error("Failed to send WhatsApp list message:", error);
-        return sendWhatsAppMessage({ to: params.to, body: formatListFallback(params) });
-    } finally {
-        clearTimeout(timeout);
-    }
+    return sendWhatsAppMessage({ to: params.to, body: formatListFallback(params) });
 }
 
 function formatListFallback(params: {

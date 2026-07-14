@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/phone";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { isWhatsAppConfigured, sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const CODE_TTL_MINUTES = 10;
 
@@ -68,7 +68,7 @@ export async function requestWhatsAppVerification(input: { country: string; phon
             return { success: false, error: "This WhatsApp number is already connected to another Bie account." };
         }
 
-        if (!process.env.WHAPI_TOKEN) {
+        if (!isWhatsAppConfigured()) {
             return { success: false, error: "WhatsApp sending is not configured yet." };
         }
 

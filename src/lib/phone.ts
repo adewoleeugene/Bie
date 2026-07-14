@@ -36,12 +36,12 @@ export function normalizePhoneNumber(country: string, value: string): string {
     return `+${withCountryCode}`;
 }
 
-export function normalizeWhapiSender(value: string): string | null {
+export function normalizeWhatsAppSender(value: string): string | null {
     const phone = value.split("@")[0]?.replace(/\D/g, "");
     if (!phone || phone.length < 8 || phone.length > 15) return null;
     return `+${phone}`;
 }
 
-export function toWhapiRecipient(phone: string): string {
-    return phone.replace(/\D/g, "");
+export function toWhatsAppChatId(phone: string): string {
+    return `${phone.replace(/\D/g, "")}@c.us`;
 }

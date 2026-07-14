@@ -1,157 +1,99 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeWhapiSender } from "@/lib/phone";
+import { normalizeWhatsAppSender } from "@/lib/phone";
 import { handleWhatsAppInbound } from "@/lib/whatsapp-workflows";
 
-function hasValidSecret(request: NextRequest) {
-    const expected = process.env.WHAPI_WEBHOOK_SECRET;
-    if (!expected) return true;
-
-    return (
-        request.nextUrl.searchParams.get("secret") === expected ||
-        request.headers.get("x-whapi-secret") === expected ||
-        request.headers.get("x-bie-whapi-secret") === expected
-    );
+interface OpenWAEnvelope {
+    event?: string;
+    sessionId?: string;
+    idempotencyKey?: string;
+    data?: {
+        id?: string;
+        from?: string;
+        senderPhone?: string;
+        body?: string;
+        type?: string;
+        isGroup?: boolean;
+        status?: string;
+        reason?: string;
+    };
 }
 
-function extractMessages(payload: unknown): Array<{ id?: string; from?: string; chatId?: string; body?: string; replyId?: string; fromMe?: boolean }> {
-    if (!payload || typeof payload !== "object") return [];
+// OpenWA signs each delivery as `X-OpenWA-Signature: sha256=<hex>` computed
+// over the raw request body. Fails closed when the secret is not configured.
+function hasValidSignature(rawBody: string, signature: string | null): boolean {
+    const secret = process.env.OPENWA_WEBHOOK_SECRET;
+    if (!secret || !signature) return false;
 
-    const record = payload as Record<string, unknown>;
-    const candidates = [
-        ...toRecordArray(record.messages),
-        ...toRecordArray(record.message),
-        ...toRecordArray(record.data),
-        ...toRecordArray(record.payload),
-        ...(looksLikeMessage(record) ? [record] : []),
-    ];
+    const expected = `sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`;
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
 
-    return candidates
-        .map((item) => {
-            const text = item.text && typeof item.text === "object" ? item.text as Record<string, unknown> : undefined;
-            const message = item.message && typeof item.message === "object" ? item.message as Record<string, unknown> : undefined;
-            const messageText = message?.text && typeof message.text === "object" ? message.text as Record<string, unknown> : undefined;
-            const chat = item.chat && typeof item.chat === "object" ? item.chat as Record<string, unknown> : undefined;
-            const contact = item.contact && typeof item.contact === "object" ? item.contact as Record<string, unknown> : undefined;
-            const sender = item.sender && typeof item.sender === "object" ? item.sender as Record<string, unknown> : undefined;
-            const interactive = item.interactive && typeof item.interactive === "object" ? item.interactive as Record<string, unknown> : undefined;
-            const listReply = interactive?.list_reply && typeof interactive.list_reply === "object" ? interactive.list_reply as Record<string, unknown> : undefined;
-            const buttonReply = interactive?.button_reply && typeof interactive.button_reply === "object" ? interactive.button_reply as Record<string, unknown> : undefined;
-            const reply = item.list_reply && typeof item.list_reply === "object" ? item.list_reply as Record<string, unknown> : undefined;
-            return {
-                id: typeof item.id === "string" ? item.id : undefined,
-                from: typeof item.from === "string"
-                    ? item.from
-                    : typeof item.sender === "string"
-                      ? item.sender
-                      : typeof sender?.id === "string"
-                        ? sender.id
-                        : typeof contact?.id === "string"
-                          ? contact.id
-                          : undefined,
-                chatId: typeof item.chat_id === "string"
-                    ? item.chat_id
-                    : typeof item.chatId === "string"
-                      ? item.chatId
-                      : typeof chat?.id === "string"
-                        ? chat.id
-                        : undefined,
-                body: typeof item.body === "string"
-                    ? item.body
-                    : typeof item.text === "string"
-                      ? item.text
-                    : typeof text?.body === "string"
-                      ? text.body
-                      : typeof message?.body === "string"
-                        ? message.body
-                        : typeof messageText?.body === "string"
-                          ? messageText.body
-                      : typeof listReply?.title === "string"
-                        ? listReply.title
-                        : typeof buttonReply?.title === "string"
-                          ? buttonReply.title
-                          : typeof reply?.title === "string"
-                            ? reply.title
-                            : undefined,
-                replyId: typeof listReply?.id === "string"
-                    ? listReply.id
-                    : typeof buttonReply?.id === "string"
-                      ? buttonReply.id
-                      : typeof reply?.id === "string"
-                        ? reply.id
-                        : undefined,
-                fromMe: item.from_me === true || item.fromMe === true,
-            };
-        });
-}
-
-function toRecordArray(value: unknown): Record<string, unknown>[] {
-    if (Array.isArray(value)) {
-        return value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
-    }
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-        return [value as Record<string, unknown>];
-    }
-    return [];
-}
-
-function looksLikeMessage(record: Record<string, unknown>) {
-    return (
-        typeof record.id === "string" ||
-        typeof record.from === "string" ||
-        typeof record.chat_id === "string" ||
-        typeof record.chatId === "string" ||
-        typeof record.body === "string" ||
-        typeof record.text === "string"
-    );
+    if (signatureBuffer.length !== expectedBuffer.length) return false;
+    return timingSafeEqual(signatureBuffer, expectedBuffer);
 }
 
 export async function POST(request: NextRequest) {
-    if (!hasValidSecret(request)) {
+    const rawBody = await request.text();
+
+    if (!hasValidSignature(rawBody, request.headers.get("x-openwa-signature"))) {
         return NextResponse.json({ ok: false }, { status: 401 });
     }
 
-    let payload: unknown;
+    let envelope: OpenWAEnvelope;
     try {
-        payload = await request.json();
+        envelope = JSON.parse(rawBody);
     } catch {
         return NextResponse.json({ ok: true });
     }
 
-    const messages = extractMessages(payload);
-    if (messages.length === 0) {
-        console.warn("[whatsapp:webhook] no messages extracted", {
-            keys: Object.keys(payload as Record<string, unknown>),
-        });
-    } else {
-        console.info("[whatsapp:webhook] messages extracted", {
-            count: messages.length,
-            hasBody: messages.map((message) => Boolean(message.body || message.replyId)),
-            hasSender: messages.map((message) => Boolean(message.from || message.chatId)),
-        });
+    if (envelope.event === "session.status") {
+        const status = envelope.data?.status;
+        if (status === "disconnected" || status === "failed") {
+            console.error("[whatsapp:webhook] OpenWA session issue", {
+                sessionId: envelope.sessionId,
+                status,
+                reason: envelope.data?.reason,
+            });
+        } else {
+            console.info("[whatsapp:webhook] OpenWA session status", {
+                sessionId: envelope.sessionId,
+                status,
+            });
+        }
+        return NextResponse.json({ ok: true });
     }
 
-    await Promise.allSettled(
-        messages.map(async (message) => {
-            if (message.fromMe) return;
+    if (envelope.event !== "message.received") {
+        return NextResponse.json({ ok: true });
+    }
 
-            const phone = normalizeWhapiSender(message.from || message.chatId || "");
-            if (!phone) {
-                console.warn("[whatsapp:webhook] message missing sender phone", {
-                    id: message.id,
-                    from: message.from,
-                    chatId: message.chatId,
-                });
-                return;
-            }
+    const message = envelope.data;
+    if (!message || message.isGroup) {
+        return NextResponse.json({ ok: true });
+    }
 
-            await handleWhatsAppInbound({
-                phone,
-                text: message.body || message.replyId || "",
-                replyId: message.replyId,
-                messageId: message.id,
-            });
-        })
-    );
+    // `senderPhone` carries the real phone when `from` is a WhatsApp @lid address.
+    const phone = normalizeWhatsAppSender(message.senderPhone || message.from || "");
+    if (!phone) {
+        console.warn("[whatsapp:webhook] message missing sender phone", {
+            id: message.id,
+            from: message.from,
+        });
+        return NextResponse.json({ ok: true });
+    }
+
+    console.info("[whatsapp:webhook] inbound message", {
+        id: message.id,
+        idempotencyKey: envelope.idempotencyKey,
+        hasBody: Boolean(message.body),
+    });
+
+    await handleWhatsAppInbound({
+        phone,
+        text: message.body || "",
+        messageId: message.id,
+    });
 
     return NextResponse.json({ ok: true });
 }
