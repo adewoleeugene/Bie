@@ -737,24 +737,35 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
 
         if (options?.sprintId !== undefined) where.sprintId = options.sprintId;
 
+        // Relations are trimmed to the fields the boards/lists actually render.
+        // Subtasks also come back as their own rows in this list, so the nested
+        // copy only carries what cards and detail rows need — shipping full
+        // task graphs here was the single heaviest payload in the app.
         const tasks = await db.task.findMany({
             where,
             include: {
                 assignees: {
-                    include: {
-                        user: true,
+                    select: {
+                        userId: true,
+                        user: { select: { id: true, name: true, email: true, image: true } },
                     },
                 },
-                project: true,
-                sprint: true,
+                project: { select: { id: true, name: true } },
+                sprint: { select: { id: true, name: true, status: true } },
                 statusColumn: true,
-                parentTask: true,
+                parentTask: { select: { id: true, title: true } },
                 subtasks: {
-                    include: {
+                    select: {
+                        id: true,
+                        title: true,
+                        status: true,
+                        priority: true,
+                        sortOrder: true,
                         statusColumn: true,
                         assignees: {
-                            include: {
-                                user: true,
+                            select: {
+                                userId: true,
+                                user: { select: { id: true, name: true, email: true, image: true } },
                             },
                         },
                     },
@@ -762,8 +773,6 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
             },
             orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
         });
-
-        console.log(`[getTasks] Fetched ${tasks.length} tasks for Org: ${organizationId}, Project: ${projectId || 'ALL'}, Sprint: ${options?.sprintId === null ? 'NULL' : options?.sprintId || 'ANY'}`);
 
         return tasks;
     } catch (error) {

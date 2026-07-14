@@ -87,6 +87,7 @@ function NavRow({
     return (
         <Link
             href={item.href}
+            prefetch={false}
             title={collapsed ? item.label : undefined}
             className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all",
@@ -238,6 +239,7 @@ export function Sidebar({ projects }: SidebarProps) {
                                 <div key={project.id} className="group/project relative">
                                     <Link
                                         href={`/projects/${project.id}`}
+                                        prefetch={false}
                                         title={collapsed ? project.name : undefined}
                                         className={cn(
                                             "relative flex items-center gap-3 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
@@ -330,6 +332,7 @@ export function Sidebar({ projects }: SidebarProps) {
             <div className="px-3 py-3">
                 <Link
                     href="/settings"
+                    prefetch={false}
                     title={collapsed ? "Settings" : undefined}
                     className={cn(
                         "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-white",

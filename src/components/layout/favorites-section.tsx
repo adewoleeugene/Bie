@@ -53,7 +53,7 @@ export function FavoritesSection() {
                     {favoritesOpen && (
                         <div className="space-y-0.5 ml-1">
                             {favorites.map((fav: SidebarItem) => (
-                                <Link key={fav.id} href={fav.itemUrl}>
+                                <Link key={fav.id} href={fav.itemUrl} prefetch={false}>
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -88,7 +88,7 @@ export function FavoritesSection() {
                         <div className="space-y-0.5 ml-1">
                             {recentItems.map((item: SidebarItem) => (
                                 <div key={item.id} className="group/recent flex items-center">
-                                    <Link href={item.itemUrl} className="min-w-0 flex-1">
+                                    <Link href={item.itemUrl} prefetch={false} className="min-w-0 flex-1">
                                         <Button
                                             variant="ghost"
                                             size="sm"
