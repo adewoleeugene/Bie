@@ -35,23 +35,31 @@ export function parseTaskInput(text: string): ParsedTask {
         title = title.replace("!low", "").trim();
     }
 
-    // Parse due date: today, tomorrow, next week, friday
+    // Parse due date: today, tomorrow, "by/on/before friday", "next friday"
     const today = new Date();
-    if (text.match(/\btoday\b/i)) {
+    const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const weekdayMatch = title.match(/\b(?:(next)\s+|(?:by|on|before|due)\s+)(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+
+    if (title.match(/\b(?:by |due )?today\b/i)) {
         dueDate = today;
-        title = title.replace(/today/i, "").trim();
-    } else if (text.match(/\btomorrow\b/i)) {
+        title = title.replace(/\b(?:by |due )?today\b/i, "").trim();
+    } else if (title.match(/\b(?:by |due )?tomorrow\b/i)) {
         const tmrw = new Date(today);
         tmrw.setDate(tmrw.getDate() + 1);
         dueDate = tmrw;
-        title = title.replace(/tomorrow/i, "").trim();
-    } else if (text.match(/\bnext (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)) {
-        // Basic next day parsing logic could go here
-        // For now, let's just set next week (+7 days)
-        const nextWeek = new Date(today);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        dueDate = nextWeek;
+        title = title.replace(/\b(?:by |due )?tomorrow\b/i, "").trim();
+    } else if (weekdayMatch) {
+        const target = weekdays.indexOf(weekdayMatch[2].toLowerCase());
+        let daysAhead = (target - today.getDay() + 7) % 7;
+        // "by friday" on a Friday means today; "next friday" always means a week out
+        if (weekdayMatch[1] && daysAhead === 0) daysAhead = 7;
+        const due = new Date(today);
+        due.setDate(due.getDate() + daysAhead);
+        dueDate = due;
+        title = title.replace(weekdayMatch[0], "").trim();
     }
+
+    title = title.replace(/\s{2,}/g, " ").trim();
 
     // Determine status - usually TODO initially
     const status: TaskStatus = "TODO";
