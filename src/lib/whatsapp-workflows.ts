@@ -665,22 +665,17 @@ async function chooseWorkspaceForPendingTask(user: LoadedWhatsAppUser, organizat
 
     const projects = await editableProjects(viewer);
     const shownProjects = projects.slice(0, 9);
+    // Always ask, even when the workspace has no projects — a consistent flow
+    // beats a silently skipped step (per PM decision 2026-07-14).
     const nextPending: PendingCreateTask = {
         ...pending,
         organizationId,
-        choices: projects.length > 0
-            ? { kind: "project", ids: ["none", ...shownProjects.map((project) => project.id)] }
-            : undefined,
+        choices: { kind: "project", ids: ["none", ...shownProjects.map((project) => project.id)] },
     };
     await db.whatsAppSession.update({
         where: { userId: user.id },
         data: { activeOrganizationId: organizationId, pendingAction: pendingActionJson(nextPending) },
     });
-
-    if (projects.length === 0) {
-        await chooseProjectForPendingTask(user, null);
-        return;
-    }
 
     await sendWhatsAppListMessage({
         to: user.phone!,
