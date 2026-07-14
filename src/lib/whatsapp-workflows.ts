@@ -34,8 +34,8 @@ interface PendingCreateTask {
     dueDate?: string;
     assigneeIds?: string[];
     // Options shown in the last numbered picker, in display order, so a plain
-    // "2" reply can be resolved back to a workspace/project id.
-    choices?: { kind: "workspace" | "project"; ids: string[] };
+    // "2" reply can be resolved back to a workspace/project id or confirm/cancel.
+    choices?: { kind: "workspace" | "project" | "confirm"; ids: string[] };
 }
 
 type PendingAction = PendingCreateTask;
@@ -364,8 +364,13 @@ async function handlePendingChoice(user: LoadedWhatsAppUser, lower: string): Pro
 
     if (pending.choices.kind === "workspace") {
         await chooseWorkspaceForPendingTask(user, choice);
-    } else {
+    } else if (pending.choices.kind === "project") {
         await chooseProjectForPendingTask(user, choice === "none" ? null : choice);
+    } else if (choice === "confirm") {
+        await confirmPendingAction(user);
+    } else {
+        await db.whatsAppSession.update({ where: { userId: user.id }, data: { pendingAction: Prisma.DbNull } });
+        await sendWhatsAppMessage({ to: user.phone!, body: "Cancelled." });
     }
     return true;
 }
@@ -706,7 +711,7 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
         priority: parsed.priority,
         dueDate: parsed.dueDate?.toISOString(),
         assigneeIds: [],
-        choices: undefined,
+        choices: { kind: "confirm", ids: ["confirm", "cancel"] },
     };
 
     await db.whatsAppSession.update({
@@ -1028,7 +1033,7 @@ function parsePendingAction(value: unknown): PendingAction | null {
 function parsePendingChoices(value: unknown): PendingCreateTask["choices"] {
     if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
     const record = value as Record<string, unknown>;
-    if (record.kind !== "workspace" && record.kind !== "project") return undefined;
+    if (record.kind !== "workspace" && record.kind !== "project" && record.kind !== "confirm") return undefined;
     const ids = jsonStringArray(record.ids);
     if (!ids || ids.length === 0) return undefined;
     return { kind: record.kind, ids };
