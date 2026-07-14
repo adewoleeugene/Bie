@@ -204,6 +204,27 @@ export async function sendMorningDigestToUser(user: LoadedWhatsAppUser, organiza
     });
 }
 
+async function sendGreeting(user: LoadedWhatsAppUser) {
+    if (!user.phone) return;
+
+    const firstName = user.name?.trim().split(/\s+/)[0];
+    const viewer = viewerFor(user);
+    const tasks = viewer ? await getMyDayTasksForViewer(viewer, 99) : [];
+    const taskLine = tasks.length === 0
+        ? "Nothing is queued for you today."
+        : `You have ${tasks.length} task${tasks.length === 1 ? "" : "s"} suggested for today.`;
+
+    await sendWhatsAppMessage({
+        to: user.phone,
+        body: [
+            `Hi${firstName ? ` ${firstName}` : ""} 👋 This is Bie.`,
+            taskLine,
+            "",
+            "Reply digest to see today's tasks, create task: followed by what needs doing to add one, or help for all commands.",
+        ].join("\n"),
+    });
+}
+
 export async function handleWhatsAppInbound(params: {
     phone: string;
     text: string;
@@ -245,6 +266,11 @@ export async function handleWhatsAppInbound(params: {
             to: user.phone,
             body: "Bie WhatsApp commands: all, 1,3, start 1, done 1, stop session, comment on 1: note, create task: title, digest, report, help.",
         });
+        return;
+    }
+
+    if (/^(hi|hiya|hello|hey|yo|howdy|good\s+(?:morning|afternoon|evening))[\s!.,]*$/i.test(normalized)) {
+        await sendGreeting(user);
         return;
     }
 
