@@ -52,6 +52,11 @@ export function AddTasksDialog({
         });
     };
 
+    const allSelected = candidates.length > 0 && selected.size === candidates.length;
+    const toggleAll = () => {
+        setSelected(allSelected ? new Set() : new Set(candidates.map((t: { id: string }) => t.id)));
+    };
+
     const close = (o: boolean) => {
         if (!o) setSelected(new Set());
         onOpenChange(o);
@@ -88,7 +93,14 @@ export function AddTasksDialog({
                         No other tasks available to add.
                     </div>
                 ) : (
-                    <ScrollArea className="max-h-[360px] pr-3">
+                    <>
+                        <label className="flex cursor-pointer items-center gap-3 px-3 pb-1">
+                            <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {allSelected ? "Deselect all" : `Select all (${candidates.length})`}
+                            </span>
+                        </label>
+                        <ScrollArea className="max-h-[360px] pr-3">
                         <div className="space-y-1">
                             {candidates.map((t: any) => (
                                 <label
@@ -109,7 +121,8 @@ export function AddTasksDialog({
                                 </label>
                             ))}
                         </div>
-                    </ScrollArea>
+                        </ScrollArea>
+                    </>
                 )}
 
                 <DialogFooter>
