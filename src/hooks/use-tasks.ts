@@ -136,6 +136,28 @@ export function useUpdateTask() {
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
             const previousTasks = queryClient.getQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] });
 
+            // Assignee toggles must reflect immediately too — build the new
+            // assignee objects from the cached members list so the picker and
+            // avatar chips update without waiting for the refetch.
+            const members = queryClient.getQueryData<
+                { id: string; name: string; email: string; image: string | null }[]
+            >(["members"]);
+            const optimisticAssignees =
+                input.assigneeIds !== undefined
+                    ? input.assigneeIds.map((userId) => {
+                          const member = members?.find((m) => m.id === userId);
+                          return {
+                              userId,
+                              user: {
+                                  id: userId,
+                                  name: member?.name ?? "",
+                                  email: member?.email ?? "",
+                                  image: member?.image ?? null,
+                              },
+                          };
+                      })
+                    : undefined;
+
             queryClient.setQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] }, (old) => {
                 if (!old) return old;
                 return old.map((task) => {
@@ -143,6 +165,7 @@ export function useUpdateTask() {
 
                     return {
                         ...task,
+                        ...(optimisticAssignees !== undefined ? { assignees: optimisticAssignees } : {}),
                         ...(input.title !== undefined ? { title: input.title } : {}),
                         ...(input.description !== undefined ? { description: input.description } : {}),
                         ...(input.status !== undefined ? { status: input.status } : {}),
@@ -163,12 +186,13 @@ export function useUpdateTask() {
         onSuccess: (result, input) => {
             if (result.success) {
                 // Refetching every open task list on every inline edit is what
-                // floods the backend. Only structural changes (assignees,
-                // project/sprint membership) need a refetch — for scalar edits,
-                // fold the server's task (which carries server-resolved fields
-                // like statusColumnId) into the caches in place.
+                // floods the backend. Only membership changes (project/sprint
+                // moves, which alter which filtered lists contain the task)
+                // need a refetch — scalar edits and assignee toggles are
+                // already patched into the caches optimistically; fold the
+                // server's task (which carries server-resolved fields like
+                // statusColumnId) into the caches in place.
                 const structural =
-                    input.assigneeIds !== undefined ||
                     input.projectId !== undefined ||
                     input.sprintId !== undefined;
                 if (structural) {
