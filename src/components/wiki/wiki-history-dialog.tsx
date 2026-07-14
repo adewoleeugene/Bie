@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { restoreWikiPageVersion } from "@/actions/wiki";
 import { diffBlocks, BlockDiffEntry } from "@/lib/blocknote-diff";
-import { BlockEditor } from "@/components/wiki/block-editor";
+import { BlockEditor } from "@/components/wiki/block-editor-lazy";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { useRouter } from "next/navigation";

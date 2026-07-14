@@ -363,6 +363,20 @@ export async function updateTask(
             );
             updateData.statusColumnId = statusColumn?.id ?? null;
             updateData.status = statusColumn?.status ?? validated.status ?? existingTask.status;
+        } else if (validated.status !== undefined && validated.status !== existingTask.status) {
+            // Status-only updates (e.g. the task drawer's Status select) must
+            // also move the task to the matching board column — the kanban
+            // places cards by statusColumnId, so leaving it behind makes the
+            // saved change invisible on the board.
+            const nextProjectId = validated.projectId !== undefined ? validated.projectId : existingTask.projectId;
+            statusColumn = await getColumnForTaskInput(
+                { status: validated.status },
+                organizationId,
+                nextProjectId
+            );
+            if (statusColumn) {
+                updateData.statusColumnId = statusColumn.id;
+            }
         }
         // Stamp completedAt when a task transitions into/out of DONE.
         const resolvedStatus: TaskStatus =
@@ -723,24 +737,35 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
 
         if (options?.sprintId !== undefined) where.sprintId = options.sprintId;
 
+        // Relations are trimmed to the fields the boards/lists actually render.
+        // Subtasks also come back as their own rows in this list, so the nested
+        // copy only carries what cards and detail rows need — shipping full
+        // task graphs here was the single heaviest payload in the app.
         const tasks = await db.task.findMany({
             where,
             include: {
                 assignees: {
-                    include: {
-                        user: true,
+                    select: {
+                        userId: true,
+                        user: { select: { id: true, name: true, email: true, image: true } },
                     },
                 },
-                project: true,
-                sprint: true,
+                project: { select: { id: true, name: true } },
+                sprint: { select: { id: true, name: true, status: true } },
                 statusColumn: true,
-                parentTask: true,
+                parentTask: { select: { id: true, title: true } },
                 subtasks: {
-                    include: {
+                    select: {
+                        id: true,
+                        title: true,
+                        status: true,
+                        priority: true,
+                        sortOrder: true,
                         statusColumn: true,
                         assignees: {
-                            include: {
-                                user: true,
+                            select: {
+                                userId: true,
+                                user: { select: { id: true, name: true, email: true, image: true } },
                             },
                         },
                     },
@@ -748,8 +773,6 @@ export async function getTasks(projectId?: string | null, options?: { sprintId?:
             },
             orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
         });
-
-        console.log(`[getTasks] Fetched ${tasks.length} tasks for Org: ${organizationId}, Project: ${projectId || 'ALL'}, Sprint: ${options?.sprintId === null ? 'NULL' : options?.sprintId || 'ANY'}`);
 
         return tasks;
     } catch (error) {

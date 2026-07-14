@@ -12,7 +12,7 @@ import { useProjects } from "@/hooks/use-projects";
 import { useSprints } from "@/hooks/use-sprints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BlockEditor } from "@/components/wiki/block-editor";
+import { BlockEditor } from "@/components/wiki/block-editor-lazy";
 import {
     Sheet,
     SheetContent,

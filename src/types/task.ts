@@ -1,23 +1,31 @@
 import { Prisma } from "@prisma/client";
 
-// Task with all relations
+// Task list shape — relations are trimmed to what boards/lists render.
+// Must stay in sync with the `include` in getTasks (src/actions/task.ts).
 export type TaskWithRelations = Prisma.TaskGetPayload<{
     include: {
         assignees: {
-            include: {
-                user: true;
+            select: {
+                userId: true;
+                user: { select: { id: true; name: true; email: true; image: true } };
             };
         };
-        project: true;
-        sprint: true;
+        project: { select: { id: true; name: true } };
+        sprint: { select: { id: true; name: true; status: true } };
         statusColumn: true;
-        parentTask: true;
+        parentTask: { select: { id: true; title: true } };
         subtasks: {
-            include: {
+            select: {
+                id: true;
+                title: true;
+                status: true;
+                priority: true;
+                sortOrder: true;
                 statusColumn: true;
                 assignees: {
-                    include: {
-                        user: true;
+                    select: {
+                        userId: true;
+                        user: { select: { id: true; name: true; email: true; image: true } };
                     };
                 };
             };

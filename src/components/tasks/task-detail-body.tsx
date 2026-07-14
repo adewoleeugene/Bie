@@ -6,11 +6,7 @@ import { useMembers } from "@/hooks/use-members";
 import { useSquads } from "@/hooks/use-squads";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
-import dynamic from "next/dynamic";
-const BlockEditor = dynamic(
-    () => import("@/components/wiki/block-editor").then((mod) => mod.BlockEditor),
-    { ssr: false },
-);
+import { BlockEditor } from "@/components/wiki/block-editor-lazy";
 import { Button } from "@/components/ui/button";
 import {
     Select,

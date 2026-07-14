@@ -17,7 +17,7 @@ import { RelationCell } from "@/components/databases/relation-cell";
 import { StatusCell } from "@/components/databases/status-cell";
 import { isRollupValue } from "@/lib/database-rollup";
 import { RollupValueRenderer } from "@/components/databases/database-table-view";
-import { BlockEditor } from "@/components/wiki/block-editor";
+import { BlockEditor } from "@/components/wiki/block-editor-lazy";
 import { useSetRowContent } from "@/hooks/use-databases";
 import { parseFormulaConfig } from "@/lib/database-types";
 import { evaluateFormula } from "@/lib/formula-engine";

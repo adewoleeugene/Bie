@@ -31,6 +31,11 @@ export function useTasks(projectId?: string | null, options?: { sprintId?: strin
     return useQuery({
         queryKey: ["tasks", projectId, options?.sprintId],
         queryFn: () => getTasks(projectId, options),
+        // Server-action fetches can be rejected at the edge under load (503)
+        // before reaching the app. Keep retrying in the background so a board
+        // opened during a throttle window fills in instead of staying blank.
+        retry: 5,
+        refetchInterval: (query) => (query.state.status === "error" ? 15_000 : false),
     });
 }
 
@@ -126,11 +131,12 @@ export function useUpdateTask() {
     return useMutation({
         mutationFn: (input: UpdateTaskInput) => updateTask(input),
         onMutate: async (input) => {
-            // Optimistic update
+            // Optimistic update across every task list (keys are
+            // ["tasks", projectId, sprintId], so prefix-match them all).
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
-            const previousTasks = queryClient.getQueryData<TaskWithRelations[]>(["tasks"]);
+            const previousTasks = queryClient.getQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] });
 
-            queryClient.setQueryData<TaskWithRelations[]>(["tasks"], (old) => {
+            queryClient.setQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] }, (old) => {
                 if (!old) return old;
                 return old.map((task) => {
                     if (task.id !== input.id) return task;
@@ -154,10 +160,27 @@ export function useUpdateTask() {
 
             return { previousTasks };
         },
-        onSuccess: (result) => {
+        onSuccess: (result, input) => {
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ["tasks"] });
-                queryClient.invalidateQueries({ queryKey: ["task"] });
+                // Refetching every open task list on every inline edit is what
+                // floods the backend. Only structural changes (assignees,
+                // project/sprint membership) need a refetch — for scalar edits,
+                // fold the server's task (which carries server-resolved fields
+                // like statusColumnId) into the caches in place.
+                const structural =
+                    input.assigneeIds !== undefined ||
+                    input.projectId !== undefined ||
+                    input.sprintId !== undefined;
+                if (structural) {
+                    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                } else if (result.data) {
+                    const updated = result.data;
+                    queryClient.setQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] }, (old) => {
+                        if (!old) return old;
+                        return old.map((task) => (task.id === updated.id ? { ...task, ...updated } : task));
+                    });
+                }
+                queryClient.invalidateQueries({ queryKey: ["task", input.id] });
                 // Silent success — inline edits (assignee toggle, status, dates)
                 // fire this hook constantly; toasting on every one is noisy.
             } else {
@@ -166,9 +189,9 @@ export function useUpdateTask() {
         },
         onError: (_error, _variables, context) => {
             // Rollback on error
-            if (context?.previousTasks) {
-                queryClient.setQueryData(["tasks"], context.previousTasks);
-            }
+            context?.previousTasks?.forEach(([key, data]) => {
+                queryClient.setQueryData(key, data);
+            });
             toast.error("Failed to update task");
         },
     });
@@ -256,12 +279,13 @@ export function useBulkReorderTasks() {
     return useMutation({
         mutationFn: (input: BulkReorderTasksInput) => bulkReorderTasks(input),
         onMutate: async (input) => {
-            // Optimistic update
+            // Optimistic update across every task list (keys are
+            // ["tasks", projectId, sprintId], so prefix-match them all).
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
-            const previousTasks = queryClient.getQueryData<TaskWithRelations[]>(["tasks"]);
+            const previousTasks = queryClient.getQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] });
 
-            // Input is array of { id, status, sortOrder }
-            queryClient.setQueryData<TaskWithRelations[]>(["tasks"], (old) => {
+            // Input is array of { id, status, statusColumnId, sortOrder }
+            queryClient.setQueriesData<TaskWithRelations[]>({ queryKey: ["tasks"] }, (old) => {
                 if (!old) return old;
                 return old.map((task) => {
                     const update = input.tasks.find(t => t.id === task.id);
@@ -275,16 +299,21 @@ export function useBulkReorderTasks() {
             return { previousTasks };
         },
         onSuccess: (result) => {
+            // Drags fire this constantly and the input already carries the full
+            // placement (status, column, sortOrder) which onMutate applied to
+            // the caches — refetching every open task list after each drop is
+            // pure amplification. Only re-sync from the server when it refused.
             if (!result.success) {
                 toast.error(result.error);
+                queryClient.invalidateQueries({ queryKey: ["tasks"] });
             }
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
         },
         onError: (_error, _variables, context) => {
-            // Rollback on error
-            if (context?.previousTasks) {
-                queryClient.setQueryData(["tasks"], context.previousTasks);
-            }
+            // Rollback on error, then re-sync from the server.
+            context?.previousTasks?.forEach(([key, data]) => {
+                queryClient.setQueryData(key, data);
+            });
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
             toast.error("Failed to reorder tasks");
         },
     });
