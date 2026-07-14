@@ -15,7 +15,7 @@ import { OrgRole, Sprint, SprintStatus, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { activeMembership } from "@/lib/user-organization";
 import {
-    canEdit,
+    canManage,
     projectAccessWhere,
     resolveProjectAccess,
     taskAccessWhere,
@@ -53,7 +53,10 @@ async function getUserOrganization() {
     };
 }
 
-async function assertProjectEdit(projectId: string, viewer: SprintViewer) {
+// Sprint planning (create/rename/fill/complete) is reserved for people who
+// manage the project — owners, admins, the lead — not everyone who can edit
+// tasks. Invitees see the sprint exactly as its creator shaped it.
+async function assertProjectManage(projectId: string, viewer: SprintViewer) {
     const project = await db.project.findFirst({
         where: { id: projectId, organizationId: viewer.organizationId },
         select: {
@@ -73,7 +76,7 @@ async function assertProjectEdit(projectId: string, viewer: SprintViewer) {
         orgRole: viewer.role,
     });
 
-    if (!canEdit(access)) throw new Error("Forbidden");
+    if (!canManage(access)) throw new Error("Forbidden");
 
     return project;
 }
@@ -86,7 +89,7 @@ export async function createSprint(
         const viewer = await getUserOrganization();
         const { organizationId } = viewer;
 
-        await assertProjectEdit(validated.projectId, viewer);
+        await assertProjectManage(validated.projectId, viewer);
 
         if (validated.status === "ACTIVE") {
             const hasActiveSprint = await db.sprint.findFirst({
@@ -144,9 +147,9 @@ export async function updateSprint(
             return { success: false, error: "Sprint not found" };
         }
 
-        await assertProjectEdit(existingSprint.projectId, viewer);
+        await assertProjectManage(existingSprint.projectId, viewer);
         if (validated.projectId && validated.projectId !== existingSprint.projectId) {
-            await assertProjectEdit(validated.projectId, viewer);
+            await assertProjectManage(validated.projectId, viewer);
         }
 
         if (validated.status === "ACTIVE" && existingSprint.status !== "ACTIVE") {
@@ -207,7 +210,7 @@ export async function deleteSprint(
             return { success: false, error: "Sprint not found" };
         }
 
-        await assertProjectEdit(existingSprint.projectId, viewer);
+        await assertProjectManage(existingSprint.projectId, viewer);
 
         await db.sprint.delete({
             where: { id: validated.id },
@@ -304,7 +307,7 @@ export async function completeSprint(
             return { success: false, error: "Sprint not found" };
         }
 
-        await assertProjectEdit(existingSprint.projectId, viewer);
+        await assertProjectManage(existingSprint.projectId, viewer);
 
         // Archive all DONE tasks in this sprint
         await db.task.updateMany({

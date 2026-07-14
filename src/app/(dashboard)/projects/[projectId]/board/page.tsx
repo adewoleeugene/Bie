@@ -5,6 +5,7 @@ import { TaskForm } from "@/components/tasks/task-form";
 import { SmartTaskInput } from "@/components/tasks/smart-task-input";
 import { TaskFiltersBar, applyTaskFilters, TaskFilters } from "@/components/tasks/task-filters";
 import { useTasks } from "@/hooks/use-tasks";
+import { useProject } from "@/hooks/use-projects";
 import { useSprints, useSprint, useCompleteSprint } from "@/hooks/use-sprints";
 import { useSquads } from "@/hooks/use-squads";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -45,6 +46,10 @@ export default function BoardPage() {
 
     const { data: tasks, isLoading: tasksLoading, isError: tasksError, refetch: refetchTasks } = useTasks(projectId, { sprintId: sprintId || undefined });
     const { data: sprints, isLoading: sprintsLoading } = useSprints(projectId);
+    // Sprint planning (create/fill/complete) belongs to whoever manages the
+    // project — owners, admins, the lead. Invitees see the sprint read-only.
+    const { data: project } = useProject(projectId);
+    const canManageSprints = project?.accessLevel === "manage";
     const { data: sprint, isLoading: sprintLoading } = useSprint(sprintId || "");
     const { data: squads } = useSquads();
     const completeSprint = useCompleteSprint();
@@ -209,17 +214,19 @@ export default function BoardPage() {
                                         </SelectItem>
                                     ))}
                                     <div className="mt-1 space-y-0.5 border-t border-[color:var(--border)] px-2 py-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSprintSelectOpen(false);
-                                                setShowSprintDialog(true);
-                                            }}
-                                            className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-xs font-medium text-neutral-300 transition-colors hover:text-white"
-                                        >
-                                            <Plus className="h-3 w-3" />
-                                            New sprint
-                                        </button>
+                                        {canManageSprints && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSprintSelectOpen(false);
+                                                    setShowSprintDialog(true);
+                                                }}
+                                                className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-xs font-medium text-neutral-300 transition-colors hover:text-white"
+                                            >
+                                                <Plus className="h-3 w-3" />
+                                                New sprint
+                                            </button>
+                                        )}
                                         {sortedSprints.length > 3 && (
                                             <Link
                                                 href={`/projects/${projectId}/sprints`}
@@ -234,7 +241,7 @@ export default function BoardPage() {
                             </Select>
                         </div>
 
-                        {sprintId && sprint?.status !== "COMPLETED" && (
+                        {canManageSprints && sprintId && sprint?.status !== "COMPLETED" && (
                             <button
                                 type="button"
                                 onClick={() => setShowAddTasks(true)}
@@ -245,7 +252,7 @@ export default function BoardPage() {
                             </button>
                         )}
 
-                        {sprintId && sprint?.status !== "COMPLETED" && (
+                        {canManageSprints && sprintId && sprint?.status !== "COMPLETED" && (
                             <button
                                 type="button"
                                 onClick={() => setShowCompleteDialog(true)}
@@ -283,17 +290,21 @@ export default function BoardPage() {
                         <div>
                             <p className="text-sm font-medium text-white">This sprint has no tasks yet.</p>
                             <p className="mt-1 text-xs text-neutral-500">
-                                Pull existing tasks in to start planning the sprint.
+                                {canManageSprints
+                                    ? "Pull existing tasks in to start planning the sprint."
+                                    : "The project owner hasn't added tasks to this sprint yet."}
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowAddTasks(true)}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add tasks to sprint
-                        </button>
+                        {canManageSprints && (
+                            <button
+                                type="button"
+                                onClick={() => setShowAddTasks(true)}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--bz-blue)] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[color:var(--bz-blue)]/90"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add tasks to sprint
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <KanbanBoard
@@ -313,7 +324,7 @@ export default function BoardPage() {
             />
 
             {/* Add Tasks to Sprint Dialog */}
-            {sprintId && (
+            {canManageSprints && sprintId && (
                 <AddTasksDialog
                     projectId={projectId}
                     sprintId={sprintId}

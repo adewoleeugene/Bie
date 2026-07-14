@@ -27,6 +27,7 @@ import { activeMembership } from "@/lib/user-organization";
 import {
     AccessLevel,
     canEdit,
+    canManage,
     canView,
     resolveProjectAccess,
     taskAccessWhere,
@@ -105,11 +106,15 @@ async function assertProjectScope(
         orgRole: viewer.role,
     });
 
-    const allowed = required === "edit" ? canEdit(access) : canView(access);
+    const allowed =
+        required === "manage" ? canManage(access) : required === "edit" ? canEdit(access) : canView(access);
     if (!allowed) {
         // Distinguish "can see but not edit" (read-only) from "no access at all",
         // so a Viewer looking right at the task gets a truthful message instead
         // of a confusing "not found".
+        if (required === "manage" && canView(access)) {
+            throw new Error("Only project owners can plan sprints");
+        }
         if (required === "edit" && canView(access)) {
             throw new Error("You have view-only access to this task");
         }
@@ -693,7 +698,7 @@ export async function addTasksToSprint(
             return { success: false, error: "Sprint not found" };
         }
 
-        await assertProjectScope(sprint.projectId, viewer, "edit");
+        await assertProjectScope(sprint.projectId, viewer, "manage");
         await Promise.all(input.taskIds.map((taskId) => assertTaskAccess(taskId, viewer, "edit")));
 
         const result = await db.task.updateMany({

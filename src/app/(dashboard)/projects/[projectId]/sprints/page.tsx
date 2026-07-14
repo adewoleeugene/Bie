@@ -1,6 +1,7 @@
 "use client";
 
 import { useSprints, useDeleteSprint } from "@/hooks/use-sprints";
+import { useProject } from "@/hooks/use-projects";
 import { useParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,10 @@ export default function SprintsPage() {
     const projectId = params.projectId as string;
     const { data: sprints, isLoading } = useSprints(projectId);
     const deleteSprint = useDeleteSprint();
+    // Sprint management is reserved for project owners/admins/lead — invitees
+    // get a read-only view of the sprints the creator set up.
+    const { data: project } = useProject(projectId);
+    const canManageSprints = project?.accessLevel === "manage";
 
     // State for dialogs
     const [editingSprint, setEditingSprint] = useState<any>(null);
@@ -61,7 +66,7 @@ export default function SprintsPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Sprints</h1>
                     <p className="text-sm text-muted-foreground">Manage project sprints and timelines.</p>
                 </div>
-                <SprintDialog projectId={projectId} />
+                {canManageSprints && <SprintDialog projectId={projectId} />}
             </div>
 
             <div className="p-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -82,6 +87,7 @@ export default function SprintsPage() {
                                         {sprint.goal || "No goal defined."}
                                     </CardDescription>
                                 </div>
+                                {canManageSprints && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -100,6 +106,7 @@ export default function SprintsPage() {
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent className="pb-2 text-sm text-muted-foreground space-y-2">
