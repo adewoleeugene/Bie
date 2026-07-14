@@ -533,8 +533,11 @@ export function KanbanBoard({ tasks: initialTasks, projectId, sprintId }: Kanban
                 document.body
             )}
 
+            {/* selectedTask is a click-time snapshot — hand the sheet the live
+                copy so edits made inside it (assignees, status) show while
+                it stays open. */}
             <TaskDetailSheet
-                task={selectedTask}
+                task={selectedTask ? tasks.find((t) => t.id === selectedTask.id) ?? selectedTask : null}
                 open={!!selectedTask}
                 onOpenChange={(open) => !open && setSelectedTask(null)}
             />

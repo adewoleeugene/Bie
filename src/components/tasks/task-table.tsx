@@ -277,7 +277,7 @@ export function TaskTable({ tasks, actionColumn }: TaskTableProps) {
             </div>
 
             <TaskDetailSheet
-                task={selectedTask}
+                task={selectedTask ? tasks.find((t) => t.id === selectedTask.id) ?? selectedTask : null}
                 open={!!selectedTask}
                 onOpenChange={(open) => !open && setSelectedTask(null)}
             />

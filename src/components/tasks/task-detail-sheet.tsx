@@ -106,10 +106,11 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                 </SheetContent>
             </Sheet>
 
-            {/* Nested Subtask Detail Sheet */}
+            {/* Nested Subtask Detail Sheet — resolve the live copy off the
+                (live) parent so edits inside it show while it stays open. */}
             {selectedSubtask && (
                 <TaskDetailSheet
-                    task={selectedSubtask}
+                    task={{ ...selectedSubtask, ...(task?.subtasks?.find((s) => s.id === selectedSubtask.id) ?? {}) } as TaskWithRelations}
                     open={!!selectedSubtask}
                     onOpenChange={(o) => !o && setSelectedSubtask(null)}
                 />

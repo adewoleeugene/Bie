@@ -137,7 +137,7 @@ export function ProjectCalendar({ tasks }: ProjectCalendarProps) {
 
             {selectedTask && (
                 <TaskDetailSheet
-                    task={selectedTask}
+                    task={tasks.find((t) => t.id === selectedTask.id) ?? selectedTask}
                     open={!!selectedTask}
                     onOpenChange={(open) => !open && setSelectedTask(null)}
                 />
