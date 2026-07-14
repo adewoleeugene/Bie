@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useActiveFocusSession, useEndFocusSession } from "@/hooks/use-focus-sessions";
+import { useEndFocusSession } from "@/hooks/use-focus-sessions";
 import { useUpdateTask } from "@/hooks/use-tasks";
 import { toast } from "sonner";
 import { SessionReflectionModal } from "@/components/focus/session-reflection-modal";

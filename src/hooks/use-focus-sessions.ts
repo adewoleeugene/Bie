@@ -23,7 +23,10 @@ export function useActiveFocusSession() {
     return useQuery({
         queryKey: ["active-focus-session"],
         queryFn: () => getActiveFocusSession(),
-        refetchInterval: 1000, // Poll every second for timer
+        // The timer ticks locally off `startedAt` — the server is only consulted to
+        // adopt a session started on another device, which mount + refocus covers.
+        staleTime: 30_000,
+        refetchOnWindowFocus: true,
     });
 }
 
