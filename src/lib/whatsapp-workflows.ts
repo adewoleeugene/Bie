@@ -33,6 +33,9 @@ interface PendingCreateTask {
     priority?: TaskPriority;
     dueDate?: string;
     assigneeIds?: string[];
+    // Options shown in the last numbered picker, in display order, so a plain
+    // "2" reply can be resolved back to a workspace/project id.
+    choices?: { kind: "workspace" | "project"; ids: string[] };
 }
 
 type PendingAction = PendingCreateTask;
@@ -298,6 +301,9 @@ export async function handleWhatsAppInbound(params: {
         return;
     }
 
+    const choiceHandled = await handlePendingChoice(user, lower);
+    if (choiceHandled) return;
+
     if (lower === "all" || /^\d+(\s*,\s*\d+)*$/.test(lower)) {
         await selectDigestTasks(user, lower);
         return;
@@ -335,6 +341,33 @@ export async function handleWhatsAppInbound(params: {
         to: user.phone,
         body: "I did not catch that. Reply help for the available Bie commands.",
     });
+}
+
+// Resolves a bare-number reply against the numbered picker the user was just
+// shown. Must run before digest selection so "2" answers an open picker
+// instead of selecting digest task 2.
+async function handlePendingChoice(user: LoadedWhatsAppUser, lower: string): Promise<boolean> {
+    if (!/^\d+$/.test(lower)) return false;
+
+    const session = await getOrCreateSession(user.id);
+    const pending = parsePendingAction(session.pendingAction);
+    if (!pending || pending.type !== "CREATE_TASK" || !pending.choices) return false;
+
+    const choice = pending.choices.ids[Number(lower) - 1];
+    if (!choice) {
+        await sendWhatsAppMessage({
+            to: user.phone!,
+            body: `Reply with a number between 1 and ${pending.choices.ids.length}, or cancel.`,
+        });
+        return true;
+    }
+
+    if (pending.choices.kind === "workspace") {
+        await chooseWorkspaceForPendingTask(user, choice);
+    } else {
+        await chooseProjectForPendingTask(user, choice === "none" ? null : choice);
+    }
+    return true;
 }
 
 async function handleListReply(user: LoadedWhatsAppUser, replyId: string) {
@@ -581,7 +614,18 @@ async function beginTaskCreation(user: LoadedWhatsAppUser, text: string) {
     }
 
     const memberships = user.memberships.filter((membership) => membership.role !== "GUEST");
-    const pending: PendingCreateTask = { type: "CREATE_TASK", text };
+    const needsWorkspaceChoice = memberships.length > 1 && !user.whatsappSession?.activeOrganizationId;
+    const workspaces = memberships.slice(0, 10).map((membership) => ({
+        id: membership.organizationId,
+        name: membership.organization.name,
+    }));
+    const pending: PendingCreateTask = {
+        type: "CREATE_TASK",
+        text,
+        choices: needsWorkspaceChoice
+            ? { kind: "workspace", ids: workspaces.map((workspace) => workspace.id) }
+            : undefined,
+    };
 
     await db.whatsAppSession.upsert({
         where: { userId: user.id },
@@ -589,11 +633,8 @@ async function beginTaskCreation(user: LoadedWhatsAppUser, text: string) {
         update: { pendingAction: pendingActionJson(pending) },
     });
 
-    if (memberships.length > 1 && !user.whatsappSession?.activeOrganizationId) {
-        await sendWorkspaceList(user, memberships.map((membership) => ({
-            id: membership.organizationId,
-            name: membership.organization.name,
-        })));
+    if (needsWorkspaceChoice) {
+        await sendWorkspaceList(user, workspaces);
         return;
     }
 
@@ -618,7 +659,14 @@ async function chooseWorkspaceForPendingTask(user: LoadedWhatsAppUser, organizat
     }
 
     const projects = await editableProjects(viewer);
-    const nextPending: PendingCreateTask = { ...pending, organizationId };
+    const shownProjects = projects.slice(0, 9);
+    const nextPending: PendingCreateTask = {
+        ...pending,
+        organizationId,
+        choices: projects.length > 0
+            ? { kind: "project", ids: ["none", ...shownProjects.map((project) => project.id)] }
+            : undefined,
+    };
     await db.whatsAppSession.update({
         where: { userId: user.id },
         data: { activeOrganizationId: organizationId, pendingAction: pendingActionJson(nextPending) },
@@ -631,14 +679,14 @@ async function chooseWorkspaceForPendingTask(user: LoadedWhatsAppUser, organizat
 
     await sendWhatsAppListMessage({
         to: user.phone!,
-        body: "Choose a project for this task, or keep it unfiled.",
+        body: "Choose a project for this task, or keep it unfiled. Reply with a number.",
         buttonText: "Choose project",
         sections: [
             {
                 title: "Projects",
                 rows: [
                     { id: "wa:project:none", title: "No project" },
-                    ...projects.slice(0, 9).map((project) => ({ id: `wa:project:${project.id}`, title: project.name.slice(0, 24) })),
+                    ...shownProjects.map((project) => ({ id: `wa:project:${project.id}`, title: project.name.slice(0, 24) })),
                 ],
             },
         ],
@@ -658,6 +706,7 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
         priority: parsed.priority,
         dueDate: parsed.dueDate?.toISOString(),
         assigneeIds: [],
+        choices: undefined,
     };
 
     await db.whatsAppSession.update({
@@ -948,7 +997,7 @@ async function sendWorkspaceList(user: LoadedWhatsAppUser, workspaces: Array<{ i
 
     await sendWhatsAppListMessage({
         to: user.phone!,
-        body: "Choose the workspace for this task.",
+        body: "Choose the workspace for this task. Reply with a number.",
         buttonText: "Choose workspace",
         sections,
     });
@@ -972,7 +1021,17 @@ function parsePendingAction(value: unknown): PendingAction | null {
         priority: isTaskPriority(action.priority) ? action.priority : undefined,
         dueDate: typeof action.dueDate === "string" ? action.dueDate : undefined,
         assigneeIds: Array.isArray(action.assigneeIds) ? action.assigneeIds.filter((id): id is string => typeof id === "string") : undefined,
+        choices: parsePendingChoices(action.choices),
     };
+}
+
+function parsePendingChoices(value: unknown): PendingCreateTask["choices"] {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const record = value as Record<string, unknown>;
+    if (record.kind !== "workspace" && record.kind !== "project") return undefined;
+    const ids = jsonStringArray(record.ids);
+    if (!ids || ids.length === 0) return undefined;
+    return { kind: record.kind, ids };
 }
 
 function pendingActionJson(action: PendingAction): Prisma.InputJsonObject {
