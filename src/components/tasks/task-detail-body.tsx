@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/command";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, X, GripVertical, ChevronRight, Hash, Check, Users } from "lucide-react";
+import { Clock, Plus, X, GripVertical, ChevronRight, Hash, Check, Users, Tag } from "lucide-react";
 import { TaskStatus, TaskPriority, AttachmentParent } from "@prisma/client";
 import { TaskWithRelations } from "@/types/task";
 import { TaskComments } from "@/components/tasks/task-comments";
@@ -524,6 +524,27 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
                         </SelectContent>
                     </Select>
                 </div>
+
+                {/* Labels */}
+                {Array.isArray(task.labels) && task.labels.length > 0 && (
+                    <div className={propertyRow}>
+                        <label className={propertyLabel}>
+                            <Tag className="h-4 w-4 text-neutral-400" />
+                            Labels
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                            {task.labels.map((label: string) => (
+                                <Badge
+                                    key={label}
+                                    variant="outline"
+                                    className="h-5 rounded-full border-[color:var(--border)] px-2 text-[11px] font-normal text-neutral-400"
+                                >
+                                    {label}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Description */}
