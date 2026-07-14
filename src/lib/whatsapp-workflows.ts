@@ -619,7 +619,9 @@ async function beginTaskCreation(user: LoadedWhatsAppUser, text: string) {
     }
 
     const memberships = user.memberships.filter((membership) => membership.role !== "GUEST");
-    const needsWorkspaceChoice = memberships.length > 1 && !user.whatsappSession?.activeOrganizationId;
+    // Always re-ask for multi-workspace users rather than silently reusing the
+    // sticky active workspace — tasks land in surprising places otherwise.
+    const needsWorkspaceChoice = memberships.length > 1;
     const workspaces = memberships.slice(0, 10).map((membership) => ({
         id: membership.organizationId,
         name: membership.organization.name,
