@@ -3,7 +3,7 @@ import { normalizePhoneNumber } from "@/lib/phone";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 function hasValidSecret(request: NextRequest) {
-    const expected = process.env.WHAPI_WEBHOOK_SECRET;
+    const expected = process.env.WHATSAPP_CRON_SECRET;
     if (!expected) return false;
     return request.nextUrl.searchParams.get("secret") === expected;
 }
