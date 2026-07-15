@@ -25,7 +25,8 @@ const NOTIFICATION_ICONS: Record<string, React.ReactNode> = {
 
 export function NotificationBell() {
     const [open, setOpen] = useState(false);
-    const { data: notifications } = useNotifications();
+    // Only the badge count is needed while the panel is closed.
+    const { data: notifications } = useNotifications(20, { enabled: open });
     const { data: unreadCount } = useUnreadCount();
     const markRead = useMarkRead();
     const markAllRead = useMarkAllRead();
