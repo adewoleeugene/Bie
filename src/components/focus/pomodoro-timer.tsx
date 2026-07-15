@@ -33,7 +33,7 @@ import {
     Minus,
     Maximize2,
 } from "lucide-react";
-import { useStartFocusSession, useEndFocusSession, useActiveFocusSession } from "@/hooks/use-focus-sessions";
+import { useStartFocusSession, useEndFocusSession, useActiveFocusSession, useActiveSessionHint } from "@/hooks/use-focus-sessions";
 import { useTasks } from "@/hooks/use-tasks";
 import { toast } from "sonner";
 
@@ -123,7 +123,17 @@ export function PomodoroTimer({
     const { data: tasks } = useTasks();
     const startSession = useStartFocusSession();
     const endSession = useEndFocusSession();
-    const { data: activeSession } = useActiveFocusSession();
+
+    // This timer mounts in the top nav on every page, so it must not talk to the
+    // server unless there's a reason to: either this browser left a session
+    // running, or the user opened the timer (where a session started on another
+    // device should surface).
+    const timerOpened = isControlled ? !!externalIsOpen : internalIsOpen;
+    const hasStoredSession = useActiveSessionHint();
+
+    const { data: activeSession } = useActiveFocusSession({
+        enabled: hasStoredSession || timerOpened,
+    });
 
     // Sync pre-selected values when they change (controlled mode)
     useEffect(() => {

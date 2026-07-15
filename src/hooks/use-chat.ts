@@ -33,7 +33,9 @@ export function useChatUnreadCount() {
     return useQuery({
         queryKey: ["chat-unread-count"],
         queryFn: () => getChatUnreadCount(),
-        refetchInterval: 15000,
+        // A minute-stale badge is imperceptible, and refocusing the tab — the
+        // moment you'd actually look at it — refetches immediately.
+        refetchInterval: 60_000,
         refetchOnWindowFocus: true,
     });
 }

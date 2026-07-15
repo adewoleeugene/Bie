@@ -8,11 +8,17 @@ import {
     markAllNotificationsRead,
 } from "@/actions/notifications";
 
-export function useNotifications(limit = 20) {
+/**
+ * The notification list. Callers pass `enabled` so the rows are only pulled
+ * while the panel showing them is actually open — the bell renders nothing from
+ * this list when closed, and the unread badge comes from `useUnreadCount`.
+ */
+export function useNotifications(limit = 20, options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: ["notifications", limit],
         queryFn: () => getNotifications(limit),
-        refetchInterval: 30000, // Poll every 30 seconds
+        enabled: options?.enabled ?? true,
+        refetchInterval: 30_000,
     });
 }
 
@@ -20,7 +26,10 @@ export function useUnreadCount() {
     return useQuery({
         queryKey: ["notifications-unread-count"],
         queryFn: () => getUnreadCount(),
-        refetchInterval: 15000, // Poll every 15 seconds
+        // A minute-stale badge is imperceptible, and refocusing the tab — the
+        // moment you'd actually look at it — refetches immediately.
+        refetchInterval: 60_000,
+        refetchOnWindowFocus: true,
     });
 }
 
