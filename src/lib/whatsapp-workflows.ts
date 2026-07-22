@@ -695,19 +695,69 @@ async function chooseWorkspaceForPendingTask(user: LoadedWhatsAppUser, organizat
     });
 }
 
+interface ResolvedMentions {
+    title: string;
+    assignees: Array<{ id: string; name: string }>;
+    unmatched: string[];
+}
+
+// Resolves "@name" tokens against workspace members. A token assigns only when
+// it matches exactly one member; ambiguous or unknown tokens are reported and
+// left in the title rather than guessed at.
+async function resolveMentions(organizationId: string, text: string): Promise<ResolvedMentions> {
+    const tokens = [...text.matchAll(/@([\p{L}\p{N}._-]+)/gu)];
+    if (tokens.length === 0) return { title: text, assignees: [], unmatched: [] };
+
+    const members = await db.organizationMember.findMany({
+        where: { organizationId },
+        include: { user: { select: { id: true, name: true, email: true } } },
+    });
+
+    const assignees: ResolvedMentions["assignees"] = [];
+    const unmatched: string[] = [];
+    let title = text;
+
+    for (const token of tokens) {
+        const needle = token[1].toLowerCase();
+        const matches = members.filter((member) => {
+            const name = member.user.name?.toLowerCase() ?? "";
+            const emailLocal = member.user.email?.split("@")[0].toLowerCase() ?? "";
+            return (
+                name === needle ||
+                name.split(/\s+/)[0] === needle ||
+                name.replace(/\s+/g, "") === needle ||
+                emailLocal === needle
+            );
+        });
+
+        if (matches.length === 1) {
+            const matched = matches[0];
+            if (!assignees.some((assignee) => assignee.id === matched.userId)) {
+                assignees.push({ id: matched.userId, name: matched.user.name ?? matched.user.email ?? "Unknown" });
+            }
+            title = title.replace(token[0], "");
+        } else if (!unmatched.includes(token[0])) {
+            unmatched.push(token[0]);
+        }
+    }
+
+    return { title: title.replace(/\s{2,}/g, " ").trim(), assignees, unmatched };
+}
+
 async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: string | null) {
     const session = await getOrCreateSession(user.id);
     const pending = parsePendingAction(session.pendingAction);
     if (!pending || pending.type !== "CREATE_TASK" || !pending.organizationId) return;
 
     const parsed = parseTaskInput(pending.text);
+    const mentions = await resolveMentions(pending.organizationId, parsed.title);
     const nextPending: PendingCreateTask = {
         ...pending,
         projectId,
-        title: parsed.title,
+        title: mentions.title,
         priority: parsed.priority,
         dueDate: parsed.dueDate?.toISOString(),
-        assigneeIds: [],
+        assigneeIds: mentions.assignees.map((assignee) => assignee.id),
         choices: { kind: "confirm", ids: ["confirm", "cancel"] },
     };
 
@@ -723,6 +773,12 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
             `Title: ${nextPending.title}`,
             `Priority: ${nextPending.priority}`,
             nextPending.dueDate ? `Due: ${new Date(nextPending.dueDate).toDateString()}` : undefined,
+            mentions.assignees.length > 0
+                ? `Assignee: ${mentions.assignees.map((assignee) => assignee.name).join(", ")}`
+                : undefined,
+            mentions.unmatched.length > 0
+                ? `I could not match ${mentions.unmatched.join(", ")} to anyone in this workspace, so it stayed in the title.`
+                : undefined,
         ].filter(Boolean).join("\n"),
         buttonText: "Confirm",
         sections: [
