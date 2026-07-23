@@ -26,6 +26,7 @@ async function currentUser() {
             whatsappQuietStart: true,
             whatsappQuietEnd: true,
             whatsappTimezone: true,
+            whatsappDigestTime: true,
         },
     });
 
@@ -165,6 +166,7 @@ export async function updateWhatsAppSettings(input: {
     quietStart?: string;
     quietEnd?: string;
     timezone?: string;
+    digestTime?: string;
 }) {
     try {
         const user = await currentUser();
@@ -180,6 +182,7 @@ export async function updateWhatsAppSettings(input: {
                 whatsappQuietStart: input.quietStart,
                 whatsappQuietEnd: input.quietEnd,
                 whatsappTimezone: input.timezone,
+                whatsappDigestTime: input.digestTime,
             },
         });
 

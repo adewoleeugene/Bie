@@ -185,12 +185,14 @@ export async function sendMorningDigestToUser(user: LoadedWhatsAppUser, organiza
             activeOrganizationId: viewer.organizationId,
             lastDigestTaskIds: tasks.map((task) => task.id),
             selectedTaskIds: [],
+            lastDigestSentAt: new Date(),
         },
         update: {
             activeOrganizationId: viewer.organizationId,
             lastDigestTaskIds: tasks.map((task) => task.id),
             selectedTaskIds: [],
             pendingAction: Prisma.DbNull,
+            lastDigestSentAt: new Date(),
         },
     });
 

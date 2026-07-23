@@ -27,6 +27,7 @@ interface WhatsAppSettingsData {
     whatsappQuietStart: string;
     whatsappQuietEnd: string;
     whatsappTimezone: string;
+    whatsappDigestTime: string;
 }
 
 export function WhatsAppSettings({ compact = false }: { compact?: boolean }) {
@@ -97,6 +98,7 @@ export function WhatsAppSettings({ compact = false }: { compact?: boolean }) {
                 quietStart: merged.whatsappQuietStart,
                 quietEnd: merged.whatsappQuietEnd,
                 timezone: merged.whatsappTimezone,
+                digestTime: merged.whatsappDigestTime,
             });
 
             if (!result.success) {
@@ -246,6 +248,19 @@ export function WhatsAppSettings({ compact = false }: { compact?: boolean }) {
                                 onChange={(event) => saveSettings({ whatsappTimezone: event.target.value })}
                                 disabled={pending}
                             />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="whatsapp-digest-time">Daily digest time</Label>
+                            <Input
+                                id="whatsapp-digest-time"
+                                type="time"
+                                value={settings?.whatsappDigestTime ?? "08:00"}
+                                onChange={(event) => saveSettings({ whatsappDigestTime: event.target.value })}
+                                disabled={pending}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Your task digest arrives around this time each day (your timezone). Turn the Daily Digest WhatsApp channel on under Notifications to receive it.
+                            </p>
                         </div>
                     </div>
                 ) : null}
