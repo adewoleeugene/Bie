@@ -18,6 +18,23 @@ import {
 } from "@/actions/whatsapp";
 import { toast } from "sonner";
 
+// The digest is delivered by an hourly job, so the time is picked by whole hours
+// only. Values are 24h "HH:00"; labels are friendly 12h.
+const DIGEST_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
+    const value = `${String(hour).padStart(2, "0")}:00`;
+    const period = hour < 12 ? "AM" : "PM";
+    const display = hour % 12 === 0 ? 12 : hour % 12;
+    return { value, label: `${display}:00 ${period}` };
+});
+
+// Snap any stored time (e.g. a legacy "17:51") to the top of its hour so it
+// matches a dropdown option.
+function snapToHour(time: string): string {
+    const hour = Number.parseInt(time.split(":")[0] ?? "8", 10);
+    const safe = Number.isNaN(hour) ? 8 : Math.min(23, Math.max(0, hour));
+    return `${String(safe).padStart(2, "0")}:00`;
+}
+
 interface WhatsAppSettingsData {
     phone: string | null;
     phoneCountry: string | null;
@@ -251,15 +268,24 @@ export function WhatsAppSettings({ compact = false }: { compact?: boolean }) {
                         </div>
                         <div className="space-y-2 sm:col-span-2">
                             <Label htmlFor="whatsapp-digest-time">Daily digest time</Label>
-                            <Input
-                                id="whatsapp-digest-time"
-                                type="time"
-                                value={settings?.whatsappDigestTime ?? "08:00"}
-                                onChange={(event) => saveSettings({ whatsappDigestTime: event.target.value })}
+                            <Select
+                                value={snapToHour(settings?.whatsappDigestTime ?? "08:00")}
                                 disabled={pending}
-                            />
+                                onValueChange={(value) => saveSettings({ whatsappDigestTime: value })}
+                            >
+                                <SelectTrigger id="whatsapp-digest-time">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {DIGEST_HOUR_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <p className="text-xs text-muted-foreground">
-                                Your task digest arrives around this time each day (your timezone). Turn the Daily Digest WhatsApp channel on under Notifications to receive it.
+                                Your task digest arrives at the top of this hour each day (your timezone). Turn the Daily Digest WhatsApp channel on under Notifications to receive it.
                             </p>
                         </div>
                     </div>
