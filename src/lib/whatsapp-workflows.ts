@@ -48,9 +48,9 @@ const WA_HELP = [
     "Here's what you can do on WhatsApp:",
     "",
     "• digest — see today's tasks",
-    "• 1  (or 1,3) — pick tasks from the list",
-    "• start 1 — start working on a task (starts a timer)",
-    "• done 1 — mark a task done (logs your time)",
+    "• start 1 — start working on task 1 (starts a timer)",
+    "• done 1 — mark task 1 done (logs your time)",
+    "• 1  (or 1,3) — select tasks to work on next",
     "• stop session — stop the timer",
     "• comment on 1: your note — add a comment",
     "• create task: finish deck by Friday @sarah — add & assign a task",
@@ -59,7 +59,7 @@ const WA_HELP = [
 ].join("\n");
 
 // Short one-line action hint reused under the digest and greeting.
-const WA_ACTION_HINT = "Reply a number to pick (e.g. 1 or 1,3), then start 1, done 1, or comment on 1: note. Reply help for all commands.";
+const WA_ACTION_HINT = "The number is the task's spot on the list. Reply start 1 to begin task 1, done 1 to finish it, or comment on 1: your note. Reply help for all commands.";
 
 const DEFAULT_STATUS_COLUMNS: Array<{ name: string; status: TaskStatus; color: string; sortOrder: number }> = [
     { name: "Backlog", status: "BACKLOG", color: "#858585", sortOrder: 0 },
