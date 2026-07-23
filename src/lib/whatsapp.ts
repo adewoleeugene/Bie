@@ -139,3 +139,47 @@ export function isInsideQuietHours(params: {
     if (start < end) return current >= start && current < end;
     return current >= start || current < end;
 }
+
+// The wall-clock date (YYYY-MM-DD) and minutes-since-midnight in a timezone.
+export function localDateAndMinutes(timezone: string, now: Date = new Date()): { date: string; minutes: number } {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).formatToParts(now);
+
+    const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+    // hour12:false can emit "24" at midnight in some runtimes — normalize to 0.
+    const hour = get("hour") === "24" ? 0 : Number(get("hour"));
+    return {
+        date: `${get("year")}-${get("month")}-${get("day")}`,
+        minutes: hour * 60 + Number(get("minute")),
+    };
+}
+
+// True when the user's local time has reached their digest time today AND they
+// have not already been sent a digest today (in their timezone). Uses ">=" so a
+// missed hourly tick still delivers (a little late) rather than skipping the day.
+export function isDigestDue(params: {
+    timezone: string;
+    digestTime: string; // "HH:MM"
+    lastSentAt?: Date | null;
+    now?: Date;
+}): boolean {
+    const now = params.now ?? new Date();
+    const { date: today, minutes: nowMinutes } = localDateAndMinutes(params.timezone, now);
+
+    const [h, m] = params.digestTime.split(":").map(Number);
+    const digestMinutes = (h || 0) * 60 + (m || 0);
+    if (nowMinutes < digestMinutes) return false;
+
+    if (params.lastSentAt) {
+        const { date: sentDate } = localDateAndMinutes(params.timezone, params.lastSentAt);
+        if (sentDate === today) return false;
+    }
+    return true;
+}
