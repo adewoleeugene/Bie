@@ -32,10 +32,19 @@ interface PendingCreateTask {
     title?: string;
     priority?: TaskPriority;
     dueDate?: string;
-    assigneeIds?: string[];
+    assignees?: MentionCandidate[];
+    // Ambiguous @mentions still awaiting a "which person?" pick.
+    pendingMentions?: Array<{ token: string; candidates: MentionCandidate[] }>;
+    // @mentions that matched nobody (shown as a note on the confirm step).
+    unmatched?: string[];
     // Options shown in the last numbered picker, in display order, so a plain
-    // "2" reply can be resolved back to a workspace/project id or confirm/cancel.
-    choices?: { kind: "workspace" | "project" | "confirm"; ids: string[] };
+    // "2" reply can be resolved back to a workspace/project/mention id or confirm/cancel.
+    choices?: { kind: "workspace" | "project" | "mention" | "confirm"; ids: string[] };
+}
+
+interface MentionCandidate {
+    id: string;
+    name: string;
 }
 
 type PendingAction = PendingCreateTask;
@@ -378,6 +387,29 @@ async function handlePendingChoice(user: LoadedWhatsAppUser, lower: string): Pro
         await chooseWorkspaceForPendingTask(user, choice);
     } else if (pending.choices.kind === "project") {
         await chooseProjectForPendingTask(user, choice === "none" ? null : choice);
+    } else if (pending.choices.kind === "mention") {
+        const current = pending.pendingMentions?.[0];
+        let assignees = pending.assignees ?? [];
+        let title = pending.title;
+        if (current && choice !== "none") {
+            const picked = current.candidates.find((candidate) => candidate.id === choice);
+            if (picked && !assignees.some((assignee) => assignee.id === picked.id)) {
+                assignees = [...assignees, picked];
+            }
+            if (title) title = title.replace(current.token, "").replace(/\s{2,}/g, " ").trim();
+        }
+        const nextPending: PendingCreateTask = {
+            ...pending,
+            assignees,
+            title,
+            pendingMentions: (pending.pendingMentions ?? []).slice(1),
+            choices: undefined,
+        };
+        await db.whatsAppSession.update({
+            where: { userId: user.id },
+            data: { pendingAction: pendingActionJson(nextPending) },
+        });
+        await promptNextMentionOrConfirm(user);
     } else if (choice === "confirm") {
         await confirmPendingAction(user);
     } else {
@@ -709,7 +741,8 @@ async function chooseWorkspaceForPendingTask(user: LoadedWhatsAppUser, organizat
 
 interface ResolvedMentions {
     title: string;
-    assignees: Array<{ id: string; name: string }>;
+    assignees: MentionCandidate[];
+    ambiguous: Array<{ token: string; candidates: MentionCandidate[] }>;
     unmatched: string[];
 }
 
@@ -718,14 +751,15 @@ interface ResolvedMentions {
 // left in the title rather than guessed at.
 async function resolveMentions(organizationId: string, text: string): Promise<ResolvedMentions> {
     const tokens = [...text.matchAll(/@([\p{L}\p{N}._-]+)/gu)];
-    if (tokens.length === 0) return { title: text, assignees: [], unmatched: [] };
+    if (tokens.length === 0) return { title: text, assignees: [], ambiguous: [], unmatched: [] };
 
     const members = await db.organizationMember.findMany({
         where: { organizationId },
         include: { user: { select: { id: true, name: true, email: true } } },
     });
 
-    const assignees: ResolvedMentions["assignees"] = [];
+    const assignees: MentionCandidate[] = [];
+    const ambiguous: ResolvedMentions["ambiguous"] = [];
     const unmatched: string[] = [];
     let title = text;
 
@@ -748,12 +782,21 @@ async function resolveMentions(organizationId: string, text: string): Promise<Re
                 assignees.push({ id: matched.userId, name: matched.user.name ?? matched.user.email ?? "Unknown" });
             }
             title = title.replace(token[0], "");
+        } else if (matches.length > 1) {
+            // Multiple people match — keep the token in the title and ask the user
+            // which one they meant (resolved via a numbered picker before confirm).
+            if (!ambiguous.some((entry) => entry.token === token[0])) {
+                ambiguous.push({
+                    token: token[0],
+                    candidates: matches.map((member) => ({ id: member.userId, name: member.user.name ?? member.user.email ?? "Unknown" })),
+                });
+            }
         } else if (!unmatched.includes(token[0])) {
             unmatched.push(token[0]);
         }
     }
 
-    return { title: title.replace(/\s{2,}/g, " ").trim(), assignees, unmatched };
+    return { title: title.replace(/\s{2,}/g, " ").trim(), assignees, ambiguous, unmatched };
 }
 
 async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: string | null) {
@@ -769,8 +812,10 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
         title: mentions.title,
         priority: parsed.priority,
         dueDate: parsed.dueDate?.toISOString(),
-        assigneeIds: mentions.assignees.map((assignee) => assignee.id),
-        choices: { kind: "confirm", ids: ["confirm", "cancel"] },
+        assignees: mentions.assignees,
+        pendingMentions: mentions.ambiguous,
+        unmatched: mentions.unmatched,
+        choices: undefined,
     };
 
     await db.whatsAppSession.update({
@@ -778,18 +823,66 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
         data: { activeProjectId: projectId, pendingAction: pendingActionJson(nextPending) },
     });
 
+    await promptNextMentionOrConfirm(user);
+}
+
+// If any @mention was ambiguous, ask which person is meant (one picker per
+// ambiguous name); once all are resolved, show the confirm step.
+async function promptNextMentionOrConfirm(user: LoadedWhatsAppUser) {
+    const session = await getOrCreateSession(user.id);
+    const pending = parsePendingAction(session.pendingAction);
+    if (!pending || pending.type !== "CREATE_TASK") return;
+
+    const next = pending.pendingMentions?.[0];
+    if (!next) {
+        await sendCreateTaskConfirm(user);
+        return;
+    }
+
+    const nextPending: PendingCreateTask = {
+        ...pending,
+        choices: { kind: "mention", ids: [...next.candidates.map((candidate) => candidate.id), "none"] },
+    };
+    await db.whatsAppSession.update({
+        where: { userId: user.id },
+        data: { pendingAction: pendingActionJson(nextPending) },
+    });
+
+    await sendWhatsAppMessage({
+        to: user.phone!,
+        body: [
+            `More than one person matches ${next.token}. Who do you mean?`,
+            ...next.candidates.map((candidate, index) => `${index + 1}. ${candidate.name}`),
+            `${next.candidates.length + 1}. Nobody — leave ${next.token} in the title`,
+        ].join("\n"),
+    });
+}
+
+async function sendCreateTaskConfirm(user: LoadedWhatsAppUser) {
+    const session = await getOrCreateSession(user.id);
+    const pending = parsePendingAction(session.pendingAction);
+    if (!pending || pending.type !== "CREATE_TASK") return;
+
+    const nextPending: PendingCreateTask = {
+        ...pending,
+        choices: { kind: "confirm", ids: ["confirm", "cancel"] },
+    };
+    await db.whatsAppSession.update({
+        where: { userId: user.id },
+        data: { pendingAction: pendingActionJson(nextPending) },
+    });
+
+    const assignees = pending.assignees ?? [];
     await sendWhatsAppListMessage({
         to: user.phone!,
         body: [
             "Create this task?",
-            `Title: ${nextPending.title}`,
-            `Priority: ${nextPending.priority}`,
-            nextPending.dueDate ? `Due: ${new Date(nextPending.dueDate).toDateString()}` : undefined,
-            mentions.assignees.length > 0
-                ? `Assignee: ${mentions.assignees.map((assignee) => assignee.name).join(", ")}`
-                : undefined,
-            mentions.unmatched.length > 0
-                ? `I could not match ${mentions.unmatched.join(", ")} to anyone in this workspace, so it stayed in the title.`
+            `Title: ${pending.title}`,
+            `Priority: ${pending.priority}`,
+            pending.dueDate ? `Due: ${new Date(pending.dueDate).toDateString()}` : undefined,
+            assignees.length > 0 ? `Assignee: ${assignees.map((assignee) => assignee.name).join(", ")}` : undefined,
+            pending.unmatched && pending.unmatched.length > 0
+                ? `I could not match ${pending.unmatched.join(", ")} to anyone in this workspace, so it stayed in the title.`
                 : undefined,
         ].filter(Boolean).join("\n"),
         buttonText: "Confirm",
@@ -821,7 +914,7 @@ async function confirmPendingAction(user: LoadedWhatsAppUser) {
         priority: pending.priority ?? "P2",
         dueDate: pending.dueDate,
         projectId: pending.projectId ?? null,
-        assigneeIds: pending.assigneeIds ?? [],
+        assigneeIds: pending.assignees?.map((assignee) => assignee.id) ?? [],
     });
 
     await db.whatsAppSession.update({
@@ -1090,15 +1183,35 @@ function parsePendingAction(value: unknown): PendingAction | null {
         title: typeof action.title === "string" ? action.title : undefined,
         priority: isTaskPriority(action.priority) ? action.priority : undefined,
         dueDate: typeof action.dueDate === "string" ? action.dueDate : undefined,
-        assigneeIds: Array.isArray(action.assigneeIds) ? action.assigneeIds.filter((id): id is string => typeof id === "string") : undefined,
+        assignees: parseMentionCandidates(action.assignees),
+        pendingMentions: parsePendingMentions(action.pendingMentions),
+        unmatched: jsonStringArray(action.unmatched) ?? undefined,
         choices: parsePendingChoices(action.choices),
     };
+}
+
+function parseMentionCandidates(value: unknown): MentionCandidate[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const candidates = value
+        .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+        .filter((item) => typeof item.id === "string" && typeof item.name === "string")
+        .map((item) => ({ id: item.id as string, name: item.name as string }));
+    return candidates.length > 0 ? candidates : undefined;
+}
+
+function parsePendingMentions(value: unknown): PendingCreateTask["pendingMentions"] {
+    if (!Array.isArray(value)) return undefined;
+    const entries = value
+        .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+        .map((item) => ({ token: item.token, candidates: parseMentionCandidates(item.candidates) }))
+        .filter((item): item is { token: string; candidates: MentionCandidate[] } => typeof item.token === "string" && Array.isArray(item.candidates));
+    return entries.length > 0 ? entries : undefined;
 }
 
 function parsePendingChoices(value: unknown): PendingCreateTask["choices"] {
     if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
     const record = value as Record<string, unknown>;
-    if (record.kind !== "workspace" && record.kind !== "project" && record.kind !== "confirm") return undefined;
+    if (record.kind !== "workspace" && record.kind !== "project" && record.kind !== "mention" && record.kind !== "confirm") return undefined;
     const ids = jsonStringArray(record.ids);
     if (!ids || ids.length === 0) return undefined;
     return { kind: record.kind, ids };
