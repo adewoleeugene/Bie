@@ -174,6 +174,11 @@ export async function updateWhatsAppSettings(input: {
             return { success: false, error: "Verify a WhatsApp number first." };
         }
 
+        // The digest runs hourly, so store the time at the top of the hour.
+        const digestTime = input.digestTime
+            ? `${String(Math.min(23, Math.max(0, Number.parseInt(input.digestTime.split(":")[0] ?? "8", 10) || 0))).padStart(2, "0")}:00`
+            : undefined;
+
         await db.user.update({
             where: { id: user.id },
             data: {
@@ -182,7 +187,7 @@ export async function updateWhatsAppSettings(input: {
                 whatsappQuietStart: input.quietStart,
                 whatsappQuietEnd: input.quietEnd,
                 whatsappTimezone: input.timezone,
-                whatsappDigestTime: input.digestTime,
+                whatsappDigestTime: digestTime,
             },
         });
 
