@@ -183,3 +183,11 @@ export function isDigestDue(params: {
     }
     return true;
 }
+
+// "Good morning" / "Good afternoon" / "Good evening" for the user's local time.
+export function greetingForTimezone(timezone: string, now: Date = new Date()): { text: string; emoji: string } {
+    const hour = Math.floor(localDateAndMinutes(timezone, now).minutes / 60);
+    if (hour < 12) return { text: "Good morning", emoji: "☀️" };
+    if (hour < 17) return { text: "Good afternoon", emoji: "🌤️" };
+    return { text: "Good evening", emoji: "🌙" };
+}

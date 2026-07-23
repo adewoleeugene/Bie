@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { parseTaskInput } from "@/lib/ai/nlp";
 import { projectAccessWhere, resolveProjectAccess, taskAccessWhere, canEdit } from "@/lib/permissions";
 import { sendNotifications } from "@/lib/notifications";
-import { sendWhatsAppListMessage, sendWhatsAppMessage, WhatsAppListSection } from "@/lib/whatsapp";
+import { greetingForTimezone, sendWhatsAppListMessage, sendWhatsAppMessage, WhatsAppListSection } from "@/lib/whatsapp";
 
 type WhatsAppUser = Awaited<ReturnType<typeof getWhatsAppUserByPhone>>;
 type LoadedWhatsAppUser = NonNullable<WhatsAppUser>;
@@ -196,10 +196,12 @@ export async function sendMorningDigestToUser(user: LoadedWhatsAppUser, organiza
         },
     });
 
+    const greeting = greetingForTimezone(user.whatsappTimezone);
+
     if (tasks.length === 0) {
         return sendWhatsAppMessage({
             to: user.phone,
-            body: "Good morning. You have no suggested tasks for today in Bie.",
+            body: `${greeting.text}. You have no tasks lined up for today in Bie.`,
         });
     }
 
@@ -209,7 +211,7 @@ export async function sendMorningDigestToUser(user: LoadedWhatsAppUser, organiza
     return sendWhatsAppMessage({
         to: user.phone,
         body: [
-            "Good morning ☀️ Here's your day:",
+            `${greeting.text} ${greeting.emoji} Here's your day:`,
             ...tasks.map((task, index) => `${index + 1}. ${task.title}${task.project ? ` (${task.project.name})` : ""}`),
             "",
             WA_ACTION_HINT,
