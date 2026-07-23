@@ -42,6 +42,25 @@ type PendingAction = PendingCreateTask;
 
 const DIGEST_CAP = 7;
 
+// One canonical command reference so every surface (help, digest, greeting,
+// fallback) uses the same wording. Reply `help` shows WA_HELP.
+const WA_HELP = [
+    "Here's what you can do on WhatsApp:",
+    "",
+    "• digest — see today's tasks",
+    "• 1  (or 1,3) — pick tasks from the list",
+    "• start 1 — start working on a task (starts a timer)",
+    "• done 1 — mark a task done (logs your time)",
+    "• stop session — stop the timer",
+    "• comment on 1: your note — add a comment",
+    "• create task: finish deck by Friday @sarah — add & assign a task",
+    "• report — today's summary",
+    "• stop — turn off WhatsApp updates",
+].join("\n");
+
+// Short one-line action hint reused under the digest and greeting.
+const WA_ACTION_HINT = "Reply a number to pick (e.g. 1 or 1,3), then start 1, done 1, or comment on 1: note. Reply help for all commands.";
+
 const DEFAULT_STATUS_COLUMNS: Array<{ name: string; status: TaskStatus; color: string; sortOrder: number }> = [
     { name: "Backlog", status: "BACKLOG", color: "#858585", sortOrder: 0 },
     { name: "To Do", status: "TODO", color: "#0099ff", sortOrder: 1 },
@@ -182,28 +201,17 @@ export async function sendMorningDigestToUser(user: LoadedWhatsAppUser, organiza
         });
     }
 
-    return sendWhatsAppListMessage({
+    // Single clean numbered list. (Previously sent as a "list message" whose
+    // text fallback re-printed every task under a "Today" section with doubled
+    // numbering — "2. 1. Wednesday Quotes" — so the list appeared twice.)
+    return sendWhatsAppMessage({
         to: user.phone,
         body: [
-            "Good morning. Pick what you want to work on today:",
+            "Good morning ☀️ Here's your day:",
             ...tasks.map((task, index) => `${index + 1}. ${task.title}${task.project ? ` (${task.project.name})` : ""}`),
             "",
-            "You can also reply: all, 1,3, start 1, done 1, or comment on 1: your note.",
+            WA_ACTION_HINT,
         ].join("\n"),
-        buttonText: "Choose tasks",
-        sections: [
-            {
-                title: "Today",
-                rows: [
-                    { id: "wa:select:all", title: "All tasks", description: `${tasks.length} suggested` },
-                    ...tasks.map((task, index) => ({
-                        id: `wa:select:${task.id}`,
-                        title: `${index + 1}. ${task.title}`.slice(0, 24),
-                        description: task.project?.name,
-                    })),
-                ],
-            },
-        ],
     });
 }
 
@@ -223,7 +231,7 @@ async function sendGreeting(user: LoadedWhatsAppUser) {
             `Hi${firstName ? ` ${firstName}` : ""} 👋 This is Bie.`,
             taskLine,
             "",
-            "Reply digest to see today's tasks, create task: followed by what needs doing to add one, or help for all commands.",
+            "Reply digest for today's tasks, or create task: <what to do> to add one. Reply help for all commands.",
         ].join("\n"),
     });
 }
@@ -267,7 +275,7 @@ export async function handleWhatsAppInbound(params: {
     if (lower === "help") {
         await sendWhatsAppMessage({
             to: user.phone,
-            body: "Bie WhatsApp commands: all, 1,3, start 1, done 1, stop session, comment on 1: note, create task: title, digest, report, help.",
+            body: WA_HELP,
         });
         return;
     }
@@ -339,7 +347,7 @@ export async function handleWhatsAppInbound(params: {
 
     await sendWhatsAppMessage({
         to: user.phone,
-        body: "I did not catch that. Reply help for the available Bie commands.",
+        body: "I did not catch that. Reply help to see what I can do.",
     });
 }
 
