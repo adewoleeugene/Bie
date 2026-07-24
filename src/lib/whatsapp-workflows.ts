@@ -62,7 +62,7 @@ const WA_HELP = [
     "• 1  (or 1,3) — select tasks to work on next",
     "• stop session — stop the timer",
     "• comment on 1: your note — add a comment",
-    "• create task: finish deck by Friday @sarah — add & assign a task",
+    "• just type a task — e.g. review the deck by Friday @sarah (adds & assigns it)",
     "• report — today's summary",
     "• stop — turn off WhatsApp updates",
 ].join("\n");
@@ -358,9 +358,19 @@ export async function handleWhatsAppInbound(params: {
         return;
     }
 
+    // No command matched. Treat a substantive free-text message as a new task —
+    // the "create task:" prefix is optional. Guarded so it doesn't hijack a
+    // reply mid-flow (e.g. a stray word at the workspace/confirm step), and the
+    // confirm step still protects against accidental tasks from chatter.
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+    if (!session.pendingAction && wordCount >= 2) {
+        await beginTaskCreation(user, normalized);
+        return;
+    }
+
     await sendWhatsAppMessage({
         to: user.phone,
-        body: "I did not catch that. Reply help to see what I can do.",
+        body: "I did not catch that. Reply help to see what I can do, or just type a task like: review the handbook by Friday.",
     });
 }
 
