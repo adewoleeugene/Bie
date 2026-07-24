@@ -108,6 +108,32 @@ function StatCell({ value, label, color }: { value: string | number; label: stri
     );
 }
 
+// Hero KPI tile — the headline numbers, one card each, in a responsive row.
+function KpiTile({
+    label,
+    value,
+    sub,
+    color,
+}: {
+    label: string;
+    value: string | number;
+    sub?: string;
+    color?: string;
+}) {
+    return (
+        <div className="bz-card p-4">
+            <div className="text-[12px] text-neutral-400">{label}</div>
+            <div
+                className="mono mt-2 text-[24px] font-semibold leading-none"
+                style={{ color: color ?? "#fff" }}
+            >
+                {value}
+            </div>
+            {sub && <div className="mt-2 text-[11px] text-neutral-500">{sub}</div>}
+        </div>
+    );
+}
+
 function SectionHeader({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
     return (
         <div className="mb-2 flex items-center justify-between px-1">
@@ -224,7 +250,7 @@ export function InsightsView() {
             : "All time";
 
     return (
-        <div className="mx-auto max-w-3xl space-y-6 p-10">
+        <div className="mx-auto max-w-6xl space-y-6 p-10">
             {/* ===== Header ===== */}
             <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
                 <div>
@@ -259,27 +285,39 @@ export function InsightsView() {
                 </div>
             </header>
 
-            {/* ===== Compact stat strip ===== */}
+            {/* ===== KPI hero row ===== */}
             {overview && (
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
-                    <StatCell value={overview.totalTasks} label="tasks" />
-                    <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell value={`${overview.completionRate}%`} label="done" />
-                    <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <KpiTile
+                        label="Completion"
+                        value={`${overview.completionRate}%`}
+                        sub={`${overview.completedTasks} / ${overview.totalTasks} tasks`}
+                        color="var(--bz-green)"
+                    />
+                    <KpiTile
+                        label="Overdue"
                         value={overview.overdueTasks}
-                        label="overdue"
+                        sub={overview.overdueTasks > 0 ? "needs attention" : "all on track"}
                         color={overview.overdueTasks > 0 ? "var(--bz-red)" : undefined}
                     />
-                    <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell value={formatCycle(overview.avgCompletionTime)} label="avg cycle" />
-                    <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell value={overview.activeSprints} label="sprints" />
-                    <span className="h-4 w-px bg-[color:var(--border)]" />
-                    <StatCell value={overview.teamMembers} label="people" />
+                    <KpiTile
+                        label="Avg cycle"
+                        value={formatCycle(overview.avgCompletionTime)}
+                        sub="create → done"
+                    />
+                    <KpiTile
+                        label="Focus streak"
+                        value={focusStats?.streak ?? 0}
+                        sub="day streak"
+                        color="var(--bz-pink)"
+                    />
+                    <KpiTile label="Sprints" value={overview.activeSprints} sub="active" />
+                    <KpiTile label="People" value={overview.teamMembers} sub="in workspace" />
                 </div>
             )}
 
+            {/* ===== Activity grid (time + focus) ===== */}
+            <div className="grid items-start gap-6 lg:grid-cols-2">
             {/* ===== Time tracked ===== */}
             <section>
                 <SectionHeader
@@ -332,51 +370,6 @@ export function InsightsView() {
                 </div>
             </section>
 
-            {/* ===== Estimate vs actual ===== */}
-            {estimateItems && estimateItems.length > 0 && (
-                <section>
-                    <SectionHeader>Estimate vs actual</SectionHeader>
-                    <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
-                        {estimateItems.map((item) => {
-                            const actualHours = item.actualMinutes / 60;
-                            // Variance is only meaningful once time has been logged.
-                            const variance =
-                                item.actualMinutes > 0 && item.estimatedHours > 0
-                                    ? ((actualHours - item.estimatedHours) / item.estimatedHours) * 100
-                                    : null;
-                            const varianceColor =
-                                variance === null ? "#858585"
-                                : variance > 10 ? "var(--bz-red)"
-                                : variance < -10 ? "var(--bz-green)"
-                                : "var(--bz-blue)";
-                            return (
-                                <div key={item.taskId} className="flex items-center gap-3 px-4 py-3">
-                                    <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-300">
-                                        {item.taskTitle}
-                                    </span>
-                                    <span className="mono text-[12px] text-neutral-500">
-                                        est {formatHoursShort(item.estimatedHours)}
-                                    </span>
-                                    <span className="mono text-[12px] text-white">
-                                        {formatHoursShort(actualHours)}
-                                    </span>
-                                    <span className="w-16 text-right">
-                                        {variance !== null ? (
-                                            <Chip color={varianceColor}>
-                                                {variance > 0 ? "+" : ""}
-                                                {variance.toFixed(0)}%
-                                            </Chip>
-                                        ) : (
-                                            <span className="text-[11px] text-neutral-600">—</span>
-                                        )}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
-            )}
-
             {/* ===== Focus ===== */}
             <section>
                 <SectionHeader>Focus</SectionHeader>
@@ -401,7 +394,10 @@ export function InsightsView() {
                     <FocusHistory />
                 </div>
             </section>
+            </div>
 
+            {/* ===== Charts grid (trend + status) ===== */}
+            <div className="grid items-start gap-6 lg:grid-cols-2">
             {/* ===== Completion trend ===== */}
             <section>
                 <SectionHeader>Completion trend</SectionHeader>
@@ -527,6 +523,52 @@ export function InsightsView() {
                     )}
                 </div>
             </section>
+            </div>
+
+            {/* ===== Estimate vs actual ===== */}
+            {estimateItems && estimateItems.length > 0 && (
+                <section>
+                    <SectionHeader>Estimate vs actual</SectionHeader>
+                    <div className="bz-card divide-y divide-[color:var(--border)] overflow-hidden p-0">
+                        {estimateItems.map((item) => {
+                            const actualHours = item.actualMinutes / 60;
+                            // Variance is only meaningful once time has been logged.
+                            const variance =
+                                item.actualMinutes > 0 && item.estimatedHours > 0
+                                    ? ((actualHours - item.estimatedHours) / item.estimatedHours) * 100
+                                    : null;
+                            const varianceColor =
+                                variance === null ? "#858585"
+                                : variance > 10 ? "var(--bz-red)"
+                                : variance < -10 ? "var(--bz-green)"
+                                : "var(--bz-blue)";
+                            return (
+                                <div key={item.taskId} className="flex items-center gap-3 px-4 py-3">
+                                    <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-300">
+                                        {item.taskTitle}
+                                    </span>
+                                    <span className="mono text-[12px] text-neutral-500">
+                                        est {formatHoursShort(item.estimatedHours)}
+                                    </span>
+                                    <span className="mono text-[12px] text-white">
+                                        {formatHoursShort(actualHours)}
+                                    </span>
+                                    <span className="w-16 text-right">
+                                        {variance !== null ? (
+                                            <Chip color={varianceColor}>
+                                                {variance > 0 ? "+" : ""}
+                                                {variance.toFixed(0)}%
+                                            </Chip>
+                                        ) : (
+                                            <span className="text-[11px] text-neutral-600">—</span>
+                                        )}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
 
             {/* ===== Projects (collapsible) ===== */}
             <CollapsibleSection title="Projects" count={projectProg?.length ?? 0}>
