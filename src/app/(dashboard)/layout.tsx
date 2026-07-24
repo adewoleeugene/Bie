@@ -63,6 +63,7 @@ export default async function DashboardLayout({
             <div className="flex flex-1 flex-col overflow-hidden">
                 <TopNav
                     user={{
+                        id: user.id,
                         name: user.name,
                         email: user.email,
                         image: user.image,
