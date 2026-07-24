@@ -32,6 +32,10 @@ export interface OrganizationPrivacyRequestItem extends PrivacyRequestListItem {
         email: string;
         image: string | null;
     };
+    /** True when the requester has left the workspace. The request still stands —
+     *  leaving doesn't discharge a data export/deletion obligation — this is just
+     *  context for the reviewing admin. */
+    isFormerMember: boolean;
 }
 
 async function getCurrentUserContext() {
@@ -158,6 +162,16 @@ export async function getOrganizationPrivacyRequests(): Promise<OrganizationPriv
             take: 50,
         });
 
+        // Who is still a member — so we can flag requests from people who left.
+        const currentMemberIds = new Set(
+            (
+                await db.organizationMember.findMany({
+                    where: { organizationId: primaryOrganizationId },
+                    select: { userId: true },
+                })
+            ).map((member) => member.userId),
+        );
+
         return requests.map((request) => ({
             id: request.id,
             kind: request.kind as PrivacyRequestKind,
@@ -171,6 +185,7 @@ export async function getOrganizationPrivacyRequests(): Promise<OrganizationPriv
                 email: request.user.email,
                 image: request.user.image,
             },
+            isFormerMember: !currentMemberIds.has(request.user.id),
         }));
     } catch (error) {
         console.error("Get organization privacy requests error:", error);
