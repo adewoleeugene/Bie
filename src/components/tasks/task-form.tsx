@@ -203,9 +203,12 @@ export function TaskForm({
 
     // Assigning a squad is a shortcut that adds all of its members as assignees.
     const assignSquad = (squad: { members?: { userId?: string; user?: { id?: string } }[] }) => {
+        const eligibleIds = new Set(assignableMembers.map((m) => m.id));
         const memberIds = (squad.members || [])
             .map((m) => m.userId || m.user?.id)
-            .filter((id): id is string => Boolean(id));
+            .filter((id): id is string => Boolean(id))
+            // Only add squad members eligible for the selected project.
+            .filter((id) => !watchedProjectId || eligibleIds.has(id));
         const current = form.getValues("assigneeIds") || [];
         form.setValue("assigneeIds", Array.from(new Set([...current, ...memberIds])));
     };
