@@ -1,6 +1,6 @@
 import { ActivityAction, FocusSessionType, NotificationType, OrgRole, Prisma, Project, Task, TaskPriority, TaskStatus } from "@prisma/client";
 import { db } from "@/lib/db";
-import { parseTaskInput } from "@/lib/ai/nlp";
+import { parseTaskSmart } from "@/lib/ai/cloudflare-nlp";
 import { projectAccessWhere, resolveProjectAccess, taskAccessWhere, canEdit } from "@/lib/permissions";
 import { sendNotifications } from "@/lib/notifications";
 import { greetingForTimezone, sendWhatsAppListMessage, sendWhatsAppMessage, WhatsAppListSection } from "@/lib/whatsapp";
@@ -804,7 +804,7 @@ async function chooseProjectForPendingTask(user: LoadedWhatsAppUser, projectId: 
     const pending = parsePendingAction(session.pendingAction);
     if (!pending || pending.type !== "CREATE_TASK" || !pending.organizationId) return;
 
-    const parsed = parseTaskInput(pending.text);
+    const parsed = await parseTaskSmart(pending.text, user.whatsappTimezone);
     const mentions = await resolveMentions(pending.organizationId, parsed.title);
     const nextPending: PendingCreateTask = {
         ...pending,
