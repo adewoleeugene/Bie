@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { OrgRole, ProjectRole } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,16 @@ const ROLE_CONFIG: Record<OrgRole, { label: string; color: string; icon: typeof 
     GUEST: { label: "Guest", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20", icon: User },
 };
 
+/** Which org roles a viewer is allowed to assign. Owners can set any role;
+ *  admins can only demote/promote within Member/Guest (the server enforces the
+ *  same rule — this keeps the menu from offering actions that would be rejected). */
+const ASSIGNABLE_ROLES: Record<"owner" | "admin", OrgRole[]> = {
+    owner: [OrgRole.OWNER, OrgRole.ADMIN, OrgRole.MEMBER, OrgRole.GUEST],
+    admin: [OrgRole.MEMBER, OrgRole.GUEST],
+};
+
 export function MemberManagement({ limit }: { limit?: number } = {}) {
+    const { data: session } = useSession();
     const { data: members = [], isLoading } = useMembers();
     const { data: projects = [] } = useProjects();
     const { data: invites } = useWorkspaceInvites();
@@ -119,6 +129,13 @@ export function MemberManagement({ limit }: { limit?: number } = {}) {
     const shareableLinks = invites?.links ?? [];
     const visibleMembers = limit ? members.slice(0, limit) : members;
     const hiddenCount = limit ? Math.max(0, members.length - limit) : 0;
+
+    // The current viewer, resolved from the member list. Only owners/admins can
+    // manage people, so the row action menu is hidden entirely for everyone else.
+    const currentUserId = session?.user?.id;
+    const viewerRole = members.find((m) => m.id === currentUserId)?.role as OrgRole | undefined;
+    const viewerIsAdmin = viewerRole === OrgRole.OWNER || viewerRole === OrgRole.ADMIN;
+    const assignableRoles = viewerRole === OrgRole.OWNER ? ASSIGNABLE_ROLES.owner : ASSIGNABLE_ROLES.admin;
 
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteScope, setInviteScope] = useState<string>(WORKSPACE_SCOPE);
@@ -445,6 +462,13 @@ export function MemberManagement({ limit }: { limit?: number } = {}) {
                         <div className="space-y-3">
                             {visibleMembers.map((member) => {
                                 const config = ROLE_CONFIG[member.role as OrgRole] ?? ROLE_CONFIG.MEMBER;
+                                // Show the action menu only when the viewer can actually act on
+                                // this row: an admin/owner, not looking at themselves, and not at
+                                // the owner (owners can't be removed or role-changed here).
+                                const isSelf = member.id === currentUserId;
+                                const isOwnerRow = member.role === OrgRole.OWNER;
+                                const canManageRow = viewerIsAdmin && !isSelf && !isOwnerRow;
+                                const roleOptions = assignableRoles.filter((role) => role !== member.role);
                                 const initials = member.name
                                     ?.split(" ")
                                     .map((n: string) => n[0])
@@ -500,46 +524,48 @@ export function MemberManagement({ limit }: { limit?: number } = {}) {
                                                 {config.label}
                                             </Badge>
 
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuSub>
-                                                        <DropdownMenuSubTrigger>
-                                                            <Shield className="mr-2 h-4 w-4" />
-                                                            Change role
-                                                        </DropdownMenuSubTrigger>
-                                                        <DropdownMenuSubContent>
-                                                            {(["OWNER", "ADMIN", "MEMBER", "GUEST"] as OrgRole[]).map((role) => (
-                                                                <DropdownMenuItem
-                                                                    key={role}
-                                                                    disabled={member.role === role}
-                                                                    onClick={() => handleRoleChange(member.id, role)}
-                                                                >
-                                                                    {ROLE_CONFIG[role].label}
-                                                                    {member.role === role && " (current)"}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuSubContent>
-                                                    </DropdownMenuSub>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        className="text-destructive focus:text-destructive"
-                                                        onClick={() =>
-                                                            setRemoveConfirm({
-                                                                id: member.id,
-                                                                name: member.name || member.email || "this member",
-                                                            })
-                                                        }
-                                                    >
-                                                        <UserMinus className="mr-2 h-4 w-4" />
-                                                        Remove member
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            {canManageRow && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        {roleOptions.length > 0 && (
+                                                            <DropdownMenuSub>
+                                                                <DropdownMenuSubTrigger>
+                                                                    <Shield className="mr-2 h-4 w-4" />
+                                                                    Change role
+                                                                </DropdownMenuSubTrigger>
+                                                                <DropdownMenuSubContent>
+                                                                    {roleOptions.map((role) => (
+                                                                        <DropdownMenuItem
+                                                                            key={role}
+                                                                            onClick={() => handleRoleChange(member.id, role)}
+                                                                        >
+                                                                            {ROLE_CONFIG[role].label}
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </DropdownMenuSubContent>
+                                                            </DropdownMenuSub>
+                                                        )}
+                                                        {roleOptions.length > 0 && <DropdownMenuSeparator />}
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onClick={() =>
+                                                                setRemoveConfirm({
+                                                                    id: member.id,
+                                                                    name: member.name || member.email || "this member",
+                                                                })
+                                                            }
+                                                        >
+                                                            <UserMinus className="mr-2 h-4 w-4" />
+                                                            Remove member
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
                                         </div>
                                     </div>
                                 );
