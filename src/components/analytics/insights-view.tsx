@@ -116,7 +116,7 @@ function KpiTile({
     color,
 }: {
     label: string;
-    value: string | number;
+    value: React.ReactNode;
     sub?: string;
     color?: string;
 }) {
@@ -262,19 +262,6 @@ export function InsightsView() {
                         Insights
                         <TrendingUp className="h-7 w-7" style={{ color: "var(--bz-peri)" }} />
                     </h1>
-                    {overview && (
-                        <p className="mt-3 text-[13px] text-neutral-400">
-                            {overview.completedTasks} of {overview.totalTasks} tasks done
-                            {overview.overdueTasks > 0 && (
-                                <>
-                                    {" · "}
-                                    <span style={{ color: "var(--bz-red)" }}>
-                                        {overview.overdueTasks} overdue
-                                    </span>
-                                </>
-                            )}
-                        </p>
-                    )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <DateRangePicker date={dateRange} setDate={setDateRange} />
@@ -307,7 +294,12 @@ export function InsightsView() {
                     />
                     <KpiTile
                         label="Focus streak"
-                        value={focusStats?.streak ?? 0}
+                        value={
+                            <span className="inline-flex items-center gap-1.5">
+                                <Flame className="h-5 w-5" />
+                                {focusStats?.streak ?? 0}
+                            </span>
+                        }
                         sub="day streak"
                         color="var(--bz-pink)"
                     />
@@ -375,21 +367,9 @@ export function InsightsView() {
                 <SectionHeader>Focus</SectionHeader>
                 <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-[color:var(--border)] px-4 py-3">
-                        <StatCell value={formatDuration(focusStats?.weekMinutes ?? 0)} label="week" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
                         <StatCell value={formatDuration(focusStats?.totalMinutes ?? 0)} label="all time" />
                         <span className="h-4 w-px bg-[color:var(--border)]" />
                         <StatCell value={focusStats?.totalSessions ?? 0} label="sessions" />
-                        <span className="h-4 w-px bg-[color:var(--border)]" />
-                        <div className="flex items-center gap-1.5">
-                            <Flame className="h-4 w-4" style={{ color: "var(--bz-pink)" }} />
-                            <span className="mono text-[20px] font-semibold leading-none text-white">
-                                {focusStats?.streak ?? 0}
-                            </span>
-                            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-neutral-500">
-                                day streak
-                            </span>
-                        </div>
                     </div>
                     <FocusHistory />
                 </div>
