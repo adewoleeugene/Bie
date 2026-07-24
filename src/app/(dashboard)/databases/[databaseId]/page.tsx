@@ -60,6 +60,7 @@ import {
 } from "@/actions/databases";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ResourceMemberRole, ResourceVisibility } from "@prisma/client";
+import { canEdit } from "@/lib/permissions";
 import { useViewerUserId } from "@/hooks/use-viewer";
 import { useRouter } from "next/navigation";
 import {
@@ -133,6 +134,10 @@ export default function DatabaseDetailPage({ params }: PageProps) {
     const activeView =
         database.views.find((v) => v.id === activeViewId) || database.views[0];
     const openRow = database.rows.find((r) => r.id === openRowId) || null;
+
+    // Sharing controls (visibility, members) only make sense for people who can
+    // edit — view-only viewers get no Share button, matching wiki/projects.
+    const canManageSharing = canEdit(database.accessLevel);
 
     // Apply this view's filters + sorts to the row list. Hidden columns are
     // applied per-view-component (passed via prop).
@@ -239,14 +244,16 @@ export default function DatabaseDetailPage({ params }: PageProps) {
                         )}
                     />
                 </button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShareOpen(true)}
-                >
-                    <Share2 className="mr-2 h-4 w-4" />
-                    Share
-                </Button>
+                {canManageSharing && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShareOpen(true)}
+                    >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
+                    </Button>
+                )}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
