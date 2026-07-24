@@ -81,6 +81,14 @@ export function PrivacyAdminPanel({ role }: { role?: OrgRole }) {
                                                     >
                                                         {request.status}
                                                     </Badge>
+                                                    {request.isFormerMember && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-neutral-500/30 text-muted-foreground"
+                                                        >
+                                                            Former member
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <p className="text-sm">{request.user.name}</p>
                                                 <p className="text-xs text-muted-foreground">{request.user.email}</p>
