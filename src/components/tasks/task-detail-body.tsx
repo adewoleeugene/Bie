@@ -279,11 +279,14 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
         updateTask.mutate({ id: task.id, assigneeIds: newAssignees });
     };
 
-    // Assigning a squad is a shortcut that adds all of its members as assignees.
+    // Assigning a squad is a shortcut that adds its members as assignees — but
+    // only the ones eligible for this task's project.
     const assignSquad = (squad: any) => {
+        const eligibleIds = new Set(assignableMembers.map((m) => m.id));
         const memberIds = (squad.members || [])
             .map((m: any) => m.userId || m.user?.id)
-            .filter(Boolean);
+            .filter(Boolean)
+            .filter((id: string) => !task.projectId || eligibleIds.has(id));
         const newAssignees = Array.from(new Set([...currentAssigneeIds, ...memberIds]));
         updateTask.mutate({ id: task.id, assigneeIds: newAssignees });
     };

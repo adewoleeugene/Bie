@@ -128,6 +128,34 @@ function assertUnfiledTaskAccess(viewer: Pick<TaskViewer, "role">, required: Acc
     if (viewer.role === "GUEST") throw new Error("Forbidden");
 }
 
+/**
+ * Restrict a task's assignee ids to people who can access its project (its
+ * members + lead). `keepIds` are grandfathered — anyone already on the task is
+ * never silently dropped by an unrelated edit. A project-less task imposes no
+ * restriction. This is the server-side guard behind the scoped assignee picker,
+ * and it also trims the "assign a squad" shortcut down to the project's people.
+ */
+async function eligibleAssigneeIds(
+    projectId: string | null | undefined,
+    organizationId: string,
+    assigneeIds: string[],
+    keepIds: string[] = [],
+): Promise<string[]> {
+    if (!projectId || assigneeIds.length === 0) return assigneeIds;
+
+    const project = await db.project.findFirst({
+        where: { id: projectId, organizationId },
+        select: { leadId: true, members: { select: { userId: true } } },
+    });
+    if (!project) return assigneeIds;
+
+    const eligible = new Set<string>(project.members.map((member) => member.userId));
+    if (project.leadId) eligible.add(project.leadId);
+    for (const id of keepIds) eligible.add(id);
+
+    return assigneeIds.filter((id) => eligible.has(id));
+}
+
 async function assertTaskAccess(
     taskId: string,
     viewer: TaskViewer,
@@ -264,6 +292,12 @@ export async function createTask(
         const viewer = await getUserOrganization();
         const { userId, organizationId } = viewer;
         await assertProjectScope(validated.projectId, viewer, "edit");
+        // Only assign people who can access the project (covers the squad shortcut too).
+        const assigneeIds = await eligibleAssigneeIds(
+            validated.projectId,
+            organizationId,
+            validated.assigneeIds,
+        );
         const statusColumn = await getColumnForTaskInput(validated, organizationId, validated.projectId);
         const taskStatus = statusColumn?.status ?? validated.status;
 
@@ -284,7 +318,7 @@ export async function createTask(
                 labels: validated.labels,
                 organizationId,
                 assignees: {
-                    create: validated.assigneeIds.map((userId) => ({
+                    create: assigneeIds.map((userId) => ({
                         userId,
                     })),
                 },
@@ -311,9 +345,9 @@ export async function createTask(
         });
 
         // Notify assigned users
-        if (validated.assigneeIds.length > 0) {
+        if (assigneeIds.length > 0) {
             sendNotifications({
-                recipientIds: validated.assigneeIds,
+                recipientIds: assigneeIds,
                 excludeUserId: userId,
                 organizationId,
                 type: NotificationType.ASSIGNED,
@@ -409,13 +443,28 @@ export async function updateTask(
             updateData.estimatedHours = validated.estimatedHours;
         if (validated.labels !== undefined) updateData.labels = validated.labels;
 
-        // Handle assignees separately
+        // Handle assignees separately — restricted to project-eligible people,
+        // grandfathering anyone already on the task so an unrelated edit never
+        // silently unassigns them.
+        let appliedAssigneeIds: string[] | undefined;
         if (validated.assigneeIds !== undefined) {
+            const nextProjectId =
+                validated.projectId !== undefined ? validated.projectId : existingTask.projectId;
+            const current = await db.taskAssignee.findMany({
+                where: { taskId: validated.id },
+                select: { userId: true },
+            });
+            appliedAssigneeIds = await eligibleAssigneeIds(
+                nextProjectId,
+                organizationId,
+                validated.assigneeIds,
+                current.map((assignee) => assignee.userId),
+            );
             await db.taskAssignee.deleteMany({
                 where: { taskId: validated.id },
             });
             await db.taskAssignee.createMany({
-                data: validated.assigneeIds.map((userId) => ({
+                data: appliedAssigneeIds.map((userId) => ({
                     taskId: validated.id,
                     userId,
                 })),
@@ -460,9 +509,9 @@ export async function updateTask(
         });
 
         // Notify newly assigned users
-        if (validated.assigneeIds !== undefined) {
+        if (appliedAssigneeIds !== undefined) {
             sendNotifications({
-                recipientIds: validated.assigneeIds,
+                recipientIds: appliedAssigneeIds,
                 excludeUserId: userId,
                 organizationId,
                 type: NotificationType.ASSIGNED,
