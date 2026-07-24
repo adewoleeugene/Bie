@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useUpdateTask, useDeleteTask, useCreateTask, useReorderTask } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
+import { useProjectAssignees } from "@/hooks/use-projects";
 import { useSquads } from "@/hooks/use-squads";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
@@ -190,8 +191,17 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
     const deleteTask = useDeleteTask();
     const createTask = useCreateTask();
     const reorderTask = useReorderTask();
-    const { data: members } = useMembers();
+    const { data: workspaceMembers } = useMembers();
     const { data: squads } = useSquads();
+    // Assignee choices scoped to the task's project; project-less tasks fall
+    // back to the whole workspace.
+    const { data: projectAssignees } = useProjectAssignees(task.projectId ?? undefined);
+    const assignableMembers: { id: string; name: string | null; email: string | null; image: string | null }[] =
+        task.projectId
+            ? projectAssignees?.success
+                ? projectAssignees.data
+                : []
+            : ((workspaceMembers ?? []) as { id: string; name: string | null; email: string | null; image: string | null }[]);
 
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -260,7 +270,7 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
 
     const currentAssigneeIds = task.assignees.map((a: any) => a.user.id);
     const selectedMembers =
-        members?.filter((m: any) => currentAssigneeIds.includes(m.id)) ?? [];
+        workspaceMembers?.filter((m: any) => currentAssigneeIds.includes(m.id)) ?? [];
 
     const toggleAssignee = (userId: string) => {
         const newAssignees = currentAssigneeIds.includes(userId)
@@ -445,7 +455,7 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
                                         </CommandGroup>
                                     )}
                                     <CommandGroup heading={squads && squads.length > 0 ? "People" : undefined}>
-                                        {members?.map((member: any) => {
+                                        {assignableMembers.map((member: any) => {
                                             const isSelected = currentAssigneeIds.includes(member.id);
                                             return (
                                                 <CommandItem

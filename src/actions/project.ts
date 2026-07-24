@@ -378,6 +378,47 @@ export async function listProjectSharing(projectId: string) {
     }
 }
 
+/**
+ * People eligible to be assigned on a project: its explicit members plus the
+ * lead. Any viewer of the project can load this — it powers the task assignee
+ * picker so tasks are only offered to people who can actually access the
+ * project, not the whole workspace.
+ */
+export async function getProjectAssignees(
+    projectId: string,
+): Promise<ActionResult<{ id: string; name: string | null; email: string | null; image: string | null }[]>> {
+    try {
+        const { userId, organizationId, role } = await getUserOrganization();
+        const project = await db.project.findFirst({
+            where: { id: projectId, organizationId },
+            include: {
+                lead: { select: { id: true, name: true, email: true, image: true } },
+                members: {
+                    include: { user: { select: { id: true, name: true, email: true, image: true } } },
+                    orderBy: { joinedAt: "asc" },
+                },
+            },
+        });
+        if (!project) return { success: false, error: "Project not found" };
+
+        const access = resolveProjectAccess(project, { userId, organizationId, orgRole: role });
+        if (access === "none") return { success: false, error: "Forbidden" };
+
+        // Dedupe by id — the lead is often also a member.
+        const byId = new Map<
+            string,
+            { id: string; name: string | null; email: string | null; image: string | null }
+        >();
+        for (const member of project.members) byId.set(member.user.id, member.user);
+        if (project.lead) byId.set(project.lead.id, project.lead);
+
+        return { success: true, data: Array.from(byId.values()) };
+    } catch (error) {
+        console.error("Get project assignees error:", error);
+        return { success: false, error: "Failed to load project assignees" };
+    }
+}
+
 export async function setProjectVisibility(
     projectId: string,
     visibility: ProjectVisibility,

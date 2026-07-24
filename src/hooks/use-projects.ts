@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     getProjects,
     getProject,
+    getProjectAssignees,
     createProject,
     updateProject,
     deleteProject,
@@ -28,6 +29,16 @@ export function useProject(id: string) {
         queryKey: ["project", id],
         queryFn: () => getProject(id),
         enabled: !!id,
+    });
+}
+
+// People eligible to be assigned on a project (its members + lead). Used to
+// scope the task assignee picker; disabled when there's no project.
+export function useProjectAssignees(projectId?: string) {
+    return useQuery({
+        queryKey: ["project-assignees", projectId],
+        queryFn: () => getProjectAssignees(projectId as string),
+        enabled: !!projectId,
     });
 }
 

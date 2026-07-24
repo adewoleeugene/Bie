@@ -8,7 +8,7 @@ import { createTaskSchema, CreateTaskInput } from "@/lib/validators/task";
 import { useCreateTask, useTaskStatusColumns } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
 import { useSquads } from "@/hooks/use-squads";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects, useProjectAssignees } from "@/hooks/use-projects";
 import { useSprints } from "@/hooks/use-sprints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,7 +100,7 @@ export function TaskForm({
     const [open, setOpen] = useState(false);
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
     const createTask = useCreateTask();
-    const { data: members } = useMembers();
+    const { data: workspaceMembers } = useMembers();
     const { data: squads } = useSquads();
     const { data: projects } = useProjects();
     const { data: statusColumnsResult } = useTaskStatusColumns(initialProjectId ?? null);
@@ -141,8 +141,20 @@ export function TaskForm({
         : allSprints;
     const hasNoProjectSprints = watchedProjectId && (!sprints || sprints.length === 0);
 
+    // Assignee choices are scoped to the selected project's members; only a
+    // project-less task offers the whole workspace.
+    const { data: projectAssignees } = useProjectAssignees(watchedProjectId ?? undefined);
+    const assignableMembers: { id: string; name: string | null; email: string | null; image: string | null }[] =
+        watchedProjectId
+            ? projectAssignees?.success
+                ? projectAssignees.data
+                : []
+            : (workspaceMembers ?? []).map((m) => ({ id: m.id, name: m.name, email: m.email, image: m.image }));
+
+    // Selected chips resolve from the full workspace so an already-assigned
+    // person still shows even if they aren't a project member.
     const selectedMembers =
-        members?.filter((member) => selectedAssigneeIds?.includes(member.id)) ?? [];
+        workspaceMembers?.filter((member) => selectedAssigneeIds?.includes(member.id)) ?? [];
 
     useEffect(() => {
         if (open) {
@@ -452,7 +464,7 @@ export function TaskForm({
                                                         </CommandGroup>
                                                     )}
                                                     <CommandGroup heading={squads && squads.length > 0 ? "People" : undefined}>
-                                                        {members?.map((member) => {
+                                                        {assignableMembers.map((member) => {
                                                             const isSelected = selectedAssigneeIds?.includes(member.id);
                                                             return (
                                                                 <CommandItem
