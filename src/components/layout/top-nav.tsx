@@ -13,15 +13,27 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { LogOut, User, Menu } from "lucide-react";
+import { useState } from "react";
+import { DoorOpen, LogOut, User, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Sidebar } from "@/components/layout/sidebar";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { leaveWorkspace } from "@/actions/workspace";
 
 interface TopNavProps {
     user: {
-        id: string;
         name?: string | null;
         email?: string | null;
         image?: string | null;
@@ -46,6 +58,29 @@ export function TopNav({
         .map((n) => n[0])
         .join("")
         .toUpperCase() || "U";
+
+    // You can only leave a real organization you're a full member of — never
+    // your personal workspace. Guest orgs surface via projects, not here.
+    const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId);
+    const canLeaveWorkspace = currentWorkspace?.type === "ORGANIZATION";
+
+    const [leaveOpen, setLeaveOpen] = useState(false);
+    const [leaving, setLeaving] = useState(false);
+
+    const handleLeaveWorkspace = async () => {
+        setLeaving(true);
+        const result = await leaveWorkspace();
+        setLeaving(false);
+
+        if (result.success) {
+            toast.success(`Left ${result.workspaceName ?? "the workspace"}`);
+            // Hard navigation so the server re-resolves the new active workspace.
+            window.location.href = "/dashboard";
+        } else {
+            setLeaveOpen(false);
+            toast.error(result.error || "Couldn't leave workspace");
+        }
+    };
 
     return (
         <div className="flex h-14 items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--background)]/70 px-5 backdrop-blur-xl">
@@ -98,11 +133,17 @@ export function TopNav({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                         <DropdownMenuItem asChild>
-                            <Link href={`/users/${user.id}`}>
+                            <Link href="/profile">
                                 <User className="mr-2 h-4 w-4" />
                                 Profile
                             </Link>
                         </DropdownMenuItem>
+                        {canLeaveWorkspace && (
+                            <DropdownMenuItem onSelect={() => setLeaveOpen(true)}>
+                                <DoorOpen className="mr-2 h-4 w-4" />
+                                Leave workspace
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                         <DropdownMenuItem
                             className="text-[color:var(--bz-red)] focus:text-[color:var(--bz-red)]"
@@ -114,6 +155,33 @@ export function TopNav({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
+            <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Leave {currentWorkspaceName ?? "this workspace"}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You&apos;ll lose access to its projects, tasks, and docs. An
+                            admin can invite you back later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={leaving}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                void handleLeaveWorkspace();
+                            }}
+                        >
+                            {leaving ? "Leaving…" : "Leave workspace"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
