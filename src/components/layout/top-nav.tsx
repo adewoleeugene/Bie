@@ -12,6 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 import { LogOut, User, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -20,6 +21,7 @@ import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 
 interface TopNavProps {
     user: {
+        id: string;
         name?: string | null;
         email?: string | null;
         image?: string | null;
@@ -95,9 +97,11 @@ export function TopNav({
                             My account
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-[color:var(--border)]" />
-                        <DropdownMenuItem>
-                            <User className="mr-2 h-4 w-4" />
-                            Profile
+                        <DropdownMenuItem asChild>
+                            <Link href={`/users/${user.id}`}>
+                                <User className="mr-2 h-4 w-4" />
+                                Profile
+                            </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                         <DropdownMenuItem

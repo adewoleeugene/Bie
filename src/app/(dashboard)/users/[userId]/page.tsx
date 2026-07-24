@@ -32,6 +32,10 @@ export default async function UserProfilePage({ params }: PageProps) {
     });
     if (!user) return notFound();
 
+    // Viewing your own profile unlocks the "Edit profile" shortcut into Settings,
+    // where name + avatar actually live.
+    const isOwnProfile = session.user.email === user.email;
+
     const { data: pages } = await getPagesMentioning("USER", userId);
 
     return (
@@ -47,6 +51,14 @@ export default async function UserProfilePage({ params }: PageProps) {
                     <h1 className="text-2xl font-semibold">{user.name || "Unnamed"}</h1>
                     <p className="text-sm text-neutral-500">{user.email}</p>
                 </div>
+                {isOwnProfile && (
+                    <Link
+                        href="/settings"
+                        className="ml-auto rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                    >
+                        Edit profile
+                    </Link>
+                )}
             </div>
 
             <section className="mt-10">
