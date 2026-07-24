@@ -150,7 +150,9 @@ export async function listDatabases() {
 
 export async function getDatabase(databaseId: string) {
     try {
-        await assertDatabaseAccess(databaseId, "view");
+        // Keep the viewer's access level so the client can gate the Share UI —
+        // only "manage"/"edit" should see visibility + member controls.
+        const { access } = await assertDatabaseAccess(databaseId, "view");
         const database = await db.wikiDatabase.findUnique({
             where: { id: databaseId },
             include: {
@@ -480,7 +482,7 @@ export async function getDatabase(databaseId: string) {
             }
         }
 
-        return database;
+        return { ...database, accessLevel: access };
     } catch (error) {
         console.error("getDatabase error:", error);
         return null;
