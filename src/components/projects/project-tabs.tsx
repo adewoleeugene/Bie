@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutGrid, Table, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectInviteDialog } from "@/components/projects/project-invite-dialog";
+import { useProject } from "@/hooks/use-projects";
 
 interface ProjectTabsProps {
     projectId: string;
@@ -12,6 +13,10 @@ interface ProjectTabsProps {
 
 export function ProjectTabs({ projectId }: ProjectTabsProps) {
     const pathname = usePathname();
+    // Only project managers can invite/change visibility/remove members — the
+    // server enforces the same, so hide the button entirely for everyone else.
+    const { data: project } = useProject(projectId);
+    const canManageProject = project?.accessLevel === "manage";
 
     const tabs = [
         { label: "Overview", icon: Info, href: `/projects/${projectId}`, active: pathname === `/projects/${projectId}` },
@@ -43,7 +48,7 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
                         );
                     })}
                 </div>
-                <ProjectInviteDialog projectId={projectId} />
+                {canManageProject && <ProjectInviteDialog projectId={projectId} />}
             </div>
         </div>
     );

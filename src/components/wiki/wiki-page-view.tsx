@@ -477,15 +477,8 @@ export function WikiPageView({
                         </span>
                     )}
 
-                    {(readOnly ? accessPeople.length >= 1 : accessPeople.length > 1) &&
-                        (readOnly ? (
-                            <div
-                                className="flex items-center -space-x-2 pr-1"
-                                title="Contributors"
-                            >
-                                {avatarEls}
-                            </div>
-                        ) : (
+                    {(canMutate ? accessPeople.length > 1 : accessPeople.length >= 1) &&
+                        (canMutate ? (
                             <button
                                 type="button"
                                 onClick={() => setShareOpen(true)}
@@ -494,6 +487,13 @@ export function WikiPageView({
                             >
                                 {avatarEls}
                             </button>
+                        ) : (
+                            <div
+                                className="flex items-center -space-x-2 pr-1"
+                                title="Contributors"
+                            >
+                                {avatarEls}
+                            </div>
                         ))}
 
                     {!readOnly && !canEdit && (
