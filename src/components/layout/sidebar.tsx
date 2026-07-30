@@ -155,11 +155,8 @@ export function Sidebar({ projects }: SidebarProps) {
                         <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[color:var(--bz-mint)] ring-2 ring-[color:var(--sidebar)]" />
                     </div>
                     {!collapsed && (
-                        <div className="leading-none">
-                            <div className="text-[15px] font-semibold tracking-tight text-white">Bie</div>
-                            <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-neutral-500">
-                                Christex Foundation
-                            </div>
+                        <div className="text-[15px] font-semibold leading-none tracking-tight text-white">
+                            Bie
                         </div>
                     )}
                 </Link>

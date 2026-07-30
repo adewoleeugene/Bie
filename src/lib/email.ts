@@ -65,7 +65,7 @@ export function buildNotificationEmail(params: {
         "",
         params.linkUrl ? `View: ${fullLink}` : "",
         "",
-        "— Bie by Christex Foundation",
+        "— Bie",
     ]
         .filter(Boolean)
         .join("\n");

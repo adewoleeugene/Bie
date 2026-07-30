@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     default: "Bie - Project Management",
     template: "%s | Bie",
   },
-  description: "Internal project management and productivity platform for Christex Foundation",
+  description: "Project management and productivity platform for modern teams",
 };
 
 export default function RootLayout({

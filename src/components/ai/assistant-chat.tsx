@@ -505,7 +505,7 @@ export function AssistantChat() {
                 .join("\n");
 
             const systemInstruction = [
-                "You are BieAI, the in-app assistant for Bie (a project management app by Christex Foundation).",
+                "You are BieAI, the in-app assistant for Bie, a project management app.",
                 "",
                 "You have ACTIONS available. To run an action, your ENTIRE reply must be a single JSON object on one line, no prose, no markdown:",
                 '  {"action":"create_task","title":"...","description":"...","priority":"P0|P1|P2|P3","dueDate":"YYYY-MM-DD","projectId":"<id or null>"}',
