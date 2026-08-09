@@ -7,10 +7,12 @@ import {
     createTaskSchema,
     updateTaskSchema,
     deleteTaskSchema,
+    duplicateTaskSchema,
     reorderTaskSchema,
     CreateTaskInput,
     UpdateTaskInput,
     DeleteTaskInput,
+    DuplicateTaskInput,
     ReorderTaskInput,
     BulkReorderTasksInput,
     bulkReorderTasksSchema,
@@ -605,6 +607,109 @@ export async function markTaskInProgressForFocus(
         return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to update task",
+        };
+    }
+}
+
+export async function duplicateTask(
+    input: DuplicateTaskInput
+): Promise<ActionResult<Task>> {
+    try {
+        const validated = duplicateTaskSchema.parse(input);
+        const viewer = await getUserOrganization();
+        const { userId, organizationId } = viewer;
+        const editable = await requireEditableTask(validated.id, viewer);
+        if (!editable.ok) {
+            return { success: false, error: editable.error };
+        }
+
+        const source = await db.task.findFirst({
+            where: { id: validated.id, organizationId },
+            include: {
+                assignees: { select: { userId: true } },
+                subtasks: {
+                    include: { assignees: { select: { userId: true } } },
+                },
+            },
+        });
+
+        if (!source) {
+            return { success: false, error: "Task not found" };
+        }
+
+        const copySubtask = (subtask: (typeof source.subtasks)[number]): Prisma.TaskUncheckedCreateWithoutParentTaskInput => ({
+            title: subtask.title,
+            description: subtask.description ?? undefined,
+            status: subtask.status,
+            statusColumnId: subtask.statusColumnId,
+            completedAt: subtask.status === "DONE" ? new Date() : null,
+            priority: subtask.priority,
+            projectId: subtask.projectId,
+            sprintId: subtask.sprintId,
+            dueDate: subtask.dueDate,
+            startDate: subtask.startDate,
+            estimatedHours: subtask.estimatedHours,
+            labels: subtask.labels,
+            sortOrder: subtask.sortOrder,
+            organizationId,
+            assignees: {
+                create: subtask.assignees.map(({ userId: assigneeId }) => ({ userId: assigneeId })),
+            },
+        });
+
+        const task = await db.task.create({
+            data: {
+                title: `${source.title} (copy)`,
+                description: source.description ?? undefined,
+                status: source.status,
+                statusColumnId: source.statusColumnId,
+                completedAt: source.status === "DONE" ? new Date() : null,
+                priority: source.priority,
+                projectId: source.projectId,
+                sprintId: source.sprintId,
+                parentTaskId: source.parentTaskId,
+                dueDate: source.dueDate,
+                startDate: source.startDate,
+                estimatedHours: source.estimatedHours,
+                labels: source.labels,
+                // Land right after the original in its column; ties resolve by createdAt.
+                sortOrder: source.sortOrder + 1,
+                organizationId,
+                assignees: {
+                    create: source.assignees.map(({ userId: assigneeId }) => ({ userId: assigneeId })),
+                },
+                subtasks: {
+                    create: source.subtasks.map(copySubtask),
+                },
+            },
+            include: {
+                assignees: {
+                    include: {
+                        user: true,
+                    },
+                },
+                project: true,
+                statusColumn: true,
+                parentTask: true,
+            },
+        });
+
+        await db.taskActivity.create({
+            data: {
+                taskId: task.id,
+                userId,
+                action: ActivityAction.EDITED,
+                metadata: { isCreation: true, duplicatedFromTaskId: source.id },
+            },
+        });
+
+        revalidatePath("/");
+        return { success: true, data: task };
+    } catch (error) {
+        console.error("Duplicate task error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to duplicate task",
         };
     }
 }

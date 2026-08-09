@@ -8,6 +8,7 @@ import {
     updateTask,
     markTaskInProgressForFocus,
     deleteTask,
+    duplicateTask,
     reorderTask,
     bulkReorderTasks,
     addTasksToSprint,
@@ -19,6 +20,7 @@ import {
     CreateTaskInput,
     UpdateTaskInput,
     DeleteTaskInput,
+    DuplicateTaskInput,
     ReorderTaskInput,
     BulkReorderTasksInput,
     CreateTaskStatusColumnInput,
@@ -217,6 +219,25 @@ export function useUpdateTask() {
                 queryClient.setQueryData(key, data);
             });
             toast.error("Failed to update task");
+        },
+    });
+}
+
+export function useDuplicateTask() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: DuplicateTaskInput) => duplicateTask(input),
+        onSuccess: (result) => {
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                toast.success("Task duplicated");
+            } else {
+                toast.error(result.error);
+            }
+        },
+        onError: () => {
+            toast.error("Failed to duplicate task");
         },
     });
 }

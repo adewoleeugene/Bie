@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useDeleteTask } from "@/hooks/use-tasks";
+import { useDeleteTask, useDuplicateTask } from "@/hooks/use-tasks";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
@@ -15,7 +15,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Maximize2 } from "lucide-react";
+import { Trash2, Maximize2, Copy } from "lucide-react";
 import { TaskWithRelations } from "@/types/task";
 import { TaskDetailBody } from "@/components/tasks/task-detail-body";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ interface TaskDetailSheetProps {
 export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetProps) {
     const router = useRouter();
     const deleteTask = useDeleteTask();
+    const duplicateTask = useDuplicateTask();
     const [selectedSubtask, setSelectedSubtask] = useState<TaskWithRelations | null>(null);
 
     if (!task) return null;
@@ -68,6 +69,16 @@ export function TaskDetailSheet({ task, open, onOpenChange }: TaskDetailSheetPro
                             >
                                 <Maximize2 className="h-3.5 w-3.5" />
                                 Open as page
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-neutral-400 hover:text-neutral-100"
+                                title="Duplicate task"
+                                disabled={duplicateTask.isPending}
+                                onClick={() => duplicateTask.mutate({ id: task.id })}
+                            >
+                                <Copy className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>

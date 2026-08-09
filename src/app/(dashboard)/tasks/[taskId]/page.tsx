@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useTask, useDeleteTask } from "@/hooks/use-tasks";
+import { useTask, useDeleteTask, useDuplicateTask } from "@/hooks/use-tasks";
 import { TaskDetailBody } from "@/components/tasks/task-detail-body";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +16,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Copy } from "lucide-react";
 import Link from "next/link";
 import type { TaskWithRelations } from "@/types/task";
 
@@ -26,6 +26,7 @@ export default function TaskPage() {
     const taskId = params.taskId as string;
     const { data: task, isLoading } = useTask(taskId);
     const deleteTask = useDeleteTask();
+    const duplicateTask = useDuplicateTask();
 
     if (isLoading) {
         return (
@@ -93,6 +94,28 @@ export default function TaskPage() {
                         </>
                     )}
                 </div>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-neutral-400 hover:text-neutral-100"
+                        title="Duplicate task"
+                        disabled={duplicateTask.isPending}
+                        onClick={() =>
+                            duplicateTask.mutate(
+                                { id: task.id },
+                                {
+                                    onSuccess: (result) => {
+                                        if (result.success && result.data) {
+                                            router.push(`/tasks/${result.data.id}`);
+                                        }
+                                    },
+                                },
+                            )
+                        }
+                    >
+                        <Copy className="h-4 w-4" />
+                    </Button>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button
@@ -118,6 +141,7 @@ export default function TaskPage() {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
