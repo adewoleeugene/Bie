@@ -48,6 +48,35 @@ function inlineToMd(content: unknown): string {
         .join("");
 }
 
+/** A single table cell is either a bare inline-content array (older BlockNote)
+ *  or an object `{ type: "tableCell", content: [...] }` (current). */
+function cellToMd(cell: unknown): string {
+    const inline = Array.isArray(cell)
+        ? cell
+        : (cell as { content?: unknown })?.content;
+    return inlineToMd(inline)
+        .replace(/\|/g, "\\|") // pipes would break the table grid
+        .replace(/\r?\n/g, "<br>"); // keep multi-line cells on one Markdown row
+}
+
+/** Serialize a BlockNote `tableContent` block to a GitHub-flavored Markdown table. */
+function tableToMd(content: unknown, indent: string): string {
+    const rows = (content as { rows?: { cells?: unknown[] }[] })?.rows;
+    if (!Array.isArray(rows) || rows.length === 0) return `${indent}[Table]`;
+
+    const cols = Math.max(...rows.map((r) => r.cells?.length ?? 0));
+    if (cols === 0) return `${indent}[Table]`;
+
+    const renderRow = (cells: unknown[] = []) => {
+        const out = Array.from({ length: cols }, (_, i) => cellToMd(cells[i] ?? ""));
+        return `${indent}| ${out.join(" | ")} |`;
+    };
+
+    const [header, ...body] = rows;
+    const separator = `${indent}| ${Array(cols).fill("---").join(" | ")} |`;
+    return [renderRow(header.cells), separator, ...body.map((r) => renderRow(r.cells))].join("\n");
+}
+
 function blockToMd(block: BNBlock, indent = ""): string {
     const type = block.type || "paragraph";
     const text = inlineToMd(block.content);
@@ -100,8 +129,7 @@ function blockToMd(block: BNBlock, indent = ""): string {
             break;
         }
         case "table": {
-            // BlockNote tables are complex — basic fallback
-            result = `${indent}[Table]`;
+            result = tableToMd(block.content, indent);
             break;
         }
         default:
