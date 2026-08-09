@@ -207,6 +207,9 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
     const [subtaskTitle, setSubtaskTitle] = useState("");
     const [isAddingSubtask, setIsAddingSubtask] = useState(false);
     const [assigneeOpen, setAssigneeOpen] = useState(false);
+    const [assigneeIds, setAssigneeIds] = useState<string[]>(
+        task.assignees.map((a: any) => a.user.id),
+    );
     const [description, setDescription] = useState(task.description);
     const debouncedDescription = useDebounce(description, 1000);
     const [isDescriptionDirty, setIsDescriptionDirty] = useState(false);
@@ -219,6 +222,12 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
         setDescription(task.description);
         setIsDescriptionDirty(false);
     }, [task.id, task.description]);
+
+    // Reset assignee selection to server truth when switching tasks. Keyed on
+    // task.id only so an in-flight refetch doesn't clobber rapid multi-select.
+    useEffect(() => {
+        setAssigneeIds(task.assignees.map((a: any) => a.user.id));
+    }, [task.id]);
 
     // Auto-save description
     useEffect(() => {
@@ -268,7 +277,7 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
-    const currentAssigneeIds = task.assignees.map((a: any) => a.user.id);
+    const currentAssigneeIds = assigneeIds;
     const selectedMembers =
         workspaceMembers?.filter((m: any) => currentAssigneeIds.includes(m.id)) ?? [];
 
@@ -276,6 +285,9 @@ export function TaskDetailBody({ task, onOpenSubtask }: TaskDetailBodyProps) {
         const newAssignees = currentAssigneeIds.includes(userId)
             ? currentAssigneeIds.filter((id: string) => id !== userId)
             : [...currentAssigneeIds, userId];
+        // Update local state immediately so consecutive toggles accumulate
+        // instead of each one recomputing from the not-yet-refetched task.
+        setAssigneeIds(newAssignees);
         updateTask.mutate({ id: task.id, assigneeIds: newAssignees });
     };
 
